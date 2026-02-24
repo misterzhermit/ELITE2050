@@ -3,7 +3,8 @@ import React, { useState, useMemo } from 'react';
 import { useGame } from '../store/GameContext';
 import { Player, Team } from '../types';
 import { PlayerCard } from './PlayerCard';
-import { UserMinus, Save, Shield, Activity, Users, Zap, AlertTriangle } from 'lucide-react';
+import { TeamLogo } from './TeamLogo';
+import { UserMinus, Save, Activity, Users, Zap, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface LineupBuilderProps {
@@ -140,8 +141,24 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({ team, allPlayers, 
         <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-xl p-4 flex items-center justify-between shadow-lg">
             <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
-                    <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
-                        <Shield size={18} className="text-emerald-400" />
+                    <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30 overflow-hidden">
+                        {team.logo ? (
+                          <TeamLogo 
+                            primaryColor={team.logo.primary}
+                            secondaryColor={team.logo.secondary}
+                            patternId={team.logo.patternId as any}
+                            symbolId={team.logo.symbolId}
+                            size={24}
+                          />
+                        ) : (
+                          <TeamLogo 
+                            primaryColor="#10b981"
+                            secondaryColor="#065f46"
+                            patternId="none"
+                            symbolId="Shield"
+                            size={18}
+                          />
+                        )}
                     </div>
                     <div>
                         <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Geral</div>

@@ -248,7 +248,15 @@ export const Dashboard: React.FC = () => {
                             size={44}
                           />
                         ) : (
-                          <Shield size={32} style={{ color: userTeam?.colors.primary || '#fff' }} />
+                          <div className="w-11 h-11 flex items-center justify-center">
+                            <TeamLogo 
+                              primaryColor={userTeam?.colors.primary || '#fff'}
+                              secondaryColor={userTeam?.colors.secondary || '#333'}
+                              patternId="none"
+                              symbolId="Shield"
+                              size={32}
+                            />
+                          </div>
                         )}
                         <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-black rounded-full border border-white/10 flex items-center justify-center z-10">
                            <span className="text-[8px] font-bold text-white">H</span>
@@ -276,7 +284,15 @@ export const Dashboard: React.FC = () => {
                             size={44}
                           />
                         ) : (
-                          <Shield size={32} style={{ color: nextMatchData.opponent?.colors.primary || '#fff' }} />
+                          <div className="w-11 h-11 flex items-center justify-center">
+                            <TeamLogo 
+                              primaryColor={nextMatchData.opponent?.colors.primary || '#fff'}
+                              secondaryColor={nextMatchData.opponent?.colors.secondary || '#333'}
+                              patternId="none"
+                              symbolId="Shield"
+                              size={32}
+                            />
+                          </div>
                         )}
                         <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-black rounded-full border border-white/10 flex items-center justify-center z-10">
                            <span className="text-[8px] font-bold text-white">A</span>
@@ -810,60 +826,76 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-4 py-4">
+            <div className="flex items-center justify-between gap-4 py-8 border-y border-white/5 my-4">
               {/* Home Team */}
-              <div className="flex flex-col items-center gap-4 flex-1">
-                <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center shadow-2xl group-hover:scale-105 transition-transform duration-700 relative overflow-hidden">
+              <div className="flex items-center gap-6 flex-1 justify-end group/home">
+                <div className="flex flex-col items-end text-right">
+                  <span className={`text-2xl font-black uppercase tracking-tight group-hover/home:text-cyan-300 transition-colors ${nextMatch.homeId === userTeam?.id ? 'text-cyan-400' : 'text-white'}`}>
+                    {nextMatch.home}
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em]">Mandante</span>
+                </div>
+                <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center shadow-2xl group-hover/home:scale-110 transition-transform duration-700 relative overflow-hidden group-hover/home:border-cyan-500/50">
                   {homeTeam?.logo ? (
                     <TeamLogo 
                       primaryColor={homeTeam.logo.primary}
                       secondaryColor={homeTeam.logo.secondary}
                       patternId={homeTeam.logo.patternId as any}
                       symbolId={homeTeam.logo.symbolId}
-                      size={80}
+                      size={64}
                     />
                   ) : (
-                    <Shield size={48} style={{ color: homeTeam?.colors.primary || '#fff' }} />
+                    <div className="w-20 h-20 flex items-center justify-center">
+                      <TeamLogo 
+                        primaryColor={homeTeam?.colors.primary || '#fff'}
+                        secondaryColor={homeTeam?.colors.secondary || '#333'}
+                        patternId="none"
+                        symbolId="Shield"
+                        size={48}
+                      />
+                    </div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none" />
-                </div>
-                <div className="flex flex-col items-center text-center">
-                  <span className={`text-lg font-black uppercase tracking-tight ${nextMatch.homeId === userTeam?.id ? 'text-cyan-400' : 'text-white'}`}>
-                    {nextMatch.home}
-                  </span>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Mandante</span>
                 </div>
               </div>
 
               {/* VS Section */}
-              <div className="flex flex-col items-center gap-2">
-                <div className="text-5xl font-black text-white/5 italic tracking-tighter select-none">VS</div>
-                <div className="px-6 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-full">
-                  <span className="text-[10px] font-black text-cyan-400 uppercase tracking-widest">AO VIVO EM BREVE</span>
+              <div className="flex flex-col items-center gap-3 shrink-0">
+                <div className="text-6xl font-black text-white/5 italic tracking-tighter select-none drop-shadow-[0_0_20px_rgba(255,255,255,0.05)]">VS</div>
+                <div className="px-4 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-full backdrop-blur-md">
+                  <span className="text-[9px] font-black text-cyan-400 uppercase tracking-[0.2em] animate-pulse">Live Soon</span>
                 </div>
               </div>
 
               {/* Away Team */}
-              <div className="flex flex-col items-center gap-4 flex-1">
-                <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center shadow-2xl group-hover:scale-105 transition-transform duration-700 relative overflow-hidden">
+              <div className="flex items-center gap-6 flex-1 group/away">
+                <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center shadow-2xl group-hover/away:scale-110 transition-transform duration-700 relative overflow-hidden group-hover/away:border-purple-500/50">
                   {awayTeam?.logo ? (
                     <TeamLogo 
                       primaryColor={awayTeam.logo.primary}
                       secondaryColor={awayTeam.logo.secondary}
                       patternId={awayTeam.logo.patternId as any}
                       symbolId={awayTeam.logo.symbolId}
-                      size={80}
+                      size={64}
                     />
                   ) : (
-                    <Shield size={48} style={{ color: awayTeam?.colors.primary || '#fff' }} />
+                    <div className="w-20 h-20 flex items-center justify-center">
+                      <TeamLogo 
+                        primaryColor={awayTeam?.colors.primary || '#fff'}
+                        secondaryColor={awayTeam?.colors.secondary || '#333'}
+                        patternId="none"
+                        symbolId="Shield"
+                        size={48}
+                      />
+                    </div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none" />
                 </div>
-                <div className="flex flex-col items-center text-center">
-                  <span className={`text-lg font-black uppercase tracking-tight ${nextMatch.awayId === userTeam?.id ? 'text-cyan-400' : 'text-white'}`}>
+                <div className="flex flex-col items-start text-left">
+                  <span className={`text-2xl font-black uppercase tracking-tight group-hover/away:text-purple-300 transition-colors ${nextMatch.awayId === userTeam?.id ? 'text-purple-400' : 'text-white'}`}>
                     {nextMatch.away}
                   </span>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Visitante</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em]">Visitante</span>
                 </div>
               </div>
             </div>
@@ -905,75 +937,91 @@ export const Dashboard: React.FC = () => {
               return (
                 <div 
                   key={match.id} 
-                  className="group relative bg-black/40 backdrop-blur-xl border border-white/5 rounded-2xl p-4 hover:bg-white/[0.02] hover:border-white/10 transition-all flex items-center justify-between gap-8 overflow-hidden"
+                  className="group relative bg-black/40 backdrop-blur-xl border border-white/5 rounded-2xl p-4 hover:bg-white/[0.05] hover:border-cyan-500/30 transition-all flex items-center justify-between gap-6 overflow-hidden shadow-lg"
                 >
                   {/* Status Indicator */}
-                  <div className={`absolute left-0 top-0 bottom-0 w-1 ${match.type === 'League' ? 'bg-emerald-500/50' : 'bg-fuchsia-500/50'}`} />
+                  <div className={`absolute left-0 top-0 bottom-0 w-1 ${match.type === 'League' ? 'bg-cyan-500/50' : 'bg-purple-500/50'}`} />
                   
-                  {/* Date & Time */}
-                  <div className="flex flex-col items-center justify-center min-w-[80px] py-2 border-r border-white/5 pr-8">
-                    <span className="text-sm font-black text-white tabular-nums tracking-tighter">{match.time}</span>
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">
-                      {new Date(match.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}
-                    </span>
+                  {/* Time & Competition */}
+                  <div className="flex flex-col items-center justify-center min-w-[100px] py-2 border-r border-white/5 pr-6">
+                    <span className="text-base font-black text-white tabular-nums tracking-tighter group-hover:text-cyan-400 transition-colors">{match.time}</span>
+                    <div className="px-2 py-0.5 bg-white/5 rounded-md border border-white/5 mt-1">
+                       <span className="text-[7px] font-black text-slate-500 uppercase tracking-[0.2em]">{match.type}</span>
+                    </div>
                   </div>
 
-                  {/* Match Info */}
-                  <div className="flex-1 flex items-center justify-center gap-12">
-                    {/* Home Team */}
-                    <div className="flex items-center gap-4 flex-1 justify-end">
-                      <span className={`text-xs font-black uppercase tracking-tight truncate text-right ${match.homeId === userTeam?.id ? 'text-cyan-400' : 'text-white'}`}>
+                  {/* Teams Row */}
+                  <div className="flex-1 flex items-center justify-between px-4">
+                    {/* Home */}
+                    <div className="flex items-center gap-4 flex-1 justify-end group/h">
+                      <span className={`text-sm font-black uppercase tracking-tight truncate text-right group-hover/h:text-cyan-300 transition-colors ${match.homeId === userTeam?.id ? 'text-cyan-400' : 'text-white'}`}>
                         {match.home}
                       </span>
-                      <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/5 flex items-center justify-center shrink-0 shadow-lg group-hover:scale-110 transition-transform duration-500 relative overflow-hidden">
+                      <div className="w-14 h-14 rounded-2xl bg-black/60 border border-white/10 flex items-center justify-center shrink-0 shadow-2xl group-hover/h:scale-110 transition-transform duration-500 relative overflow-hidden group-hover/h:border-cyan-500/30">
                         {hTeam?.logo ? (
                           <TeamLogo 
                             primaryColor={hTeam.logo.primary}
                             secondaryColor={hTeam.logo.secondary}
                             patternId={hTeam.logo.patternId as any}
                             symbolId={hTeam.logo.symbolId}
-                            size={36}
+                            size={40}
                           />
                         ) : (
-                          <Shield size={24} style={{ color: hTeam?.colors.primary || '#fff' }} />
+                          <div className="w-10 h-10 flex items-center justify-center">
+                            <TeamLogo 
+                              primaryColor={hTeam?.colors.primary || '#fff'}
+                              secondaryColor={hTeam?.colors.secondary || '#333'}
+                              patternId="none"
+                              symbolId="Shield"
+                              size={28}
+                            />
+                          </div>
                         )}
                       </div>
                     </div>
 
-                    {/* VS Center */}
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="text-[10px] font-black text-white/10 italic">VS</span>
-                      <div className="px-2 py-0.5 bg-white/5 rounded-md border border-white/5">
-                         <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">{match.type}</span>
-                      </div>
+                    {/* VS */}
+                    <div className="mx-8">
+                      <span className="text-xl font-black text-white/5 italic tracking-tighter">VS</span>
                     </div>
 
-                    {/* Away Team */}
-                    <div className="flex items-center gap-4 flex-1 justify-start">
-                      <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/5 flex items-center justify-center shrink-0 shadow-lg group-hover:scale-110 transition-transform duration-500 relative overflow-hidden">
+                    {/* Away */}
+                    <div className="flex items-center gap-4 flex-1 justify-start group/a">
+                      <div className="w-14 h-14 rounded-2xl bg-black/60 border border-white/10 flex items-center justify-center shrink-0 shadow-2xl group-hover/a:scale-110 transition-transform duration-500 relative overflow-hidden group-hover/a:border-purple-500/30">
                         {aTeam?.logo ? (
                           <TeamLogo 
                             primaryColor={aTeam.logo.primary}
                             secondaryColor={aTeam.logo.secondary}
                             patternId={aTeam.logo.patternId as any}
                             symbolId={aTeam.logo.symbolId}
-                            size={36}
+                            size={40}
                           />
                         ) : (
-                          <Shield size={24} style={{ color: aTeam?.colors.primary || '#fff' }} />
+                          <div className="w-10 h-10 flex items-center justify-center">
+                            <TeamLogo 
+                              primaryColor={aTeam?.colors.primary || '#fff'}
+                              secondaryColor={aTeam?.colors.secondary || '#333'}
+                              patternId="none"
+                              symbolId="Shield"
+                              size={28}
+                            />
+                          </div>
                         )}
                       </div>
-                      <span className={`text-xs font-black uppercase tracking-tight truncate ${match.awayId === userTeam?.id ? 'text-cyan-400' : 'text-white'}`}>
+                      <span className={`text-sm font-black uppercase tracking-tight truncate group-hover/a:text-purple-300 transition-colors ${match.awayId === userTeam?.id ? 'text-purple-400' : 'text-white'}`}>
                         {match.away}
                       </span>
                     </div>
                   </div>
 
-                  {/* Actions / Info */}
-                  <div className="flex flex-col items-end min-w-[100px] pl-8 border-l border-white/5">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Rodada {match.id.split('_')[1]}</span>
-                    <button className="mt-1 text-[8px] font-black text-cyan-400 hover:text-white transition-colors uppercase tracking-[0.2em] flex items-center gap-1 group/btn">
-                      DETALHES <ChevronRight size={10} className="group-hover/btn:translate-x-0.5 transition-transform" />
+                  {/* Round & Date */}
+                  <div className="flex flex-col items-end min-w-[120px] pl-6 border-l border-white/5">
+                    <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Rodada {match.id.split('_')[1]}</span>
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">
+                      {new Date(match.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}
+                    </span>
+                    <button className="mt-2 text-[8px] font-black text-cyan-400 hover:text-white transition-colors uppercase tracking-[0.2em] flex items-center gap-1 group/btn">
+                      PREPARAR <ChevronRight size={10} className="group-hover/btn:translate-x-0.5 transition-transform" />
                     </button>
                   </div>
                 </div>
@@ -1014,7 +1062,15 @@ export const Dashboard: React.FC = () => {
                     size={64}
                   />
                 ) : (
-                  <Shield size={40} style={{ color: team.colors.primary || '#fff' }} />
+                  <div className="w-16 h-16 flex items-center justify-center">
+                    <TeamLogo 
+                      primaryColor={team.colors.primary || '#fff'}
+                      secondaryColor={team.colors.secondary || '#333'}
+                      patternId="none"
+                      symbolId="Shield"
+                      size={40}
+                    />
+                  </div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none" />
               </div>
@@ -1218,7 +1274,21 @@ export const Dashboard: React.FC = () => {
                     notification.type === 'crisis' ? 'bg-red-500/20 text-red-400' :
                     'bg-cyan-500/20 text-cyan-400'
                   }`}>
-                    {notification.type === 'transfer' ? <Wallet size={24} /> :
+                    {notification.type === 'transfer' ? (
+                      notification.message.includes('assinou com o') ? (() => {
+                        const teamName = notification.message.split('assinou com o')[1].replace('!', '').trim();
+                        const team = Object.values(state.teams).find(t => t.name === teamName);
+                        return team?.logo ? (
+                          <TeamLogo 
+                            primaryColor={team.logo.primary}
+                            secondaryColor={team.logo.secondary}
+                            patternId={team.logo.patternId as any}
+                            symbolId={team.logo.symbolId}
+                            size={24}
+                          />
+                        ) : <Wallet size={24} />;
+                      })() : <Wallet size={24} />
+                    ) :
                      notification.type === 'match' ? (
                        notification.message.includes('vs') ? (() => {
                          const matchParts = notification.message.split('vs');
@@ -1232,8 +1302,28 @@ export const Dashboard: React.FC = () => {
                              symbolId={team.logo.symbolId}
                              size={24}
                            />
-                         ) : <Shield size={24} />;
-                       })() : <Shield size={24} />
+                         ) : (
+                           <div className="w-6 h-6 flex items-center justify-center">
+                             <TeamLogo 
+                               primaryColor="#334155"
+                               secondaryColor="#1e293b"
+                               patternId="none"
+                               symbolId="Shield"
+                               size={24}
+                             />
+                           </div>
+                         );
+                       })() : (
+                         <div className="w-6 h-6 flex items-center justify-center">
+                           <TeamLogo 
+                             primaryColor="#334155"
+                             secondaryColor="#1e293b"
+                             patternId="none"
+                             symbolId="Shield"
+                             size={24}
+                           />
+                         </div>
+                       )
                      ) :
                      notification.type === 'crisis' ? <AlertTriangle size={24} /> :
                      <Newspaper size={24} />}
@@ -1431,7 +1521,15 @@ export const Dashboard: React.FC = () => {
                                       size={18}
                                     />
                                   ) : (
-                                    <Shield size={12} className={row.team === (userTeam?.name || 'Seu Time') ? 'text-emerald-400' : 'text-slate-600'} />
+                                    <div className="w-3 h-3 flex items-center justify-center">
+                                      <TeamLogo 
+                                        primaryColor={row.team === (userTeam?.name || 'Seu Time') ? '#10b981' : '#334155'}
+                                        secondaryColor={row.team === (userTeam?.name || 'Seu Time') ? '#065f46' : '#1e293b'}
+                                        patternId="none"
+                                        symbolId="Shield"
+                                        size={12}
+                                      />
+                                    </div>
                                   )}
                                 </div>
                                 <span className="truncate max-w-[120px] sm:max-w-none">{row.team}</span>
@@ -1486,72 +1584,192 @@ export const Dashboard: React.FC = () => {
                     {/* Round 1 */}
                     <div className="space-y-2 min-w-[200px]">
                       <h4 className="text-xs font-bold text-fuchsia-400 uppercase tracking-widest mb-2 border-b border-fuchsia-500/30 pb-1">Oitavas</h4>
-                      {state.world.eliteCup.bracket.round1.map((match) => (
-                        <div key={match.id} className="bg-black/40 border border-fuchsia-500/20 rounded-xl p-2 text-xs">
-                          <div className={`flex justify-between ${match.homeScore > match.awayScore ? 'text-fuchsia-300 font-bold' : 'text-slate-400'}`}>
-                            <span>{state.teams[match.homeTeamId]?.name.substring(0, 10)}</span>
-                            <span>{match.played ? match.homeScore : '-'}</span>
+                      {state.world.eliteCup.bracket.round1.map((match) => {
+                        const hTeam = state.teams[match.homeTeamId];
+                        const aTeam = state.teams[match.awayTeamId];
+                        return (
+                          <div key={match.id} className="bg-black/40 border border-fuchsia-500/20 rounded-xl p-2 text-xs">
+                            <div className={`flex justify-between items-center mb-1 ${match.homeScore > match.awayScore ? 'text-fuchsia-300 font-bold' : 'text-slate-400'}`}>
+                              <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 shrink-0">
+                                  {hTeam?.logo && (
+                                    <TeamLogo 
+                                      primaryColor={hTeam.logo.primary}
+                                      secondaryColor={hTeam.logo.secondary}
+                                      patternId={hTeam.logo.patternId as any}
+                                      symbolId={hTeam.logo.symbolId}
+                                      size={16}
+                                    />
+                                  )}
+                                </div>
+                                <span className="truncate w-24">{hTeam?.name}</span>
+                              </div>
+                              <span>{match.played ? match.homeScore : '-'}</span>
+                            </div>
+                            <div className={`flex justify-between items-center ${match.awayScore > match.homeScore ? 'text-fuchsia-300 font-bold' : 'text-slate-400'}`}>
+                              <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 shrink-0">
+                                  {aTeam?.logo && (
+                                    <TeamLogo 
+                                      primaryColor={aTeam.logo.primary}
+                                      secondaryColor={aTeam.logo.secondary}
+                                      patternId={aTeam.logo.patternId as any}
+                                      symbolId={aTeam.logo.symbolId}
+                                      size={16}
+                                    />
+                                  )}
+                                </div>
+                                <span className="truncate w-24">{aTeam?.name}</span>
+                              </div>
+                              <span>{match.played ? match.awayScore : '-'}</span>
+                            </div>
                           </div>
-                          <div className={`flex justify-between ${match.awayScore > match.homeScore ? 'text-fuchsia-300 font-bold' : 'text-slate-400'}`}>
-                            <span>{state.teams[match.awayTeamId]?.name.substring(0, 10)}</span>
-                            <span>{match.played ? match.awayScore : '-'}</span>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                       {state.world.eliteCup.bracket.round1.length === 0 && <div className="text-slate-500 text-[10px] italic">A definir</div>}
                     </div>
 
                     {/* Quarters */}
                     <div className="space-y-2 min-w-[200px]">
                       <h4 className="text-xs font-bold text-fuchsia-400 uppercase tracking-widest mb-2 border-b border-fuchsia-500/30 pb-1">Quartas</h4>
-                      {state.world.eliteCup.bracket.quarters.map((match) => (
-                        <div key={match.id} className="bg-black/40 border border-fuchsia-500/20 rounded-xl p-2 text-xs">
-                           <div className={`flex justify-between ${match.homeScore > match.awayScore ? 'text-fuchsia-300 font-bold' : 'text-slate-400'}`}>
-                            <span>{state.teams[match.homeTeamId]?.name.substring(0, 10)}</span>
-                            <span>{match.played ? match.homeScore : '-'}</span>
+                      {state.world.eliteCup.bracket.quarters.map((match) => {
+                        const hTeam = state.teams[match.homeTeamId];
+                        const aTeam = state.teams[match.awayTeamId];
+                        return (
+                          <div key={match.id} className="bg-black/40 border border-fuchsia-500/20 rounded-xl p-2 text-xs">
+                             <div className={`flex justify-between items-center mb-1 ${match.homeScore > match.awayScore ? 'text-fuchsia-300 font-bold' : 'text-slate-400'}`}>
+                              <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 shrink-0">
+                                  {hTeam?.logo && (
+                                    <TeamLogo 
+                                      primaryColor={hTeam.logo.primary}
+                                      secondaryColor={hTeam.logo.secondary}
+                                      patternId={hTeam.logo.patternId as any}
+                                      symbolId={hTeam.logo.symbolId}
+                                      size={16}
+                                    />
+                                  )}
+                                </div>
+                                <span className="truncate w-24">{hTeam?.name}</span>
+                              </div>
+                              <span>{match.played ? match.homeScore : '-'}</span>
+                            </div>
+                            <div className={`flex justify-between items-center ${match.awayScore > match.homeScore ? 'text-fuchsia-300 font-bold' : 'text-slate-400'}`}>
+                              <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 shrink-0">
+                                  {aTeam?.logo && (
+                                    <TeamLogo 
+                                      primaryColor={aTeam.logo.primary}
+                                      secondaryColor={aTeam.logo.secondary}
+                                      patternId={aTeam.logo.patternId as any}
+                                      symbolId={aTeam.logo.symbolId}
+                                      size={16}
+                                    />
+                                  )}
+                                </div>
+                                <span className="truncate w-24">{aTeam?.name}</span>
+                              </div>
+                              <span>{match.played ? match.awayScore : '-'}</span>
+                            </div>
                           </div>
-                          <div className={`flex justify-between ${match.awayScore > match.homeScore ? 'text-fuchsia-300 font-bold' : 'text-slate-400'}`}>
-                            <span>{state.teams[match.awayTeamId]?.name.substring(0, 10)}</span>
-                            <span>{match.played ? match.awayScore : '-'}</span>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                       {state.world.eliteCup.bracket.quarters.length === 0 && <div className="text-slate-500 text-[10px] italic">A definir</div>}
                     </div>
 
                     {/* Semis */}
                     <div className="space-y-2 min-w-[200px]">
                       <h4 className="text-xs font-bold text-fuchsia-400 uppercase tracking-widest mb-2 border-b border-fuchsia-500/30 pb-1">Semifinal</h4>
-                      {state.world.eliteCup.bracket.semis.map((match) => (
-                        <div key={match.id} className="bg-black/40 border border-fuchsia-500/20 rounded-xl p-2 text-xs">
-                           <div className={`flex justify-between ${match.homeScore > match.awayScore ? 'text-fuchsia-300 font-bold' : 'text-slate-400'}`}>
-                            <span>{state.teams[match.homeTeamId]?.name.substring(0, 10)}</span>
-                            <span>{match.played ? match.homeScore : '-'}</span>
+                      {state.world.eliteCup.bracket.semis.map((match) => {
+                        const hTeam = state.teams[match.homeTeamId];
+                        const aTeam = state.teams[match.awayTeamId];
+                        return (
+                          <div key={match.id} className="bg-black/40 border border-fuchsia-500/20 rounded-xl p-2 text-xs">
+                             <div className={`flex justify-between items-center mb-1 ${match.homeScore > match.awayScore ? 'text-fuchsia-300 font-bold' : 'text-slate-400'}`}>
+                              <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 shrink-0">
+                                  {hTeam?.logo && (
+                                    <TeamLogo 
+                                      primaryColor={hTeam.logo.primary}
+                                      secondaryColor={hTeam.logo.secondary}
+                                      patternId={hTeam.logo.patternId as any}
+                                      symbolId={hTeam.logo.symbolId}
+                                      size={16}
+                                    />
+                                  )}
+                                </div>
+                                <span className="truncate w-24">{hTeam?.name}</span>
+                              </div>
+                              <span>{match.played ? match.homeScore : '-'}</span>
+                            </div>
+                            <div className={`flex justify-between items-center ${match.awayScore > match.homeScore ? 'text-fuchsia-300 font-bold' : 'text-slate-400'}`}>
+                              <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 shrink-0">
+                                  {aTeam?.logo && (
+                                    <TeamLogo 
+                                      primaryColor={aTeam.logo.primary}
+                                      secondaryColor={aTeam.logo.secondary}
+                                      patternId={aTeam.logo.patternId as any}
+                                      symbolId={aTeam.logo.symbolId}
+                                      size={16}
+                                    />
+                                  )}
+                                </div>
+                                <span className="truncate w-24">{aTeam?.name}</span>
+                              </div>
+                              <span>{match.played ? match.awayScore : '-'}</span>
+                            </div>
                           </div>
-                          <div className={`flex justify-between ${match.awayScore > match.homeScore ? 'text-fuchsia-300 font-bold' : 'text-slate-400'}`}>
-                            <span>{state.teams[match.awayTeamId]?.name.substring(0, 10)}</span>
-                            <span>{match.played ? match.awayScore : '-'}</span>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                       {state.world.eliteCup.bracket.semis.length === 0 && <div className="text-slate-500 text-[10px] italic">A definir</div>}
                     </div>
 
                     {/* Final */}
                     <div className="space-y-2 min-w-[200px]">
                       <h4 className="text-xs font-bold text-yellow-400 uppercase tracking-widest mb-2 border-b border-yellow-500/30 pb-1">Final</h4>
-                      {state.world.eliteCup.bracket.final ? (
-                        <div className="bg-gradient-to-br from-fuchsia-900/40 to-black border border-yellow-500/50 rounded-xl p-3 text-sm shadow-[0_0_15px_rgba(234,179,8,0.2)]">
-                           <div className={`flex justify-between mb-1 ${state.world.eliteCup.bracket.final.homeScore > state.world.eliteCup.bracket.final.awayScore ? 'text-yellow-400 font-bold' : 'text-white'}`}>
-                            <span>{state.teams[state.world.eliteCup.bracket.final.homeTeamId]?.name}</span>
-                            <span>{state.world.eliteCup.bracket.final.played ? state.world.eliteCup.bracket.final.homeScore : '-'}</span>
+                      {state.world.eliteCup.bracket.final ? (() => {
+                        const hTeam = state.teams[state.world.eliteCup.bracket.final.homeTeamId];
+                        const aTeam = state.teams[state.world.eliteCup.bracket.final.awayTeamId];
+                        return (
+                          <div className="bg-gradient-to-br from-fuchsia-900/40 to-black border border-yellow-500/50 rounded-xl p-3 text-sm shadow-[0_0_15px_rgba(234,179,8,0.2)]">
+                             <div className={`flex justify-between items-center mb-2 ${state.world.eliteCup.bracket.final.homeScore > state.world.eliteCup.bracket.final.awayScore ? 'text-yellow-400 font-bold' : 'text-white'}`}>
+                              <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 shrink-0">
+                                  {hTeam?.logo && (
+                                    <TeamLogo 
+                                      primaryColor={hTeam.logo.primary}
+                                      secondaryColor={hTeam.logo.secondary}
+                                      patternId={hTeam.logo.patternId as any}
+                                      symbolId={hTeam.logo.symbolId}
+                                      size={20}
+                                    />
+                                  )}
+                                </div>
+                                <span className="truncate w-28">{hTeam?.name}</span>
+                              </div>
+                              <span>{state.world.eliteCup.bracket.final.played ? state.world.eliteCup.bracket.final.homeScore : '-'}</span>
+                            </div>
+                            <div className={`flex justify-between items-center ${state.world.eliteCup.bracket.final.awayScore > state.world.eliteCup.bracket.final.homeScore ? 'text-yellow-400 font-bold' : 'text-white'}`}>
+                              <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 shrink-0">
+                                  {aTeam?.logo && (
+                                    <TeamLogo 
+                                      primaryColor={aTeam.logo.primary}
+                                      secondaryColor={aTeam.logo.secondary}
+                                      patternId={aTeam.logo.patternId as any}
+                                      symbolId={aTeam.logo.symbolId}
+                                      size={20}
+                                    />
+                                  )}
+                                </div>
+                                <span className="truncate w-28">{aTeam?.name}</span>
+                              </div>
+                              <span>{state.world.eliteCup.bracket.final.played ? state.world.eliteCup.bracket.final.awayScore : '-'}</span>
+                            </div>
                           </div>
-                          <div className={`flex justify-between ${state.world.eliteCup.bracket.final.awayScore > state.world.eliteCup.bracket.final.homeScore ? 'text-yellow-400 font-bold' : 'text-white'}`}>
-                            <span>{state.teams[state.world.eliteCup.bracket.final.awayTeamId]?.name}</span>
-                            <span>{state.world.eliteCup.bracket.final.played ? state.world.eliteCup.bracket.final.awayScore : '-'}</span>
-                          </div>
-                        </div>
-                      ) : (
+                        );
+                      })() : (
                         <div className="text-slate-500 text-[10px] italic">A definir</div>
                       )}
                     </div>
@@ -1593,7 +1811,19 @@ export const Dashboard: React.FC = () => {
                               <tr key={row.teamId} className="hover:bg-cyan-500/5 transition-colors">
                                 <td className="px-6 py-4 font-mono text-cyan-500/50">#{index + 1}</td>
                                 <td className="px-6 py-4 font-bold text-white flex items-center gap-3">
-                                  <Globe size={16} className="text-cyan-600" />
+                                  <div className="w-5 h-5 shrink-0">
+                                    {team?.logo ? (
+                                      <TeamLogo 
+                                        primaryColor={team.logo.primary}
+                                        secondaryColor={team.logo.secondary}
+                                        patternId={team.logo.patternId as any}
+                                        symbolId={team.logo.symbolId}
+                                        size={18}
+                                      />
+                                    ) : (
+                                      <Globe size={16} className="text-cyan-600" />
+                                    )}
+                                  </div>
                                   {team?.name || row.teamId}
                                 </td>
                                 <td className="px-4 py-4 text-center text-slate-400">{row.played}</td>
@@ -1723,8 +1953,8 @@ export const Dashboard: React.FC = () => {
                   <div className="space-y-1">
                      <div className="flex justify-between items-center">
                         <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                           <Shield size={10} /> Rating Min
-                        </label>
+                     <TeamLogo primaryColor="#22d3ee" secondaryColor="#0891b2" patternId="none" symbolId="Shield" size={10} /> Rating Min
+                  </label>
                         <span className="text-[9px] font-mono text-cyan-400 font-bold">{marketPointsMin}</span>
                      </div>
                      <input 
@@ -1887,8 +2117,26 @@ export const Dashboard: React.FC = () => {
                 >
                   <div className="flex items-center gap-4">
                     <div className="font-mono text-purple-500/50 font-bold text-lg w-8">#{index + 1}</div>
-                    <div className="w-12 h-12 bg-purple-950/40 rounded-lg flex items-center justify-center border border-purple-400/50 group-hover:bg-purple-900/50 transition-colors">
-                      <Shield size={20} className="text-purple-400" />
+                    <div className="w-12 h-12 bg-purple-950/40 rounded-lg flex items-center justify-center border border-purple-400/50 group-hover:bg-purple-900/50 transition-colors overflow-hidden">
+                      {team.logo ? (
+                        <TeamLogo 
+                          primaryColor={team.logo.primary}
+                          secondaryColor={team.logo.secondary}
+                          patternId={team.logo.patternId as any}
+                          symbolId={team.logo.symbolId}
+                          size={28}
+                        />
+                      ) : (
+                        <div className="w-8 h-8 flex items-center justify-center">
+                          <TeamLogo 
+                            primaryColor="#a855f7"
+                            secondaryColor="#7e22ce"
+                            patternId="none"
+                            symbolId="Shield"
+                            size={20}
+                          />
+                        </div>
+                      )}
                     </div>
                     <div>
                       <h3 className="text-base font-black text-white drop-shadow-md group-hover:text-purple-300 transition-colors">{team.name}</h3>
@@ -2000,8 +2248,26 @@ export const Dashboard: React.FC = () => {
             className="bg-gradient-to-r from-cyan-900/40 to-blue-900/40 backdrop-blur-md border border-cyan-500/30 rounded-xl p-3 flex items-center justify-between group hover:border-cyan-400 cursor-pointer transition-all shadow-lg"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-cyan-500/10 border border-cyan-500/30 rounded-lg flex items-center justify-center">
-                <Shield size={20} className="text-cyan-400" />
+              <div className="w-10 h-10 bg-cyan-500/10 border border-cyan-500/30 rounded-lg flex items-center justify-center overflow-hidden">
+                {userTeam.logo ? (
+                  <TeamLogo 
+                    primaryColor={userTeam.logo.primary}
+                    secondaryColor={userTeam.logo.secondary}
+                    patternId={userTeam.logo.patternId as any}
+                    symbolId={userTeam.logo.symbolId}
+                    size={24}
+                  />
+                ) : (
+                  <div className="w-6 h-6 flex items-center justify-center">
+                    <TeamLogo 
+                      primaryColor="#22d3ee"
+                      secondaryColor="#0891b2"
+                      patternId="none"
+                      symbolId="Shield"
+                      size={20}
+                    />
+                  </div>
+                )}
               </div>
               <div>
                 <span className="text-[8px] text-cyan-400 font-black uppercase tracking-widest">Contrato Ativo</span>
@@ -2302,7 +2568,29 @@ export const Dashboard: React.FC = () => {
                   isActive ? 'text-cyan-400 bg-cyan-900/30 border border-cyan-500/50 shadow-[inset_0_0_15px_rgba(34,211,238,0.2)]' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
                 }`}
               >
-                <Icon className={`w-5 h-5 mb-1 transition-transform duration-300 ${isActive ? 'scale-110 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]' : ''}`} />
+                {item.id === 'team' ? (
+                  <div className={`mb-1 transition-transform duration-300 ${isActive ? 'scale-110 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]' : ''}`}>
+                    {userTeam?.logo ? (
+                      <TeamLogo 
+                        primaryColor={userTeam.logo.primary}
+                        secondaryColor={userTeam.logo.secondary}
+                        patternId={userTeam.logo.patternId as any}
+                        symbolId={userTeam.logo.symbolId}
+                        size={20}
+                      />
+                    ) : (
+                      <TeamLogo 
+                        primaryColor={isActive ? "#22d3ee" : "#475569"}
+                        secondaryColor={isActive ? "#0891b2" : "#334155"}
+                        patternId="none"
+                        symbolId="Shield"
+                        size={20}
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <Icon className={`w-5 h-5 mb-1 transition-transform duration-300 ${isActive ? 'scale-110 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]' : ''}`} />
+                )}
                 <span className={`text-[9px] font-bold tracking-wider uppercase transition-all duration-300 ${isActive ? 'opacity-100' : 'opacity-70'}`}>
                   {item.label}
                 </span>
@@ -2344,8 +2632,26 @@ export const Dashboard: React.FC = () => {
               {userTeam ? (
                 <>
                   <div className="flex flex-col items-center text-center space-y-3 py-2">
-                    <div className="w-16 h-16 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-500/10">
-                      <Shield size={32} className="text-cyan-400" />
+                    <div className="w-16 h-16 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-500/10 overflow-hidden">
+                      {userTeam.logo ? (
+                        <TeamLogo 
+                          primaryColor={userTeam.logo.primary}
+                          secondaryColor={userTeam.logo.secondary}
+                          patternId={userTeam.logo.patternId as any}
+                          symbolId={userTeam.logo.symbolId}
+                          size={48}
+                        />
+                      ) : (
+                        <div className="w-12 h-12 flex items-center justify-center">
+                          <TeamLogo 
+                            primaryColor="#22d3ee"
+                            secondaryColor="#0891b2"
+                            patternId="none"
+                            symbolId="Shield"
+                            size={32}
+                          />
+                        </div>
+                      )}
                     </div>
                     <div>
                       <h4 className="text-lg font-black text-white uppercase tracking-tight leading-none">{userTeam.name}</h4>

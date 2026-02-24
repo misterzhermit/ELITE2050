@@ -1,6 +1,6 @@
 import React from 'react';
 import { Player, District } from '../types';
-import { X, Shield, TrendingUp, Zap, Lock, Activity } from 'lucide-react';
+import { X, TrendingUp, Zap, Lock, Activity } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useGame } from '../store/GameContext';
 import { calculateTeamPower } from '../engine/gameLogic';
@@ -171,7 +171,27 @@ export const PlayerModal: React.FC<PlayerModalProps> = ({ player, onClose }) => 
              
              <div className="flex-1 mb-1">
                <div className="flex items-center gap-2 mb-1">
-                 <Shield size={14} className={theme.main} />
+                 {player.contract.teamId && state.teams[player.contract.teamId]?.logo ? (
+                   <div className="w-4 h-4 overflow-hidden flex items-center justify-center">
+                     <TeamLogo 
+                       primaryColor={state.teams[player.contract.teamId].logo!.primary}
+                       secondaryColor={state.teams[player.contract.teamId].logo!.secondary}
+                       patternId={state.teams[player.contract.teamId].logo!.patternId as any}
+                       symbolId={state.teams[player.contract.teamId].logo!.symbolId}
+                       size={14}
+                     />
+                   </div>
+                 ) : (
+                   <div className="w-4 h-4 overflow-hidden flex items-center justify-center">
+                     <TeamLogo 
+                       primaryColor={theme.main.includes('cyan') ? '#22d3ee' : theme.main.includes('orange') ? '#f97316' : theme.main.includes('emerald') ? '#10b981' : '#a855f7'}
+                       secondaryColor={theme.main.includes('cyan') ? '#0891b2' : theme.main.includes('orange') ? '#c2410c' : theme.main.includes('emerald') ? '#059669' : '#7e22ce'}
+                       patternId="none"
+                       symbolId="Shield"
+                       size={14}
+                     />
+                   </div>
+                 )}
                  <span className={`text-[10px] font-semibold tracking-[0.2em] uppercase ${theme.main}`}>{player.district} CLAN</span>
                </div>
                <h2 className="text-2xl font-semibold text-white leading-none uppercase tracking-tight drop-shadow-lg">{player.nickname}</h2>
