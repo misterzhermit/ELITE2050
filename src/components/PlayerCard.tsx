@@ -1,6 +1,6 @@
 import React from 'react';
 import { Player, TeamLogoMetadata } from '../types';
-import { Star, Shield, Zap, Trophy } from 'lucide-react';
+import { Star, Zap, Trophy } from 'lucide-react';
 import { motion } from 'motion/react';
 import { TeamLogo } from './TeamLogo';
 
@@ -228,7 +228,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({ player, onClick, variant
         </div>
         <div className="flex flex-col gap-1">
           <div className="bg-black/40 backdrop-blur-sm rounded-lg px-1 py-0.5 flex items-center gap-1 text-[6px] sm:text-[7px] uppercase font-bold text-white/90 truncate">
-            <Shield size={8} /> {player.position}
+            <TeamLogo primaryColor="#fff" secondaryColor="#ccc" patternId="none" symbolId="Shield" size={8} /> {player.position}
           </div>
           <div className={`bg-black/40 backdrop-blur-sm rounded-lg px-1 py-0.5 flex items-center gap-1 text-[6px] sm:text-[7px] uppercase font-bold truncate ${player.totalRating < 500 ? 'text-red-400 drop-shadow-[0_0_5px_rgba(239,68,68,0.8)]' : 'text-emerald-400 drop-shadow-[0_0_5px_rgba(16,185,129,0.8)]'}`}>
             <Zap size={8} /> {player.totalRating}

@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  Shield, 
   Briefcase, 
   Globe, 
   ChevronRight, 
@@ -17,6 +16,7 @@ import {
   Layout
 } from 'lucide-react';
 import { useGame } from '../store/GameContext';
+import { TeamLogo } from './TeamLogo';
 import { Player, Team, PlayerRole, District, LeagueColor } from '../types';
 import { PlayerCard } from './PlayerCard';
 
@@ -520,7 +520,25 @@ export const NewGameFlow: React.FC = () => {
                           <div className={`w-12 h-12 xl:w-16 xl:h-16 rounded-2xl flex items-center justify-center border transition-all duration-500 ${
                             isSelected ? 'border-cyan-400 bg-black/40 shadow-lg shadow-cyan-500/20' : 'border-white/10 bg-black/20 group-hover:border-white/30'
                           }`} style={{ backgroundColor: isSelected ? undefined : team.colors.primary + '15' }}>
-                            <Shield size={isSelected ? 32 : 28} style={{ color: isSelected ? '#22d3ee' : team.colors.primary }} className="transition-transform duration-500 group-hover:scale-110" />
+                          <div className="flex items-center justify-center transition-transform duration-500 group-hover:scale-110">
+                            {team.logo ? (
+                              <TeamLogo 
+                                primaryColor={team.logo.primary}
+                                secondaryColor={team.logo.secondary}
+                                patternId={team.logo.patternId as any}
+                                symbolId={team.logo.symbolId}
+                                size={isSelected ? 44 : 40}
+                              />
+                            ) : (
+                              <TeamLogo 
+                                primaryColor={isSelected ? '#22d3ee' : team.colors.primary}
+                                secondaryColor={team.colors.secondary}
+                                patternId="none"
+                                symbolId="Shield"
+                                size={isSelected ? 32 : 28}
+                              />
+                            )}
+                          </div>
                           </div>
                           {isSelected && (
                             <div className="absolute -top-2 -right-2 w-6 h-6 bg-cyan-500 rounded-full flex items-center justify-center border-2 border-[#02040a] shadow-lg animate-bounce">
@@ -854,7 +872,14 @@ export const NewGameFlow: React.FC = () => {
               >
                 <div className="absolute inset-0 bg-black/40" />
                 <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.4)_0%,transparent_70%)]" />
-                <Shield size={110} style={{ color: founderData.primaryColor }} className="relative z-10 drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] xl:size-[130px] transition-transform duration-700 group-hover/crest:scale-110" />
+                <TeamLogo 
+                  primaryColor={founderData.primaryColor}
+                  secondaryColor={founderData.secondaryColor}
+                  patternId="none"
+                  symbolId="Shield"
+                  size={110}
+                  className="relative z-10 drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] xl:size-[130px] transition-transform duration-700 group-hover/crest:scale-110"
+                />
               </div>
               
               {/* Decorative Tech Rings */}

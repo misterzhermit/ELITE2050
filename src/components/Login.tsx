@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Shield, Lock, User, ChevronRight, Zap, Globe, Cpu } from 'lucide-react';
+import { Lock, User, ChevronRight, Zap, Globe, Cpu } from 'lucide-react';
+import { TeamLogo } from './TeamLogo';
 
 interface LoginProps {
   onLogin: () => void;
@@ -48,7 +49,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             transition={{ type: 'spring', stiffness: 200, damping: 15 }}
             className="w-20 h-20 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(34,211,238,0.4)] border border-white/20 mb-6"
           >
-            <Shield size={40} className="text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
+            <TeamLogo primaryColor="#fff" secondaryColor="#ccc" patternId="none" symbolId="Shield" size={40} className="drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
           </motion.div>
           <h1 className="text-5xl font-black text-white tracking-tighter uppercase italic flex flex-col items-center">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-cyan-400">Elite</span>

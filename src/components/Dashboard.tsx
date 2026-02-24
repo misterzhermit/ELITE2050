@@ -5,7 +5,7 @@ import { PlayerModal } from './PlayerModal';
 import { LineupBuilder } from './LineupBuilder';
 import { calculateTeamPower, applySafetyNet } from '../engine/gameLogic';
 import { 
-  Home, Shield, Trophy, ShoppingCart, Database, User, 
+  Home, Trophy, ShoppingCart, Database, User, 
   Clock, Newspaper, Wallet, TrendingUp, AlertCircle, Award,
   Calendar, Users, Activity, Sliders, Flame, Target, Zap,
   Globe, MessageSquare, AlertTriangle, TrendingDown, Briefcase, Star, Search, Crown, ChevronRight
@@ -1891,105 +1891,123 @@ export const Dashboard: React.FC = () => {
         })()}
 
         {activeWorldTab === 'market' && (
-          <div className="space-y-4 animate-in fade-in duration-500">
-             {/* Market Filters - Serious Style */}
-             <div className="bg-black/60 backdrop-blur-md border border-white/10 rounded-xl p-3 shadow-lg">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {/* Search */}
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                       <Search size={10} /> Buscar Nome
-                    </label>
-                    <div className="relative">
-                      <input 
-                          type="text" 
-                          value={marketSearch}
-                          onChange={(e) => setMarketSearch(e.target.value)}
-                          placeholder="NOME..."
-                          className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white font-mono focus:border-cyan-500/50 focus:outline-none transition-colors placeholder:text-slate-600 uppercase"
-                        />
-                      </div>
-                    </div>
+          <div className="space-y-6 animate-in fade-in duration-500">
+             {/* Market Filters - Neon Style */}
+             <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 via-fuchsia-500/20 to-cyan-500/20 blur-xl opacity-50 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="relative bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-2xl overflow-hidden">
+                   {/* Decorative background element */}
+                   <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 blur-[60px] rounded-full -mr-16 -mt-16" />
+                   
+                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 relative z-10">
+                     {/* Search */}
+                     <div className="space-y-2">
+                       <label className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                          <Search size={12} className="drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]" /> Buscar Nome
+                       </label>
+                       <div className="relative group/input">
+                         <div className="absolute inset-0 bg-cyan-500/5 rounded-lg group-focus-within/input:bg-cyan-500/10 transition-colors" />
+                         <input 
+                             type="text" 
+                             value={marketSearch}
+                             onChange={(e) => setMarketSearch(e.target.value)}
+                             placeholder="NOME DO ATLETA..."
+                             className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs text-white font-bold focus:border-cyan-500/50 focus:outline-none transition-all placeholder:text-slate-700 uppercase tracking-widest relative z-10 shadow-inner"
+                           />
+                         </div>
+                       </div>
 
-                    {/* District Filter */}
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                         <Globe size={10} /> Distrito
-                      </label>
-                      <select 
-                        value={marketDistrict}
-                        onChange={(e) => setMarketDistrict(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white font-mono focus:border-cyan-500/50 focus:outline-none transition-colors appearance-none uppercase"
-                      >
-                        <option value="all">TODOS</option>
-                        <option value="NORTE">NORTE (TECH)</option>
-                        <option value="SUL">SUL (IND)</option>
-                        <option value="LESTE">LESTE (TRAD)</option>
-                        <option value="OESTE">OESTE (REB)</option>
-                      </select>
-                    </div>
+                       {/* District Filter */}
+                       <div className="space-y-2">
+                         <label className="text-[10px] font-black text-fuchsia-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                            <Globe size={12} className="drop-shadow-[0_0_5px_rgba(217,70,239,0.5)]" /> Distrito
+                         </label>
+                         <div className="relative group/input">
+                           <div className="absolute inset-0 bg-fuchsia-500/5 rounded-lg group-focus-within/input:bg-fuchsia-500/10 transition-colors" />
+                           <select 
+                             value={marketDistrict}
+                             onChange={(e) => setMarketDistrict(e.target.value)}
+                             className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs text-white font-bold focus:border-fuchsia-500/50 focus:outline-none transition-all appearance-none uppercase tracking-widest relative z-10 cursor-pointer shadow-inner"
+                           >
+                             <option value="all">TODOS OS SETORES</option>
+                             <option value="NORTE">SETOR NORTE (TECH)</option>
+                             <option value="SUL">SETOR SUL (IND)</option>
+                             <option value="LESTE">SETOR LESTE (TRAD)</option>
+                             <option value="OESTE">SETOR OESTE (REB)</option>
+                           </select>
+                           <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none z-20" />
+                         </div>
+                       </div>
 
-                    {/* Position Filter (NEW) */}
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                         <Activity size={10} /> Posição
-                      </label>
-                      <select 
-                        value={marketPosition}
-                        onChange={(e) => setMarketPosition(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white font-mono focus:border-cyan-500/50 focus:outline-none transition-colors appearance-none uppercase"
-                      >
-                        <option value="all">TODAS</option>
-                        <option value="Goleiro">GOLEIRO</option>
-                        <option value="Zagueiro">ZAGUEIRO</option>
-                        <option value="Lateral">LATERAL</option>
-                        <option value="Volante">VOLANTE</option>
-                        <option value="Meia">MEIA</option>
-                        <option value="Atacante">ATACANTE</option>
-                      </select>
-                    </div>
+                       {/* Position Filter */}
+                       <div className="space-y-2">
+                         <label className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                            <Activity size={12} className="drop-shadow-[0_0_5px_rgba(251,191,36,0.5)]" /> Especialidade
+                         </label>
+                         <div className="relative group/input">
+                           <div className="absolute inset-0 bg-amber-500/5 rounded-lg group-focus-within/input:bg-amber-500/10 transition-colors" />
+                           <select 
+                             value={marketPosition}
+                             onChange={(e) => setMarketPosition(e.target.value)}
+                             className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs text-white font-bold focus:border-amber-500/50 focus:outline-none transition-all appearance-none uppercase tracking-widest relative z-10 cursor-pointer shadow-inner"
+                           >
+                             <option value="all">TODAS POSIÇÕES</option>
+                             <option value="Goleiro">GOLEIRO</option>
+                             <option value="Zagueiro">ZAGUEIRO</option>
+                             <option value="Lateral">LATERAL</option>
+                             <option value="Volante">VOLANTE</option>
+                             <option value="Meia">MEIA</option>
+                             <option value="Atacante">ATACANTE</option>
+                           </select>
+                           <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none z-20" />
+                         </div>
+                       </div>
 
-                  {/* Points Slider */}
-                  <div className="space-y-1">
-                     <div className="flex justify-between items-center">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                     <TeamLogo primaryColor="#22d3ee" secondaryColor="#0891b2" patternId="none" symbolId="Shield" size={10} /> Rating Min
-                  </label>
-                        <span className="text-[9px] font-mono text-cyan-400 font-bold">{marketPointsMin}</span>
+                     {/* Points Sliders Group */}
+                     <div className="flex flex-col gap-4">
+                        {/* Points Slider */}
+                        <div className="space-y-2">
+                           <div className="flex justify-between items-center">
+                              <label className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                 <TeamLogo primaryColor="#22d3ee" secondaryColor="#0891b2" patternId="none" symbolId="Shield" size={12} className="drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]" /> Rating Mín
+                              </label>
+                              <span className="text-[10px] font-mono text-cyan-400 font-black bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/30 shadow-[0_0_10px_rgba(34,211,238,0.2)]">{marketPointsMin}</span>
+                           </div>
+                           <input 
+                             type="range" 
+                             min="0" 
+                             max="1000" 
+                             step="10"
+                             value={marketPointsMin}
+                             onChange={(e) => setMarketPointsMin(parseInt(e.target.value))}
+                             className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-500 shadow-inner"
+                           />
+                        </div>
+
+                        {/* Potential Slider */}
+                        <div className="space-y-2">
+                           <div className="flex justify-between items-center">
+                              <label className="text-[10px] font-black text-fuchsia-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                 <Zap size={12} className="drop-shadow-[0_0_5px_rgba(217,70,239,0.5)]" /> Potencial Mín
+                              </label>
+                              <span className="text-[10px] font-mono text-fuchsia-400 font-black bg-fuchsia-500/10 px-2 py-0.5 rounded border border-fuchsia-500/30 shadow-[0_0_10px_rgba(217,70,239,0.2)]">{marketPotentialMin}</span>
+                           </div>
+                           <input 
+                             type="range" 
+                             min="0" 
+                             max="1000" 
+                             step="10"
+                             value={marketPotentialMin}
+                             onChange={(e) => setMarketPotentialMin(parseInt(e.target.value))}
+                             className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-fuchsia-500 shadow-inner"
+                           />
+                        </div>
                      </div>
-                     <input 
-                       type="range" 
-                       min="0" 
-                       max="1000" 
-                       step="10"
-                       value={marketPointsMin}
-                       onChange={(e) => setMarketPointsMin(parseInt(e.target.value))}
-                       className="w-full h-1 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-500"
-                     />
-                  </div>
-
-                  {/* Potential Slider */}
-                  <div className="space-y-1">
-                     <div className="flex justify-between items-center">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                           <Zap size={10} /> Potencial Min
-                        </label>
-                        <span className="text-[9px] font-mono text-fuchsia-400 font-bold">{marketPotentialMin}</span>
-                     </div>
-                     <input 
-                       type="range" 
-                       min="0" 
-                       max="1000" 
-                       step="10"
-                       value={marketPotentialMin}
-                       onChange={(e) => setMarketPotentialMin(parseInt(e.target.value))}
-                       className="w-full h-1 bg-slate-800 rounded-full appearance-none cursor-pointer accent-fuchsia-500"
-                     />
-                  </div>
+                   </div>
                 </div>
              </div>
 
-             <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2">
+             <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
                 {players
                   .filter(p => !p.contract.teamId)
                   .filter(p => {
@@ -2000,7 +2018,7 @@ export const Dashboard: React.FC = () => {
                     const matchesPotential = p.potential >= marketPotentialMin;
                     return matchesSearch && matchesDistrict && matchesPosition && matchesPoints && matchesPotential;
                   })
-                  .slice(0, 16)
+                  .slice(0, 20)
                   .map(player => (
                     <PlayerCard key={player.id} player={player} onClick={setSelectedPlayer} />
                 ))}
@@ -2444,7 +2462,7 @@ export const Dashboard: React.FC = () => {
 
   const navItems = [
     { id: 'home', icon: Home, label: '' },
-    { id: 'team', icon: Shield, label: '' },
+    { id: 'team', icon: (props: any) => <TeamLogo primaryColor="#22d3ee" secondaryColor="#0891b2" patternId="none" symbolId="Shield" size={props.size || 20} />, label: '' },
     { id: 'calendar', icon: Calendar, label: '' },
     { id: 'world', icon: Globe, label: '' },
     { id: 'career', icon: Briefcase, label: '' },

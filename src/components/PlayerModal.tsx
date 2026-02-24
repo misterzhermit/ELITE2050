@@ -2,6 +2,7 @@ import React from 'react';
 import { Player, District } from '../types';
 import { X, TrendingUp, Zap, Lock, Activity } from 'lucide-react';
 import { motion } from 'motion/react';
+import { TeamLogo } from './TeamLogo';
 import { useGame } from '../store/GameContext';
 import { calculateTeamPower } from '../engine/gameLogic';
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
@@ -318,16 +319,37 @@ export const PlayerModal: React.FC<PlayerModalProps> = ({ player, onClose }) => 
           {!isMyPlayer && (
              <button 
                onClick={handleProposal}
-               className={`w-full py-3 rounded-xl font-semibold uppercase tracking-[0.3em] text-[11px] transition-all shadow-lg hover:scale-[1.01] active:scale-[0.99] ${
+               className={`w-full py-4 rounded-xl font-black uppercase tracking-[0.4em] text-[11px] transition-all shadow-lg hover:scale-[1.02] active:scale-[0.98] relative overflow-hidden group/btn ${
                  player.satisfaction < 80
-                   ? `bg-white text-black hover:bg-slate-200 ${theme.glow}` 
+                   ? `bg-white text-black hover:bg-cyan-50 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(34,211,238,0.3)]` 
                    : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
                }`}
                disabled={player.satisfaction >= 80}
              >
-               {player.satisfaction >= 80 ? 'Contrato Estável' : `Propor Troca (${player.totalRating} pts)`}
+               <div className="relative z-10 flex items-center justify-center gap-3">
+                 {player.satisfaction >= 80 ? (
+                   <>
+                     <Lock size={14} className="opacity-50" />
+                     CONTRATO ESTÁVEL
+                   </>
+                 ) : (
+                   <>
+                     <Zap size={14} className="animate-pulse" />
+                     FAZER PROPOSTA ({player.totalRating} PTS)
+                   </>
+                 )}
+               </div>
+               {player.satisfaction < 80 && (
+                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent -translate-x-full group-hover/btn:animate-[shimmer_1.5s_infinite]" />
+               )}
              </button>
           )}
+          
+          <style dangerouslySetInnerHTML={{ __html: `
+            @keyframes shimmer {
+              100% { transform: translateX(100%); }
+            }
+          `}} />
 
         </div>
       </motion.div>
