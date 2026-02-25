@@ -46,12 +46,20 @@ export interface Player {
   name: string;
   nickname: string;
   district: District;
+  appearance: {
+    gender: 'M' | 'F';
+    bodyId: number; // 1, 2, 3
+    hairId: number; // 1..6
+    bootId: number; // 1..15
+  };
   position: PositionType;
   role: PlayerRole;
   pentagon: Pentagon;
   fusion: FusionSkills;
   totalRating: number; // 0-1000
   potential: number; // Max rating ceiling
+  currentPhase: number; // Current form/phase (0.0 - 10.0)
+  phaseHistory: number[]; // Last 3-5 match ratings for phase calculation
   badges: Badges;
   contract: Contract;
   history: PlayerHistory;
@@ -61,7 +69,25 @@ export interface Player {
 
 export type LeagueColor = 'Cyan' | 'Orange' | 'Green' | 'Purple';
 
-export type PlayStyle = 'Vertical' | 'Cadenciado' | 'Retranca';
+export type PlayStyle = 'Blitzkrieg' | 'Tiki-Taka' | 'Retranca Armada' | 'Motor Lento' | 'Equilibrado' | 'Gegenpressing' | 'Catenaccio';
+
+export type Mentality = 'Calculista' | 'Emocional' | 'Predadora';
+
+export interface TacticalCard {
+  id: string;
+  name: string;
+  description: string;
+  effect: string;
+}
+
+export interface TeamTactics {
+  playStyle: PlayStyle;
+  mentality: Mentality;
+  linePosition: number; // 0 (Recuada) to 100 (Alta)
+  aggressiveness: number; // 0 (Sombra) to 100 (Caçada)
+  slots: (TacticalCard | null)[]; // Max 3 slots
+  preferredFormation: string;
+}
 
 export interface TeamFinances {
   transferBudget: number;
@@ -73,8 +99,9 @@ export interface TeamFinances {
 export interface TeamLogoMetadata {
   primary: string;
   secondary: string;
-  patternId: string; // 'none' | 'stripes-v' | 'stripes-h' | 'diagonal' | 'half-v' | 'half-h' | 'cross' | 'circle'
-  symbolId: string; // Lucide icon name
+  patternId: string;
+  symbolId: string;
+  secondarySymbolId?: string;
 }
 
 export interface Team {
@@ -89,19 +116,12 @@ export interface Team {
   };
   logo: TeamLogoMetadata;
   finances: TeamFinances;
-  tactics: {
-    playStyle: PlayStyle;
-    preferredFormation: string;
-  };
+  tactics: TeamTactics;
+  inventory: TacticalCard[]; // Cards available to use in slots
   managerId: string | null;
-  squad: string[]; // Player IDs, max 20
-  lineup: Record<string, string | null>; // Slot ID -> Player ID
-}
-
-export interface ManagerAttributes {
-  evolution: number; // 0-100
-  negotiation: number; // 0-100
-  scout: number; // 0-100
+  squad: string[]; // Player IDs
+  lineup: Record<string, string>; // Position -> Player ID
+  chemistry: number; // 0-100
 }
 
 export interface Manager {
@@ -109,7 +129,11 @@ export interface Manager {
   name: string;
   district: District;
   reputation: number; // 0-100
-  attributes: ManagerAttributes;
+  attributes: {
+    evolution: number;
+    negotiation: number;
+    scout: number;
+  };
   career: {
     titlesWon: number;
     currentTeamId: string | null;
@@ -117,128 +141,118 @@ export interface Manager {
   };
 }
 
-export interface Match {
+export type MatchStatus = 'SCHEDULED' | 'LOCKED' | 'PLAYING' | 'FINISHED';
+
+export interface MatchEvent {
   id: string;
+  minute: number; // 0-90
+  realTimeSecond: number; // 0-360 (6 minutes)
+  type: 'GOAL' | 'CARD_YELLOW' | 'CARD_RED' | 'CHANCE' | 'FOUL' | 'SUBSTITUTION' | 'COMMENTARY' | 'INJURY';
+  title: string;
+  description: string;
+  playerId?: string;
+  assistantId?: string;
+  teamId: string;
+}
+
+export interface MatchResult {
   homeTeamId: string;
   awayTeamId: string;
   homeScore: number;
   awayScore: number;
-  round: number;
-  played: boolean;
-  date: string;
+  scorers: Array<{ playerId: string; teamId: string }>;
+  assists: Array<{ playerId: string; teamId: string }>;
+  ratings: Record<string, number>;
+  events: MatchEvent[];
+  headline?: string;
+  stats?: {
+    possession: { home: number; away: number };
+    shots: { home: number; away: number };
+    shotsOnTarget: { home: number; away: number };
+  };
 }
 
+export interface Match {
+  id: string;
+  homeTeamId: string;
+  awayTeamId: string;
+  time: string; // HH:mm
+  date: string; // ISO String
+  status: MatchStatus;
+  result: MatchResult | null;
+  homeScore?: number;
+  awayScore?: number;
+  played?: boolean;
+  round: number;
+}
 
+export interface Round {
+  matches: Match[];
+}
 
 export interface LeagueTeamStats {
   teamId: string;
-  points: number;
+  team: string;
   played: number;
   won: number;
   drawn: number;
   lost: number;
   goalsFor: number;
   goalsAgainst: number;
+  points: number;
 }
 
-export interface League {
-  id: string;
+export interface LeagueScorer {
+  rank: number;
   name: string;
-  standings: LeagueTeamStats[];
-  matches: Match[];
-  tvQuota: 'Alta' | 'Média' | 'Baixa';
-  difficulty: 'Fácil' | 'Normal' | 'Difícil';
-}
-
-export interface EliteCupState {
-  round: number; // 0=Not Started, 1=Round of 16, 2=Quarters, 3=Semis, 4=Final
-  teams: string[]; // 16 Team IDs
-  bracket: {
-    round1: Match[]; // 8 matches
-    quarters: Match[]; // 4 matches
-    semis: Match[]; // 2 matches
-    final: Match | null; // 1 match
-  };
-  winnerId: string | null;
-}
-
-export interface DistrictCupState {
-  round: number; // 0=Not Started, 1=Round 1, 2=Round 2, 3=Round 3, 4=Final
-  teams: string[]; // 4 District Team IDs
-  standings: LeagueTeamStats[]; // For the round robin phase
-  matches: Match[]; // All matches
-  final: Match | null;
-  winnerId: string | null;
+  team: string;
+  goals: number;
+  teamId: string;
 }
 
 export interface WorldState {
-  leagues: {
-    norte: League;
-    sul: League;
-    leste: League;
-    oeste: League;
-  };
-  eliteCup: EliteCupState;
-  districtCup: DistrictCupState;
-  transferWindowOpen: boolean;
-  rank1000PlayerId: string | null; // Tracks the 1000th ranked player for "relegation" logic
-  currentSeason: number;
-  currentRound: number;
+  id: string;
+  name: string;
   currentDate: string;
-  seasonStartReal: number | null; // Timestamp of when the user started the season (real time)
+  currentRound: number;
+  totalRounds: number;
+  leagues: Record<string, {
+    id: string;
+    name: string;
+    district: District;
+    standings: LeagueTeamStats[];
+    scorers: LeagueScorer[];
+    rounds: Round[];
+  }>;
 }
 
-export interface Notification {
-  id: string;
-  date: string;
-  title: string;
-  message: string;
-  type: 'info' | 'alert' | 'success' | 'match' | 'transfer';
-  read: boolean;
+export interface TrainingState {
+  chemistryBoostLastUsed?: string; // ISO Date
+  cardLaboratory: {
+    slots: Array<{
+      cardId: string | null;
+      finishTime: string | null; // ISO Date
+    }>;
+  };
+  individualFocus: {
+    evolutionSlot: string | null; // Player ID (1.5x Rating gain)
+    stabilizationSlot: string | null; // Player ID (Reduced Rating loss)
+  };
 }
 
 export interface GameState {
   world: WorldState;
+  worldId?: string;
+  userId?: string;
   teams: Record<string, Team>;
   players: Record<string, Player>;
   managers: Record<string, Manager>;
   userTeamId: string | null;
-  userManagerId: string | null;
-  notifications: Notification[];
-}
-
-export type MatchEventType = 'goal' | 'card' | 'injury' | 'substitution' | 'chance' | 'save';
-
-export interface MatchEvent {
-  minute: number;
-  type: MatchEventType;
-  teamId: string;
-  playerId?: string;
-  description: string;
-}
-
-export interface MatchStats {
-  possession: { home: number; away: number };
-  shots: { home: number; away: number };
-  shotsOnTarget: { home: number; away: number };
-  fouls?: { home: number; away: number };
-  corners?: { home: number; away: number };
-}
-
-export interface MatchResult {
-  homeScore: number;
-  awayScore: number;
-  events: MatchEvent[];
-  stats: MatchStats;
-  ratings?: Record<string, number>;
-}
-
-export interface TeamStats {
-  id: string;
-  name: string;
-  attack: number;
-  midfield: number;
-  defense: number;
-  goalkeeper: number;
-  tactic: string;
+  userManagerId?: string | null;
+  notifications?: Notification[];
+  lastHeadline?: {
+    title: string;
+    message: string;
+  };
+  training: TrainingState;
 }

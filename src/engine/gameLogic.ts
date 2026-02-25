@@ -112,7 +112,7 @@ export const applySafetyNet = (state: GameState, teamId: string) => {
   }
 };
 
-const updateStandings = (standings: LeagueTeamStats[], homeId: string, awayId: string, homeScore: number, awayScore: number) => {
+export const updateStandings = (standings: LeagueTeamStats[], homeId: string, awayId: string, homeScore: number, awayScore: number) => {
   const homeStats = standings.find(s => s.teamId === homeId);
   const awayStats = standings.find(s => s.teamId === awayId);
 
@@ -145,7 +145,16 @@ const updatePlayerEvolutions = (state: GameState, result: MatchResult, homePlaye
   const allPlayers = [...homePlayers, ...awayPlayers];
   
   allPlayers.forEach(player => {
-    // Get rating from match result (calculated by ticks)
+    // 1. Basic Stats
+    player.history.gamesPlayed++;
+    
+    // 2. Goals & Assists
+    const goals = result.scorers.filter(s => s.playerId === player.id).length;
+    const assists = result.assists.filter(a => a.playerId === player.id).length;
+    player.history.goals += goals;
+    player.history.assists += assists;
+
+    // 3. Rating Evolution
     let matchRating = result.ratings?.[player.id];
     
     // If no rating (no events), give average 6.0 with variance
@@ -156,90 +165,99 @@ const updatePlayerEvolutions = (state: GameState, result: MatchResult, homePlaye
     // Ensure rating is within bounds
     matchRating = Math.max(3, Math.min(10, matchRating));
 
-    const evolution = calculateEvolution(player, matchRating, player.history.lastMatchRatings || []);
+    const isEvolutionFocus = state.training.individualFocus.evolutionSlot === player.id;
+    const isStabilizationFocus = state.training.individualFocus.stabilizationSlot === player.id;
+
+    const evolution = calculateEvolution(
+      player, 
+      matchRating, 
+      player.history.lastMatchRatings || [],
+      isEvolutionFocus,
+      isStabilizationFocus
+    );
     
     player.totalRating = evolution.newRating;
     player.pentagon = evolution.newPentagon;
     player.history.lastMatchRatings = [matchRating, ...(player.history.lastMatchRatings || [])].slice(0, 5);
+    
+    // Calculate average rating incrementally
+    const oldGames = player.history.gamesPlayed - 1;
+    player.history.averageRating = Number(((player.history.averageRating * oldGames + matchRating) / player.history.gamesPlayed).toFixed(2));
   });
 };
 
-const simulateAndRecordMatch = (state: GameState, match: Match, standings: LeagueTeamStats[] | null): MatchResult => {
+export const calculateAttr = (sel: { gk: Player, def: Player[], mid: Player[], att: Player[] }, attr: string) => {
+  if (attr === 'goalkeeper') {
+      return Math.round(sel.gk.totalRating * (sel.gk.role === 'GOL' ? 1.0 : 0.5));
+  }
+  let players: Player[] = [];
+  let targetRole = '';
+  if (attr === 'defense') { players = sel.def; targetRole = 'DEF'; }
+  if (attr === 'midfield') { players = sel.mid; targetRole = 'MEI'; }
+  if (attr === 'attack') { players = sel.att; targetRole = 'ATA'; }
+
+  if (players.length === 0) return 0;
+  
+  const sum = players.reduce((acc, p) => {
+      const penalty = p.role === targetRole ? 1.0 : 0.6;
+      return acc + (p.totalRating * penalty);
+  }, 0);
+  
+  return Math.round(sum / players.length);
+};
+
+export const getMatchSquad = (team: Team, players: Record<string, Player>): { gk: Player, def: Player[], mid: Player[], att: Player[], all: Player[] } => {
+  const squad = team.squad.map(id => players[id]).filter(p => !!p);
+  
+  // 1. Find best GK
+  let gk = squad.find(p => p.role === 'GOL');
+  if (!gk) {
+     // Fallback: Best rated player becomes GK
+     const sorted = [...squad].sort((a, b) => b.totalRating - a.totalRating);
+     gk = sorted[0];
+  }
+
+  let pool = squad.filter(p => p.id !== gk!.id);
+  pool.sort((a, b) => b.totalRating - a.totalRating);
+
+  const def: Player[] = [];
+  const mid: Player[] = [];
+  const att: Player[] = [];
+
+  // Helper to fill slots
+  const fill = (target: Player[], role: string, count: number) => {
+     for (let i = 0; i < count; i++) {
+        if (target.length >= count) break;
+        const idx = pool.findIndex(p => p.role === role);
+        if (idx !== -1) {
+           target.push(pool[idx]);
+           pool.splice(idx, 1);
+        }
+     }
+  };
+
+  fill(def, 'DEF', 4);
+  fill(mid, 'MEI', 3);
+  fill(att, 'ATA', 3);
+
+  while (def.length < 4 && pool.length > 0) def.push(pool.shift()!);
+  while (mid.length < 3 && pool.length > 0) mid.push(pool.shift()!);
+  while (att.length < 3 && pool.length > 0) att.push(pool.shift()!);
+
+  return { gk: gk!, def, mid, att, all: [gk!, ...def, ...mid, ...att] };
+};
+
+export const simulateAndRecordMatch = (state: GameState, match: Match, standings: LeagueTeamStats[] | null): MatchResult => {
   const homeTeam = state.teams[match.homeTeamId];
   const awayTeam = state.teams[match.awayTeamId];
 
   if (!homeTeam || !awayTeam) {
     console.error(`Teams not found: ${match.homeTeamId} vs ${match.awayTeamId}`);
-    return { homeScore: 0, awayScore: 0, events: [], stats: { possession: { home: 50, away: 50 }, shots: { home: 0, away: 0 }, shotsOnTarget: { home: 0, away: 0 } }, ratings: {} };
+    return { homeTeamId: match.homeTeamId, awayTeamId: match.awayTeamId, homeScore: 0, awayScore: 0, scorers: [], assists: [], ratings: {}, events: [], stats: { possession: { home: 50, away: 50 }, shots: { home: 0, away: 0 }, shotsOnTarget: { home: 0, away: 0 } } };
   }
 
-  // Get Players (Best 11 with Position Logic)
-  const getMatchSquad = (team: Team): { gk: Player, def: Player[], mid: Player[], att: Player[], all: Player[] } => {
-     const squad = team.squad.map(id => state.players[id]).filter(p => !!p);
-     
-     // 1. Find best GK
-     let gk = squad.find(p => p.role === 'GOL');
-     if (!gk) {
-        // Fallback: Best rated player becomes GK (with heavy penalty later)
-        squad.sort((a, b) => b.totalRating - a.totalRating);
-        gk = squad[0];
-     }
-
-     let pool = squad.filter(p => p.id !== gk!.id);
-     pool.sort((a, b) => b.totalRating - a.totalRating);
-
-     const def: Player[] = [];
-     const mid: Player[] = [];
-     const att: Player[] = [];
-
-     // Helper to fill slots
-     const fill = (target: Player[], role: string, count: number) => {
-        // First pass: try to find matching role
-        for (let i = 0; i < count; i++) {
-           if (target.length >= count) break;
-           const idx = pool.findIndex(p => p.role === role);
-           if (idx !== -1) {
-              target.push(pool[idx]);
-              pool.splice(idx, 1);
-           }
-        }
-     };
-
-     // Try to fill natural positions first
-     fill(def, 'DEF', 4);
-     fill(mid, 'MEI', 3);
-     fill(att, 'ATA', 3);
-
-     // Second pass: fill remaining with best available
-     while (def.length < 4 && pool.length > 0) def.push(pool.shift()!);
-     while (mid.length < 3 && pool.length > 0) mid.push(pool.shift()!);
-     while (att.length < 3 && pool.length > 0) att.push(pool.shift()!);
-
-     return { gk: gk!, def, mid, att, all: [gk!, ...def, ...mid, ...att] };
-  };
-
-  const homeSelection = getMatchSquad(homeTeam);
-  const awaySelection = getMatchSquad(awayTeam);
-
-  const calculateAttr = (sel: { gk: Player, def: Player[], mid: Player[], att: Player[] }, attr: string) => {
-      if (attr === 'goalkeeper') {
-          return Math.round(sel.gk.totalRating * (sel.gk.role === 'GOL' ? 1.0 : 0.5));
-      }
-      let players: Player[] = [];
-      let targetRole = '';
-      if (attr === 'defense') { players = sel.def; targetRole = 'DEF'; }
-      if (attr === 'midfield') { players = sel.mid; targetRole = 'MEI'; }
-      if (attr === 'attack') { players = sel.att; targetRole = 'ATA'; }
-
-      if (players.length === 0) return 0;
-      
-      const sum = players.reduce((acc, p) => {
-          const penalty = p.role === targetRole ? 1.0 : 0.6; // 40% penalty for out of position
-          return acc + (p.totalRating * penalty);
-      }, 0);
-      
-      return Math.round(sum / players.length);
-  };
+  const homeSelection = getMatchSquad(homeTeam, state.players);
+  const awaySelection = getMatchSquad(awayTeam, state.players);
 
   const homeStats: MatchTeamStats = {
     id: homeTeam.id,
@@ -248,9 +266,19 @@ const simulateAndRecordMatch = (state: GameState, match: Match, standings: Leagu
     midfield: calculateAttr(homeSelection, 'midfield'),
     defense: calculateAttr(homeSelection, 'defense'),
     goalkeeper: calculateAttr(homeSelection, 'goalkeeper'),
-    tactic: (homeTeam.tactics.playStyle === 'Vertical' ? 'Contra-Ataque' :
-           homeTeam.tactics.playStyle === 'Cadenciado' ? 'Posse de Bola' : 'Ataque Total') as Tactic
+    playStyle: homeTeam.tactics.playStyle,
+    mentality: homeTeam.tactics.mentality,
+    linePosition: homeTeam.tactics.linePosition,
+    aggressiveness: homeTeam.tactics.aggressiveness,
+    slots: homeTeam.tactics.slots,
+    chemistry: homeTeam.chemistry || 50
   };
+
+  // Home advantage (5% bonus to all attributes)
+  homeStats.attack = Math.round(homeStats.attack * 1.05);
+  homeStats.midfield = Math.round(homeStats.midfield * 1.05);
+  homeStats.defense = Math.round(homeStats.defense * 1.05);
+  homeStats.goalkeeper = Math.round(homeStats.goalkeeper * 1.05);
 
   const awayStats: MatchTeamStats = {
     id: awayTeam.id,
@@ -259,16 +287,21 @@ const simulateAndRecordMatch = (state: GameState, match: Match, standings: Leagu
     midfield: calculateAttr(awaySelection, 'midfield'),
     defense: calculateAttr(awaySelection, 'defense'),
     goalkeeper: calculateAttr(awaySelection, 'goalkeeper'),
-    tactic: (awayTeam.tactics.playStyle === 'Vertical' ? 'Contra-Ataque' :
-           awayTeam.tactics.playStyle === 'Cadenciado' ? 'Posse de Bola' : 'Ataque Total') as Tactic
+    playStyle: awayTeam.tactics.playStyle,
+    mentality: awayTeam.tactics.mentality,
+    linePosition: awayTeam.tactics.linePosition,
+    aggressiveness: awayTeam.tactics.aggressiveness,
+    slots: awayTeam.tactics.slots,
+    chemistry: awayTeam.chemistry || 50
   };
 
   const result = simulateMatch(homeStats, awayStats, homeSelection.all, awaySelection.all);
 
+  match.result = result;
   match.homeScore = result.homeScore;
   match.awayScore = result.awayScore;
-  match.played = true;
-
+  // Note: we don't set played = true here yet because it might be LOCKED status
+  
   updatePlayerEvolutions(state, result, homeSelection.all, awaySelection.all);
 
   if (standings) {
@@ -277,6 +310,7 @@ const simulateAndRecordMatch = (state: GameState, match: Match, standings: Leagu
 
   return result;
 };
+
 
 const getEliteCupTeams = (state: GameState) => {
   const leagues = ['norte', 'sul', 'leste', 'oeste'] as const;
@@ -348,6 +382,66 @@ export const advanceGameDay = (prevState: GameState): GameState => {
   // Transfer Window Logic
   world.transferWindowOpen = dayNumber <= 2 || dayNumber >= SEASON_DAYS;
 
+  // --- Progress Card Laboratory ---
+  if (state.training.cardLaboratory.slots) {
+    state.training.cardLaboratory.slots.forEach(slot => {
+      if (slot.cardId && slot.finishTime) {
+        const finish = new Date(slot.finishTime);
+        const now = new Date(state.world.currentDate);
+        if (now >= finish) {
+          // Card finished! Add to user team inventory
+          const userTeam = state.teams[state.userTeamId!];
+          if (userTeam) {
+            // Card Templates
+            const cardTemplates: Record<string, Partial<TacticalCard>> = {
+              'ataque': {
+                name: 'Ataque Total',
+                description: 'Aumenta o bônus ofensivo da equipe em 10%.',
+                effect: 'Ataque +10%'
+              },
+              'defesa': {
+                name: 'Muralha',
+                description: 'Aumenta o bônus defensivo da equipe em 15%.',
+                effect: 'Defesa +15%'
+              },
+              'meio': {
+                name: 'Meio Criativo',
+                description: 'Aumenta o controle de jogo no meio-campo em 10%.',
+                effect: 'Meio-Campo +10%'
+              }
+            };
+
+            const template = cardTemplates[slot.cardId] || {
+              name: 'Carta Desconhecida',
+              description: 'Efeito misterioso.',
+              effect: '???'
+            };
+
+            const newCard: TacticalCard = {
+              id: `card_${Date.now()}_${slot.cardId}`,
+              name: template.name!,
+              description: template.description!,
+              effect: template.effect!
+            };
+
+            userTeam.inventory.push(newCard);
+            
+            state.notifications.unshift({
+              id: `n_${Date.now()}_card_lab`,
+              date: state.world.currentDate,
+              title: 'Laboratório de Cartas',
+              message: `A pesquisa da carta "${newCard.name}" foi concluída e adicionada ao seu inventário!`,
+              type: 'success',
+              read: false
+            });
+          }
+          slot.cardId = null;
+          slot.finishTime = null;
+        }
+      }
+    });
+  }
+
   if (isMatchDay) {
     const round = getRoundFromDay(dayNumber);
     world.currentRound = round;
@@ -369,6 +463,8 @@ export const advanceGameDay = (prevState: GameState): GameState => {
         const roundMatches = league.matches.filter(m => m.round === round);
         roundMatches.forEach(match => {
           simulateAndRecordMatch(state, match, league.standings);
+          match.played = true;
+          match.status = 'FINISHED';
         });
       });
 
@@ -443,19 +539,31 @@ export const advanceGameDay = (prevState: GameState): GameState => {
         matchesToPlay = [world.eliteCup.bracket.final!];
       }
 
-      matchesToPlay.forEach(match => simulateAndRecordMatch(state, match, null));
+      matchesToPlay.forEach(match => {
+        simulateAndRecordMatch(state, match, null);
+        match.played = true;
+        match.status = 'FINISHED';
+      });
       world.eliteCup.round = eliteRound;
 
       if (eliteRound === 4 && world.eliteCup.bracket.final) {
         const final = world.eliteCup.bracket.final;
-        const winnerId = final.homeScore >= final.awayScore ? final.homeTeamId : final.awayTeamId;
+        // In final, if draw, decide by penalty (random for now)
+        if (final.homeScore === final.awayScore) {
+          const penaltyWinner = Math.random() > 0.5 ? 'home' : 'away';
+          if (penaltyWinner === 'home') final.homeScore += 1; // Representation of winning on penalties
+          else final.awayScore += 1;
+        }
+        
+        const winnerId = final.homeScore > final.awayScore ? final.homeTeamId : final.awayTeamId;
         world.eliteCup.winnerId = winnerId;
         const winnerTeam = state.teams[winnerId];
+        
         state.notifications.unshift({
           id: `n_${Date.now()}_elite_winner`,
           date: world.currentDate,
           title: 'Campeão da Copa Elite!',
-          message: `${winnerTeam.name} conquistou a Copa Elite!`,
+          message: `${winnerTeam.name} conquistou a Copa Elite em uma final emocionante!`,
           type: 'success',
           read: false
         });
@@ -469,7 +577,7 @@ export const advanceGameDay = (prevState: GameState): GameState => {
         const teamIds = getDistrictCupTeams(state);
         world.districtCup.teams = teamIds;
         world.districtCup.standings = teamIds.map(id => ({
-          teamId: id, played: 0, points: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0
+          teamId: id, team: state.teams[id]?.name || id, played: 0, points: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0
         }));
       }
 
@@ -477,17 +585,13 @@ export const advanceGameDay = (prevState: GameState): GameState => {
         id: `n_${Date.now()}_district_${districtRound}`,
         date: world.currentDate,
         title: `Copa dos Distritos - Rodada ${districtRound}`,
-        message: districtRound === 4 ? 'Grande Final' : 'Fase de Grupos',
+        message: districtRound === 4 ? 'Grande Final dos Distritos' : `Fase de Grupos - Rodada ${districtRound}`,
         type: 'match',
         read: false
       });
 
       if (districtRound <= 3) {
          // Group Phase (Round Robin for 4 teams: 3 rounds)
-         // Teams: 0, 1, 2, 3
-         // R1: 0v1, 2v3
-         // R2: 0v2, 1v3
-         // R3: 0v3, 1v2
          const pairings = [
            [[0, 1], [2, 3]], 
            [[0, 2], [1, 3]], 
@@ -500,10 +604,11 @@ export const advanceGameDay = (prevState: GameState): GameState => {
            const away = world.districtCup.teams[idx2];
            const match: Match = {
              id: `dc_r${districtRound}_${i}`, round: districtRound, homeTeamId: home, awayTeamId: away,
-             homeScore: 0, awayScore: 0, played: false, date: world.currentDate
+             homeScore: 0, awayScore: 0, played: false, date: world.currentDate, status: 'FINISHED'
            };
            world.districtCup.matches.push(match);
            simulateAndRecordMatch(state, match, world.districtCup.standings);
+           match.played = true;
          });
          world.districtCup.round = districtRound;
 
@@ -514,13 +619,21 @@ export const advanceGameDay = (prevState: GameState): GameState => {
         
         const match: Match = {
            id: `dc_final`, round: districtRound, homeTeamId: finalists[0], awayTeamId: finalists[1],
-           homeScore: 0, awayScore: 0, played: false, date: world.currentDate
+           homeScore: 0, awayScore: 0, played: false, date: world.currentDate, status: 'FINISHED'
         };
         world.districtCup.final = match;
         
         simulateAndRecordMatch(state, match, null);
+        match.played = true;
+
+        // Penalty logic for final
+        if (match.homeScore === match.awayScore) {
+          const penaltyWinner = Math.random() > 0.5 ? 'home' : 'away';
+          if (penaltyWinner === 'home') match.homeScore! += 1;
+          else match.awayScore! += 1;
+        }
         
-        const winnerId = match.homeScore >= match.awayScore ? match.homeTeamId : match.awayTeamId;
+        const winnerId = match.homeScore! > match.awayScore! ? match.homeTeamId : match.awayTeamId;
         world.districtCup.winnerId = winnerId;
         world.districtCup.round = districtRound;
         
@@ -529,7 +642,7 @@ export const advanceGameDay = (prevState: GameState): GameState => {
           id: `n_${Date.now()}_district_winner`,
           date: world.currentDate,
           title: 'Campeão dos Distritos!',
-          message: `${winnerTeam.name} venceu a Copa dos Distritos!`,
+          message: `${winnerTeam.name} venceu a Copa dos Distritos e unificou a região!`,
           type: 'success',
           read: false
         });

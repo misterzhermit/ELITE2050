@@ -6,12 +6,17 @@
 import { GameProvider, useGame } from './store/GameContext';
 import { Dashboard } from './components/Dashboard';
 import { Login } from './components/Login';
+import { WorldSelector } from './components/WorldSelector';
 
 function AppContent() {
-  const { isAuthenticated, setIsAuthenticated } = useGame();
+  const { isAuthenticated, worldId } = useGame();
 
   if (!isAuthenticated) {
-    return <Login onLogin={() => setIsAuthenticated(true)} />;
+    return <Login onLogin={() => {}} />;
+  }
+
+  if (!worldId) {
+    return <WorldSelector />;
   }
 
   return <Dashboard />;

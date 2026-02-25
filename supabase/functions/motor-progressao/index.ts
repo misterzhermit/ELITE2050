@@ -1,237 +1,204 @@
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from './database.types'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import type { Database } from './database.types.ts'
 
-// Tipos do banco
-interface Player {
-  id: string
-  name: string
-  current_rating: number
-  potential_rating: number
-  current_phase: number
-  phase_history: Array<{
-    date: string
-    phase: number
-    rating: number
-  }>
-  badges: string[]
-}
-
-interface MatchPerformance {
+type MatchPerformance = {
   player_id: string
   phase: number // nota da partida (0.0 a 10.0)
   match_date: string
 }
 
-// Configurações do Motor de Progressão
 const RATING_CONFIG = {
-  BASE_EQUILIBRIUM: 6.0, // Nota base de equilíbrio
-  BASE_MULTIPLIER: 5, // Multiplicador base do delta
+  BASE_EQUILIBRIUM: 6.0,
+  BASE_MULTIPLIER: 5,
   VOLATILITY_THRESHOLDS: {
-    LOW: 600, // Bagre/Promessa
-    HIGH: 800, // Craque
+    LOW: 600,
+    HIGH: 800,
   },
   VOLATILITY_MULTIPLIERS: {
-    LOW: 1.5, // Alta volatilidade para jogadores < 600
-    MEDIUM: 1.0, // Volatilidade normal para 600-800
-    HIGH: 0.15, // Baixa volatilidade para > 800 (Blue Chips)
+    LOW: 1.5,
+    MEDIUM: 1.0,
+    HIGH: 0.15,
   },
-  POTENTIAL_THRESHOLD: 15, // Quando current_rating está a 15 do potential, reduz ganhos
-  POTENTIAL_REDUCTION: 0.5, // Reduz ganhos pela metade quando próximo do teto
-  MAX_HISTORY: 5, // Máximo de fases no histórico
+  POTENTIAL_THRESHOLD: 15,
+  POTENTIAL_REDUCTION: 0.5,
+  MAX_HISTORY: 5,
 }
 
-// Badges que afetam o cálculo
 const BADGE_EFFECTS = {
-  'Trabalhador': (delta: number) => delta > 0 ? delta * 1.2 : delta, // +20% em ganhos positivos
-  'Preguiçoso': (delta: number) => delta < 0 ? delta * 1.2 : delta, // -20% piorado em perdas
-  'Consistente': (delta: number) => delta < 0 ? delta * 0.5 : delta, // Metade da queda negativa
+  'Trabalhador': (delta: number) => delta > 0 ? delta * 1.2 : delta,
+  'Preguiçoso': (delta: number) => delta < 0 ? delta * 1.2 : delta,
+  'Consistente': (delta: number) => delta < 0 ? delta * 0.5 : delta,
+}
+
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value))
+
+/**
+ * Calcula a evolução do pentágono baseada no desempenho
+ */
+function updatePentagon(
+  pentagon: { FOR: number; AGI: number; INT: number; TAT: number; TEC: number },
+  phase: number
+) {
+  const updated = { ...pentagon }
+  const keys: Array<keyof typeof pentagon> = ['FOR', 'AGI', 'INT', 'TAT', 'TEC']
+  
+  if (phase > 8.0) {
+    // Evolução excelente: +1 em 2 atributos aleatórios
+    for (let i = 0; i < 2; i++) {
+      const key = keys[Math.floor(Math.random() * keys.length)]
+      updated[key] = clamp(updated[key] + 1, 0, 100)
+    }
+  } else if (phase < 4.5) {
+    // Desempenho muito ruim: -1 em 1 atributo aleatório
+    const key = keys[Math.floor(Math.random() * keys.length)]
+    updated[key] = clamp(updated[key] - 1, 0, 100)
+  }
+  
+  return updated
 }
 
 /**
- * Motor de Progressão - Edge Function que atualiza os ratings dos jogadores
- * Roda semanalmente após cada rodada de partidas
+ * Recalcula as fusões baseadas no pentágono e posição
  */
+function calculateFusions(p: { FOR: number; AGI: number; INT: number; TAT: number; TEC: number }, position: string) {
+  const isGK = position === 'Goleiro'
+  
+  const base = {
+    fusion_det: p.FOR + p.INT,
+    fusion_pas: p.TAT + p.TEC,
+    fusion_dri: isGK ? 0 : p.AGI + p.INT,
+    fusion_fin: isGK ? 0 : p.FOR + p.TEC,
+    fusion_mov: isGK ? 0 : p.AGI + p.TAT,
+    fusion_ref: isGK ? p.AGI + p.INT : 0,
+    fusion_def: isGK ? p.FOR + p.TEC : 0,
+    fusion_pos: isGK ? p.AGI + p.TAT : 0,
+  }
+
+  return base
+}
+
+/**
+ * Calcula o novo rating baseado na performance e características
+ */
+function calculateEvolution(player: any, performance: MatchPerformance) {
+  const currentRating = player.current_rating
+  const potentialRating = player.potential_rating
+  const phase = performance.phase
+  const badges = player.badge_tags || []
+
+  // 1. Delta base
+  const baseDelta = (phase - RATING_CONFIG.BASE_EQUILIBRIUM) * RATING_CONFIG.BASE_MULTIPLIER
+
+  // 2. Volatilidade
+  let volatility = RATING_CONFIG.VOLATILITY_MULTIPLIERS.MEDIUM
+  if (currentRating < RATING_CONFIG.VOLATILITY_THRESHOLDS.LOW) volatility = RATING_CONFIG.VOLATILITY_MULTIPLIERS.LOW
+  else if (currentRating > RATING_CONFIG.VOLATILITY_THRESHOLDS.HIGH) volatility = RATING_CONFIG.VOLATILITY_MULTIPLIERS.HIGH
+
+  let delta = baseDelta * volatility
+
+  // 3. Próximo do teto
+  if (potentialRating - currentRating < RATING_CONFIG.POTENTIAL_THRESHOLD && delta > 0) {
+    delta *= RATING_CONFIG.POTENTIAL_REDUCTION
+  }
+
+  // 4. Badges
+  for (const badge of badges) {
+    const effect = BADGE_EFFECTS[badge as keyof typeof BADGE_EFFECTS]
+    if (effect) delta = effect(delta)
+  }
+
+  const finalDelta = Math.round(delta)
+  const newRating = clamp(currentRating + finalDelta, 0, potentialRating)
+
+  // 5. Pentágono e Fusões
+  const currentPentagon = {
+    FOR: player.for_attr,
+    AGI: player.agi_attr,
+    INT: player.int_attr,
+    TAT: player.tat_attr,
+    TEC: player.tec_attr
+  }
+  const updatedPentagon = updatePentagon(currentPentagon, phase)
+  const fusions = calculateFusions(updatedPentagon, player.position)
+
+  return {
+    newRating,
+    delta: finalDelta,
+    updatedPentagon,
+    fusions
+  }
+}
+
 Deno.serve(async (req) => {
   try {
-    // Configuração do Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    
     const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey)
 
-    // Verificar método HTTP
     if (req.method !== 'POST') {
-      return new Response(JSON.stringify({ error: 'Método não permitido' }), {
-        status: 405,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      return new Response(JSON.stringify({ error: 'Método não permitido' }), { status: 405 })
     }
 
-    // Obter dados da requisição
     const { match_performances }: { match_performances: MatchPerformance[] } = await req.json()
-
     if (!match_performances || !Array.isArray(match_performances)) {
-      return new Response(JSON.stringify({ error: 'Dados inválidos' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      return new Response(JSON.stringify({ error: 'Dados inválidos' }), { status: 400 })
     }
-
-    console.log(`Processando ${match_performances.length} performances de jogadores...`)
 
     const updatedPlayers = []
 
-    // Processar cada performance
     for (const performance of match_performances) {
-      try {
-        // Buscar jogador no banco
-        const { data: player, error: playerError } = await supabase
-          .from('players')
-          .select('*')
-          .eq('id', performance.player_id)
-          .single()
+      const { data: player, error: fetchError } = await supabase
+        .from('players')
+        .select('*')
+        .eq('id', performance.player_id)
+        .single()
 
-        if (playerError || !player) {
-          console.error(`Jogador ${performance.player_id} não encontrado:`, playerError)
-          continue
-        }
+      if (fetchError || !player) continue
 
-        // Calcular novo rating
-        const newRating = calculateNewRating(player, performance)
-        
-        // Atualizar histórico de fases
-        const newPhaseHistory = updatePhaseHistory(player.phase_history || [], {
+      const evolution = calculateEvolution(player, performance)
+
+      const newHistory = [
+        {
           date: performance.match_date,
           phase: performance.phase,
-          rating: newRating
+          rating: evolution.newRating,
+          delta: evolution.delta
+        },
+        ...(player.phase_history || [])
+      ].slice(0, RATING_CONFIG.MAX_HISTORY)
+
+      const { error: updateError } = await supabase
+        .from('players')
+        .update({
+          current_rating: evolution.newRating,
+          current_phase: performance.phase,
+          phase_history: newHistory,
+          for_attr: evolution.updatedPentagon.FOR,
+          agi_attr: evolution.updatedPentagon.AGI,
+          int_attr: evolution.updatedPentagon.INT,
+          tat_attr: evolution.updatedPentagon.TAT,
+          tec_attr: evolution.updatedPentagon.TEC,
+          ...evolution.fusions,
+          updated_at: new Date().toISOString()
         })
+        .eq('id', player.id)
 
-        // Atualizar jogador no banco
-        const { error: updateError } = await supabase
-          .from('players')
-          .update({
-            current_rating: newRating,
-            current_phase: performance.phase,
-            phase_history: newPhaseHistory,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', player.id)
-
-        if (updateError) {
-          console.error(`Erro ao atualizar jogador ${player.id}:`, updateError)
-          continue
-        }
-
+      if (!updateError) {
         updatedPlayers.push({
           id: player.id,
           name: player.name,
           old_rating: player.current_rating,
-          new_rating: newRating,
-          delta: newRating - player.current_rating,
-          phase: performance.phase
+          new_rating: evolution.newRating,
+          delta: evolution.delta
         })
-
-      } catch (error) {
-        console.error(`Erro ao processar performance do jogador ${performance.player_id}:`, error)
       }
     }
 
-    console.log(`Motor de Progressão concluído. ${updatedPlayers.length} jogadores atualizados.`)
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        updated_count: updatedPlayers.length,
-        players: updatedPlayers
-      }),
-      {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }
-    )
+    return new Response(JSON.stringify({ success: true, updated_count: updatedPlayers.length, players: updatedPlayers }), {
+      headers: { 'Content-Type': 'application/json' }
+    })
 
   } catch (error) {
-    console.error('Erro no Motor de Progressão:', error)
-    return new Response(JSON.stringify({ error: 'Erro interno do servidor' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 })
   }
 })
-
-/**
- * Calcula o novo rating baseado na performance e características do jogador
- */
-function calculateNewRating(player: Player, performance: MatchPerformance): number {
-  const currentRating = player.current_rating
-  const potentialRating = player.potential_rating
-  const phase = performance.phase
-  const badges = player.badges || []
-
-  // 1. Delta base: diferença da performance em relação ao equilíbrio
-  const baseDelta = (phase - RATING_CONFIG.BASE_EQUILIBRIUM) * RATING_CONFIG.BASE_MULTIPLIER
-
-  // 2. Aplicar volatilidade baseada no rating atual
-  let volatilityMultiplier = RATING_CONFIG.VOLATILITY_MULTIPLIERS.MEDIUM
-  
-  if (currentRating < RATING_CONFIG.VOLATILITY_THRESHOLDS.LOW) {
-    // Bagre/Promessa: alta volatilidade
-    volatilityMultiplier = RATING_CONFIG.VOLATILITY_MULTIPLIERS.LOW
-  } else if (currentRating > RATING_CONFIG.VOLATILITY_THRESHOLDS.HIGH) {
-    // Craque: baixa volatilidade (Blue Chip)
-    volatilityMultiplier = RATING_CONFIG.VOLATILITY_MULTIPLIERS.HIGH
-  }
-
-  let delta = baseDelta * volatilityMultiplier
-
-  // 3. Resistência do potencial: reduz ganhos quando próximo do teto
-  const distanceToPotential = potentialRating - currentRating
-  
-  if (distanceToPotential < RATING_CONFIG.POTENTIAL_THRESHOLD && delta > 0) {
-    // Está próximo do teto, reduz ganhos pela metade
-    delta = delta * RATING_CONFIG.POTENTIAL_REDUCTION
-  }
-
-  // 4. Aplicar efeitos dos badges
-  for (const badge of badges) {
-    const effectFunction = BADGE_EFFECTS[badge as keyof typeof BADGE_EFFECTS]
-    if (effectFunction) {
-      delta = effectFunction(delta)
-    }
-  }
-
-  // 5. Calcular novo rating
-  let newRating = Math.round(currentRating + delta)
-
-  // 6. Limites: não pode ultrapassar o potencial nem ficar abaixo de 0
-  newRating = Math.min(newRating, potentialRating)
-  newRating = Math.max(newRating, 0)
-
-  console.log(`Rating calculado para ${player.name}: ${currentRating} → ${newRating} (delta: ${delta}, phase: ${phase})`)
-
-  return newRating
-}
-
-/**
- * Atualiza o histórico de fases, mantendo apenas as últimas 5
- */
-function updatePhaseHistory(
-  currentHistory: Array<{ date: string; phase: number; rating: number }>,
-  newEntry: { date: string; phase: number; rating: number }
-): Array<{ date: string; phase: number; rating: number }> {
-  const history = [...currentHistory]
-  
-  // Adicionar nova entrada no início
-  history.unshift({
-    date: newEntry.date,
-    phase: newEntry.phase,
-    rating: newEntry.rating
-  })
-
-  // Manter apenas as últimas 5 entradas
-  if (history.length > RATING_CONFIG.MAX_HISTORY) {
-    history.splice(RATING_CONFIG.MAX_HISTORY)
-  }
-
-  return history
-}

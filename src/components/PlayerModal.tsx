@@ -3,6 +3,7 @@ import { Player, District } from '../types';
 import { X, TrendingUp, Zap, Lock, Activity } from 'lucide-react';
 import { motion } from 'motion/react';
 import { TeamLogo } from './TeamLogo';
+import { PlayerAvatar } from './PlayerAvatar';
 import { useGame } from '../store/GameContext';
 import { calculateTeamPower } from '../engine/gameLogic';
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
@@ -81,12 +82,15 @@ export const PlayerModal: React.FC<PlayerModalProps> = ({ player, onClose }) => 
   const traitList = [player.badges.slot1, player.badges.slot2, player.badges.slot3].filter(Boolean);
 
   // Buy Logic
-  const { setState } = useGame();
+  const { setState, saveGame } = useGame();
+  const [isProcessing, setIsProcessing] = React.useState(false);
+  const [showSuccess, setShowSuccess] = React.useState(false);
+  
   const userManager = state.userManagerId ? state.managers[state.userManagerId] : null;
   const userTeam = userManager?.career.currentTeamId ? state.teams[userManager.career.currentTeamId] : null;
   const isMyPlayer = userTeam?.squad.includes(player.id);
   
-  const handleProposal = () => {
+  const handleProposal = async () => {
     if (!userTeam || isMyPlayer || player.satisfaction >= 80) return;
     
     const currentPower = calculateTeamPower(userTeam, state.players);
@@ -94,53 +98,70 @@ export const PlayerModal: React.FC<PlayerModalProps> = ({ player, onClose }) => 
     const pointsLeft = powerCap - currentPower;
     
     if (pointsLeft < player.totalRating) {
-      alert(`Budget insuficiente! Você precisa de ${player.totalRating} pts, mas tem apenas ${pointsLeft} pts.`);
-      return;
+      return; // UI already handles visual feedback or button state
     }
 
+    setIsProcessing(true);
+
+    // Simulate some "negotiation" delay for feel
+    await new Promise(resolve => setTimeout(resolve, 1200));
+
     // Process Transfer
-    setState(prev => {
-      const next = { ...prev };
-      
-      // Add to user team
-      next.teams[userTeam.id] = {
-        ...next.teams[userTeam.id],
-        squad: [...next.teams[userTeam.id].squad, player.id]
-      };
+    const newState = { ...state };
+    
+    // Add to user team
+    newState.teams[userTeam.id] = {
+      ...newState.teams[userTeam.id],
+      squad: [...newState.teams[userTeam.id].squad, player.id]
+    };
 
-      // Remove from old team if exists
-      if (player.contract.teamId) {
-        const oldTeamId = player.contract.teamId;
-        next.teams[oldTeamId] = {
-          ...next.teams[oldTeamId],
-          squad: next.teams[oldTeamId].squad.filter(id => id !== player.id)
-        };
+    // Remove from old team if exists
+    if (player.contract.teamId) {
+      const oldTeamId = player.contract.teamId;
+      newState.teams[oldTeamId] = {
+        ...newState.teams[oldTeamId],
+        squad: newState.teams[oldTeamId].squad.filter(id => id !== player.id)
+      };
+    }
+
+    // Update player contract
+    newState.players[player.id] = {
+      ...newState.players[player.id],
+      contract: {
+        ...newState.players[player.id].contract,
+        teamId: userTeam.id
       }
+    };
 
-      // Update player contract
-      next.players[player.id] = {
-        ...next.players[player.id],
-        contract: {
-          ...next.players[player.id].contract,
-          teamId: userTeam.id
-        }
-      };
+    // Notification
+    const newNotif = {
+      id: `transf_${Date.now()}`,
+      type: 'transfer' as const,
+      title: 'Transferência Concluída',
+      message: `${player.nickname} assinou com o ${userTeam.name}!`,
+      date: new Date().toISOString(),
+      read: false
+    };
+    newState.notifications = [newNotif, ...newState.notifications];
 
-      // Notification
-      const newNotif = {
-        id: `transf_${Date.now()}`,
-        type: 'transfer' as const,
-        title: 'Transferência Concluída',
-        message: `${player.nickname} assinou com o ${userTeam.name}!`,
-        date: new Date().toISOString(),
-        read: false
-      };
-      next.notifications = [newNotif, ...next.notifications];
+    setState(newState);
+    await saveGame(newState);
+    
+    setShowSuccess(true);
+    setIsProcessing(false);
+    
+    // Close after showing success
+    setTimeout(() => {
+      onClose();
+    }, 1500);
+  };
 
-      return next;
-    });
-
-    onClose();
+  const playerWithBoot2 = {
+    ...player,
+    appearance: {
+      ...player.appearance,
+      bootId: 2
+    }
   };
 
   return (
@@ -159,15 +180,18 @@ export const PlayerModal: React.FC<PlayerModalProps> = ({ player, onClose }) => 
           <X size={16} />
         </button>
 
-        <div className={`relative h-40 bg-gradient-to-b ${theme.gradient} flex items-end p-4`}>
-           <div className="absolute inset-0 opacity-30" 
-                style={{ backgroundImage: `url(https://picsum.photos/seed/${player.id}/800/400)`, backgroundSize: 'cover' }} 
-           />
-           <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
+        <div className={`relative h-56 bg-gradient-to-b ${theme.gradient} flex items-end p-4 overflow-hidden`}>
+           <div className="absolute inset-0 opacity-20" 
+                style={{ filter: 'blur(2px)' }} 
+           >
+             <PlayerAvatar player={playerWithBoot2} size="xl" mode="full" className="w-full h-full object-cover translate-y-8" />
+           </div>
+           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
            
-           <div className="relative z-10 flex items-end gap-3 w-full">
-             <div className={`w-20 h-20 rounded-xl border ${theme.border} bg-black/50 shadow-lg overflow-hidden flex-shrink-0`}>
-                <img src={`https://picsum.photos/seed/${player.id}/200/200`} className="w-full h-full object-cover" />
+           <div className="relative z-10 flex items-end gap-4 w-full">
+             <div className={`w-28 h-28 rounded-2xl border ${theme.border} bg-black/60 shadow-2xl overflow-hidden flex-shrink-0 group relative`}>
+                <PlayerAvatar player={playerWithBoot2} size="lg" mode="full" className="w-full h-full object-contain translate-y-2 group-hover:scale-110 transition-transform duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
              </div>
              
              <div className="flex-1 mb-1">
@@ -320,14 +344,28 @@ export const PlayerModal: React.FC<PlayerModalProps> = ({ player, onClose }) => 
              <button 
                onClick={handleProposal}
                className={`w-full py-4 rounded-xl font-black uppercase tracking-[0.4em] text-[11px] transition-all shadow-lg hover:scale-[1.02] active:scale-[0.98] relative overflow-hidden group/btn ${
-                 player.satisfaction < 80
+                 showSuccess 
+                   ? 'bg-emerald-500 text-white shadow-[0_0_30px_rgba(16,185,129,0.5)]'
+                   : isProcessing
+                   ? 'bg-slate-700 text-slate-400 cursor-wait'
+                   : player.satisfaction < 80
                    ? `bg-white text-black hover:bg-cyan-50 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(34,211,238,0.3)]` 
                    : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
                }`}
-               disabled={player.satisfaction >= 80}
+               disabled={player.satisfaction >= 80 || isProcessing || showSuccess}
              >
                <div className="relative z-10 flex items-center justify-center gap-3">
-                 {player.satisfaction >= 80 ? (
+                 {showSuccess ? (
+                   <>
+                     <Activity size={14} className="animate-bounce" />
+                     CONTRATADO COM SUCESSO!
+                   </>
+                 ) : isProcessing ? (
+                   <>
+                     <div className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                     NEGOCIANDO...
+                   </>
+                 ) : player.satisfaction >= 80 ? (
                    <>
                      <Lock size={14} className="opacity-50" />
                      CONTRATO ESTÁVEL
@@ -339,7 +377,7 @@ export const PlayerModal: React.FC<PlayerModalProps> = ({ player, onClose }) => 
                    </>
                  )}
                </div>
-               {player.satisfaction < 80 && (
+               {!isProcessing && !showSuccess && player.satisfaction < 80 && (
                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent -translate-x-full group-hover/btn:animate-[shimmer_1.5s_infinite]" />
                )}
              </button>

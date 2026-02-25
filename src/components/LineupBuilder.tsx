@@ -4,6 +4,7 @@ import { useGame } from '../store/GameContext';
 import { Player, Team } from '../types';
 import { PlayerCard } from './PlayerCard';
 import { TeamLogo } from './TeamLogo';
+import { PlayerAvatar } from './PlayerAvatar';
 import { UserMinus, Save, Activity, Users, Zap, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -70,54 +71,49 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({ team, allPlayers, 
     }
 
     // Place selected player in slot
-    setState(prev => {
-      const newTeams = { ...prev.teams };
-      const currentTeam = { ...newTeams[team.id] };
-      const newLineup = { ...currentTeam.lineup };
+    const newState = { ...state };
+    const newTeams = { ...newState.teams };
+    const currentTeam = { ...newTeams[team.id] };
+    const newLineup = { ...currentTeam.lineup };
 
-      // Check if player is already in another slot and remove them
-      Object.keys(newLineup).forEach(key => {
-        if (newLineup[key] === selectedPlayerId) {
-          delete newLineup[key];
-        }
-      });
-
-      // If slot is occupied, move the occupant to bench (simply overwrite)
-      // or swap? For now, let's overwrite (occupant goes to bench automatically as they are no longer in lineup)
-      // Actually, if we want to swap, we'd need to know where the selected player came from.
-      // But "Click from bench -> Click slot" implies overwrite.
-      // "Click from slot A -> Click slot B" implies move.
-      // If Slot B has player, it's a swap or overwrite. 
-      // Let's implement overwrite for simplicity first: the previous occupant is just removed from lineup.
-      
-      newLineup[slotId] = selectedPlayerId;
-      
-      currentTeam.lineup = newLineup;
-      newTeams[team.id] = currentTeam;
-      
-      return { ...prev, teams: newTeams };
+    // Check if player is already in another slot and remove them
+    Object.keys(newLineup).forEach(key => {
+      if (newLineup[key] === selectedPlayerId) {
+        delete newLineup[key];
+      }
     });
+
+    newLineup[slotId] = selectedPlayerId;
+    
+    currentTeam.lineup = newLineup;
+    newTeams[team.id] = currentTeam;
+    newState.teams = newTeams;
+    
+    setState(newState);
+    saveGame(newState);
     
     setSelectedPlayerId(null);
   };
 
   const handleRemoveFromLineup = (playerId: string) => {
-     setState(prev => {
-        const newTeams = { ...prev.teams };
-        const currentTeam = { ...newTeams[team.id] };
-        const newLineup = { ...currentTeam.lineup };
-        
-        Object.keys(newLineup).forEach(key => {
-            const slotKey = key;
-            if (newLineup[slotKey] === playerId) {
-                delete newLineup[slotKey];
-            }
-        });
-        
-        currentTeam.lineup = newLineup;
-        newTeams[team.id] = currentTeam;
-        return { ...prev, teams: newTeams };
-      });
+     const newState = { ...state };
+     const newTeams = { ...newState.teams };
+     const currentTeam = { ...newTeams[team.id] };
+     const newLineup = { ...currentTeam.lineup };
+     
+     Object.keys(newLineup).forEach(key => {
+         const slotKey = key;
+         if (newLineup[slotKey] === playerId) {
+             delete newLineup[slotKey];
+         }
+     });
+     
+     currentTeam.lineup = newLineup;
+     newTeams[team.id] = currentTeam;
+     newState.teams = newTeams;
+     
+     setState(newState);
+     saveGame(newState);
   };
 
   const handleSaveLineup = async () => {
@@ -188,14 +184,14 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({ team, allPlayers, 
             <button 
                 onClick={handleSaveLineup}
                 disabled={isSaving}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all shadow-lg ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all shadow-lg border ${
                     isSaving 
-                    ? 'bg-emerald-600/50 text-white/50 cursor-wait' 
-                    : 'bg-emerald-600 hover:bg-emerald-500 text-white hover:scale-105 active:scale-95'
+                    ? 'bg-emerald-900/20 border-emerald-500/30 text-emerald-500/50 cursor-wait' 
+                    : 'bg-black/40 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500 hover:scale-105 active:scale-95'
                 }`}
             >
                 <Save size={16} />
-                {isSaving ? 'Salvando...' : 'Salvar Escalação'}
+                {isSaving ? 'Salvando...' : 'Salvar'}
             </button>
         </div>
 
@@ -240,15 +236,20 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({ team, allPlayers, 
                           handlePlayerClick(e, player.id);
                         }}
                         onDoubleClick={(e) => { e.stopPropagation(); onPlayerSelect(player); }}
-                        className={`transform hover:scale-110 transition-transform duration-200 relative z-20 w-16 cursor-pointer ${
+                        className={`transform hover:scale-110 transition-transform duration-200 relative z-20 w-16 h-16 cursor-pointer flex items-center justify-center ${
                           isSelected 
                             ? 'ring-2 ring-cyan-400 rounded-xl scale-110 shadow-[0_0_15px_rgba(34,211,238,0.5)]' 
                             : player.role !== slot.label
-                              ? 'ring-2 ring-red-500/50 rounded-xl shadow-[0_0_10px_rgba(239,68,68,0.3)]'
-                              : ''
+                              ? 'ring-2 ring-red-500 rounded-xl shadow-[0_0_15px_rgba(239,68,68,0.6)]'
+                              : 'ring-2 ring-emerald-400 rounded-xl shadow-[0_0_15px_rgba(52,211,153,0.6)]'
                         }`}
                     >
-                        <PlayerCard player={player} onClick={() => {}} variant="compact" teamLogo={team.logo} />
+                        <PlayerAvatar player={player} size="sm" mode="head" className="rounded-xl" />
+                        
+                        {/* Rating Overlay */}
+                        <div className="absolute -bottom-1 -right-1 bg-black/80 border border-white/20 rounded-md px-1 py-0.5 text-[8px] font-black text-white">
+                          {player.totalRating}
+                        </div>
                         
                         {/* Wrong position warning badge */}
                         {player.role !== slot.label && (

@@ -39,13 +39,18 @@ export const calculateMatchEvent = (
   const defensePower = applyChaos(baseDefense, defense.chaosMax);
 
   const ratio = attackPower / Math.max(1, defensePower);
-  const goalProbability = clamp(0.08 + (ratio - 1) * 0.45, 0.02, 0.7);
-  const defenseProbability = clamp(0.18 + (1 / ratio - 1) * 0.35, 0.05, 0.7);
+  const goalProbability = clamp(0.08 + (ratio - 1) * 0.45, 0.02, 0.6);
+  const defenseProbability = clamp(0.18 + (1 / ratio - 1) * 0.35, 0.05, 0.6);
 
   let outcome: 'goal' | 'defense' | 'turnover' = 'turnover';
-  if (ratio >= 1.12) outcome = 'goal';
-  else if (ratio <= 0.9) outcome = 'defense';
-  else outcome = Math.random() < goalProbability ? 'goal' : Math.random() < defenseProbability ? 'defense' : 'turnover';
+  const roll = Math.random();
+  if (roll < goalProbability) {
+    outcome = 'goal';
+  } else if (roll < goalProbability + defenseProbability) {
+    outcome = 'defense';
+  } else {
+    outcome = 'turnover';
+  }
 
   const ratings: Record<string, number> = {};
   const attackBonus = outcome === 'goal' ? 0.8 : outcome === 'defense' ? -0.2 : -0.4;
@@ -80,7 +85,9 @@ export type EvolutionResult = {
 export const calculateEvolution = (
   player: Player,
   matchRating: number | null,
-  lastPhases: number[]
+  lastPhases: number[],
+  isEvolutionFocus: boolean = false,
+  isStabilizationFocus: boolean = false
 ): EvolutionResult => {
   const currentRating = player.totalRating;
   const potential = Math.min(1000, player.potential);
@@ -95,6 +102,15 @@ export const calculateEvolution = (
   else if (currentRating < 600) inertia = 1.5;
 
   let delta = played ? (effectiveRating - 6) * 5 * inertia : -1.2 * inertia;
+  
+  // Apply individual focus modifiers
+  if (isEvolutionFocus && delta > 0) {
+    delta *= 1.5; // 50% more gains
+  }
+  if (isStabilizationFocus && delta < 0) {
+    delta *= 0.5; // 50% less losses
+  }
+
   delta = Math.round(delta);
 
   const newPentagon = { ...player.pentagon };
@@ -117,13 +133,19 @@ export const calculateEvolution = (
 
   delta = Math.round(delta * badgeModifier);
 
+  // Focus increases chances of pentagon improvement
+  const pentagonChanceMultiplier = isEvolutionFocus ? 1.5 : 1.0;
+
   if (played && newPhase > 8) {
-    for (let i = 0; i < 2; i++) {
+    const rolls = Math.floor(2 * pentagonChanceMultiplier);
+    for (let i = 0; i < rolls; i++) {
       const key = keys[Math.floor(Math.random() * keys.length)];
       newPentagon[key] = clamp(newPentagon[key] + 1, 0, 100);
     }
   } else if (played && newPhase < 5) {
-    for (let i = 0; i < 2; i++) {
+    // Stabilization reduces pentagon decay
+    const decayRolls = isStabilizationFocus ? 1 : 2;
+    for (let i = 0; i < decayRolls; i++) {
       const key = keys[Math.floor(Math.random() * keys.length)];
       newPentagon[key] = clamp(newPentagon[key] - 1, 0, 100);
     }

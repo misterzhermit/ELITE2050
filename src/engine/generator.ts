@@ -47,11 +47,30 @@ const positiveProfileTraits = ['Referência', 'Combativo', 'Vertical', 'Cadencia
 const specialTraits = ['Dono do Jogo', 'Passo à Frente', 'Gênio', 'Destreza Máxima', 'Frieza Absoluta'];
 
 const generateName = () => {
-  const useMale = Math.random() < 0.5;
-  const firstList = useMale ? firstNamesMale : firstNamesFemale;
+  const gender = Math.random() < 0.5 ? 'M' : 'F';
+  const firstList = gender === 'M' ? firstNamesMale : firstNamesFemale;
   const first = firstList[randomInt(0, firstList.length - 1)];
   const last = lastNames[randomInt(0, lastNames.length - 1)];
-  return { name: `${first} ${last}`, nickname: `${first[0]}. ${last}` };
+  
+  // Deterministic appearance based on name hash (so it stays the same)
+  const seedStr = `${first}${last}`;
+  let hash = 0;
+  for (let i = 0; i < seedStr.length; i++) {
+    hash = ((hash << 5) - hash) + seedStr.charCodeAt(i);
+    hash |= 0;
+  }
+  const absHash = Math.abs(hash);
+
+  return { 
+    name: `${first} ${last}`, 
+    nickname: `${first[0]}. ${last}`,
+    appearance: {
+      gender: gender as 'M' | 'F',
+      bodyId: (absHash % 3) + 1, // 1, 2, 3
+      hairId: (absHash % 6) + 1, // 1..6
+      bootId: (absHash % 15) + 1 // 1..15
+    }
+  };
 };
 
 const generatePentagon = (): Pentagon => {
@@ -110,7 +129,7 @@ const generateBadges = (totalRating: number): Badges => {
 };
 
 export const generatePlayer = (id: string, district: District, ratingOverride?: number, forcedRole?: PlayerRole): Player => {
-  const { name, nickname } = generateName();
+  const { name, nickname, appearance } = generateName();
   
   let role: PlayerRole;
   if (forcedRole) {
@@ -145,6 +164,7 @@ export const generatePlayer = (id: string, district: District, ratingOverride?: 
     id,
     name,
     nickname,
+    appearance,
     district,
     position,
     role,
@@ -152,6 +172,8 @@ export const generatePlayer = (id: string, district: District, ratingOverride?: 
     fusion: fusions,
     totalRating: baseRating,
     potential,
+    currentPhase: 6.0,
+    phaseHistory: lastMatchRatings.slice(0, 3),
     badges,
     contract: {
       teamId: null,
@@ -216,23 +238,39 @@ const cities = ['Neo-Tokyo', 'Cyber-SP', 'New London', 'Mega-York', 'Neo-Paris',
 
 const getColorsForDistrict = (district: District) => {
   switch (district) {
-    case 'NORTE': return { primary: '#00FFFF', secondary: '#FF00FF' }; // Ciano/Magenta
-    case 'SUL': return { primary: '#FF6600', secondary: '#808080' }; // Laranja/Cinza
-    case 'LESTE': return { primary: '#00FF00', secondary: '#8B4513' }; // Verde/Marrom
-    case 'OESTE': return { primary: '#800080', secondary: '#C0C0C0' }; // Roxo/Prata
-    default: return { primary: '#FFFFFF', secondary: '#000000' };
+    case 'NORTE': return { primary: '#00f2ff', secondary: '#7000ff' }; // Cyber Cyan / Electric Purple
+    case 'SUL': return { primary: '#ff4d00', secondary: '#2e2e2e' }; // Neon Orange / Carbon Gray
+    case 'LESTE': return { primary: '#00ff6a', secondary: '#5c3a21' }; // Matrix Green / Dark Wood
+    case 'OESTE': return { primary: '#bf00ff', secondary: '#e2e2e2' }; // Deep Violet / Silver Chrome
+    default: return { primary: '#ffffff', secondary: '#000000' };
   }
 };
 
-const logoPatterns = ['none', 'stripes-v', 'stripes-h', 'diagonal', 'half-v', 'half-h', 'cross', 'circle'];
-const logoSymbols = ['Shield', 'Star', 'Sword', 'Zap', 'Flame', 'Crown', 'Target', 'Anchor', 'Award', 'Compass', 'Crosshair', 'Feather', 'Flag', 'Heart', 'Key', 'Leaf', 'Lightning', 'Moon', 'Mountain', 'Rocket', 'Sun', 'Trophy', 'Wind'];
+const logoPatterns: LogoPattern[] = [
+  'none', 'stripes-v', 'stripes-h', 'diagonal', 'half-v', 'half-h', 'cross', 'circle', 
+  'checkered', 'waves', 'diamond', 'sunburst'
+];
+const logoSymbols = [
+  'Shield', 'Star', 'Sword', 'Zap', 'Flame', 'Crown', 'Target', 'Anchor', 'Award', 
+  'Compass', 'Crosshair', 'Feather', 'Flag', 'Heart', 'Key', 'Leaf', 'Lightning', 
+  'Moon', 'Mountain', 'Rocket', 'Sun', 'Trophy', 'Wind', 'Gem', 'Skull', 'Ghost', 
+  'Fingerprint', 'Cpu', 'Activity', 'ShieldAlert', 'ShieldCheck', 'Radio', 'Telescope'
+];
 
 const generateLogo = (primary: string, secondary: string): TeamLogoMetadata => {
+  const patternId = logoPatterns[randomInt(0, logoPatterns.length - 1)];
+  const symbolId = logoSymbols[randomInt(0, logoSymbols.length - 1)];
+  
+  // 30% chance of having a secondary symbol
+  const hasSecondary = Math.random() < 0.3;
+  const secondarySymbolId = hasSecondary ? logoSymbols[randomInt(0, logoSymbols.length - 1)] : undefined;
+
   return {
     primary,
     secondary,
-    patternId: logoPatterns[randomInt(0, logoPatterns.length - 1)],
-    symbolId: logoSymbols[randomInt(0, logoSymbols.length - 1)],
+    patternId,
+    symbolId,
+    secondarySymbolId,
   };
 };
 
@@ -263,12 +301,22 @@ export const generateTeam = (id: string, index: number, district: District): Tea
       emergencyCredit: 0,
     },
     tactics: {
-      playStyle: ['Vertical', 'Cadenciado', 'Retranca'][randomInt(0, 2)] as any,
+      playStyle: 'Equilibrado',
+      mentality: 'Calculista',
+      linePosition: 50,
+      aggressiveness: 50,
+      slots: [null, null, null],
       preferredFormation: ['4-3-3', '4-4-2', '3-5-2', '4-2-3-1'][randomInt(0, 3)],
     },
     managerId: null,
     squad: [],
     lineup: {},
+    chemistry: 50,
+    inventory: [
+      { id: 'card_1', name: 'Ataque Total', type: 'BUFF', rarity: 'COMMON', effect: 'Aumenta o ataque em 10%' },
+      { id: 'card_2', name: 'Muralha', type: 'BUFF', rarity: 'RARE', effect: 'Aumenta a defesa em 15%' },
+      { id: 'card_3', name: 'Meio-Campo Criativo', type: 'BUFF', rarity: 'COMMON', effect: 'Aumenta o meio-campo em 10%' }
+    ],
   };
 };
 
@@ -507,8 +555,26 @@ export const generateInitialState = (): GameState => {
       currentDate: new Date('2050-01-01T08:00:00Z').toISOString(),
       seasonStartReal: null,
     },
+    worldId: 'default',
     userTeamId: null,
     userManagerId: null,
+    lastHeadline: {
+      title: "Temporada Iniciada",
+      message: "A nova era do futebol de elite começa hoje em Neo-City. Quem dominará os distritos?"
+    },
     notifications: [],
+    training: {
+      chemistryBoostLastUsed: undefined,
+      cardLaboratory: {
+        slots: [
+          { cardId: null, finishTime: null },
+          { cardId: null, finishTime: null }
+        ]
+      },
+      individualFocus: {
+        evolutionSlot: null,
+        stabilizationSlot: null
+      }
+    }
   };
 };

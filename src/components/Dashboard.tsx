@@ -1,38 +1,234 @@
 import React, { useState, useEffect } from 'react';
 import { useGame } from '../store/GameContext';
+import { supabase } from '../lib/supabase';
 import { PlayerCard } from './PlayerCard';
 import { PlayerModal } from './PlayerModal';
 import { LineupBuilder } from './LineupBuilder';
-import { calculateTeamPower, applySafetyNet } from '../engine/gameLogic';
+import { calculateTeamPower, applySafetyNet, advanceGameDay, simulateAndRecordMatch, updateStandings } from '../engine/gameLogic';
 import { 
   Home, Trophy, ShoppingCart, Database, User, 
   Clock, Newspaper, Wallet, TrendingUp, AlertCircle, Award,
-  Calendar, Users, Activity, Sliders, Flame, Target, Zap,
-  Globe, MessageSquare, AlertTriangle, TrendingDown, Briefcase, Star, Search, Crown, ChevronRight
+  Calendar, Users, Activity, Sliders, Flame, Target, Zap, FastForward,
+  Globe, MessageSquare, AlertTriangle, TrendingDown, Briefcase, Star, Search, Crown, ChevronRight, Lock, ChevronDown, Eye, Shield, Brain, X, Save
 } from 'lucide-react';
-import { Player, Team, League, LeagueTeamStats } from '../types';
+import { Player, Team, League, LeagueTeamStats, Match, MatchResult } from '../types';
 import { NewGameFlow } from './NewGameFlow';
 import { TeamLogo } from './TeamLogo';
+import { getMatchStatus, isMatchLive, getLiveMatchSecond } from '../utils/matchUtils';
+import { simulateMatch, TeamStats, Tactic } from '../engine/MatchEngine';
+import { LiveReport, PostGameReport } from './MatchReports';
 
 type Tab = 'home' | 'team' | 'calendar' | 'world' | 'career';
 type TeamSubTab = 'squad' | 'tactics' | 'lineup' | 'training' | 'locker_room';
 
 export const Dashboard: React.FC = () => {
-  const { state, setState, isSyncing, isOnline } = useGame();
+  const { state, setState, isSyncing, isOnline, setWorldId, saveGame, userId } = useGame();
+  const isOwner = !state.worldId || state.worldId === 'default' || (state as any).userId === userId;
+  
+  const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [activeTeamTab, setActiveTeamTab] = useState<TeamSubTab>('squad');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [selectedMatchReport, setSelectedMatchReport] = useState<Match | null>(null);
+  const [isWatchingVod, setIsWatchingVod] = useState(false);
+  const [vodSecond, setVodSecond] = useState(0);
+  const [gmRandomPlayer, setGmRandomPlayer] = useState<Player | null>(null);
   const [isCareerModalOpen, setIsCareerModalOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [activeLeague, setActiveLeague] = useState('norte');
   const [activeCompetition, setActiveCompetition] = useState<'league' | 'elite' | 'district'>('league');
+  const [selectedCardSlot, setSelectedCardSlot] = useState<number | null>(null);
+  const [isCardModalOpen, setIsCardModalOpen] = useState(false);
+
+  // Patch state if training is missing (compatibility with old saves)
+  const handleManualSave = async () => {
+    if (!saveGame) return;
+    setIsSaving(true);
+    await saveGame();
+    setTimeout(() => setIsSaving(false), 1000);
+  };
+
+  useEffect(() => {
+    if (!state.training) {
+      setState(prev => ({
+        ...prev,
+        training: {
+          chemistryBoostLastUsed: undefined,
+          cardLaboratory: {
+            slots: [
+              { cardId: null, finishTime: null },
+              { cardId: null, finishTime: null }
+            ]
+          },
+          individualFocus: {
+            evolutionSlot: null,
+            stabilizationSlot: null
+          }
+        }
+      }));
+    }
+  }, [state.training, setState]);
+
+  const availableCards: TacticalCard[] = [
+    { id: 'card_att_1', name: 'Ataque Total', description: 'Aumenta a eficiência ofensiva em 10%.', effect: 'ATT_10' },
+    { id: 'card_def_1', name: 'Defesa de Ferro', description: 'Fortalece a linha defensiva em 10%.', effect: 'DEF_10' },
+    { id: 'card_mid_1', name: 'Meio Criativo', description: 'Melhora o controle de jogo em 10%.', effect: 'MID_10' },
+    { id: 'card_gk_1', name: 'Goleiro Murada', description: 'Aumenta reflexos do goleiro em 10%.', effect: 'GK_10' },
+    { id: 'card_super_chute', name: 'Super Chute', description: 'Bônus massivo de finalização (+15%).', effect: 'ATT_15' },
+    { id: 'card_muralha', name: 'Muralha', description: 'Bônus massivo de interceptação (+15%).', effect: 'DEF_15' },
+  ];
+
+  const handleSelectCard = (card: TacticalCard | null) => {
+    if (selectedCardSlot === null || !userTeam) return;
+    
+    const newSlots = [...userTeam.tactics.slots];
+    newSlots[selectedCardSlot] = card;
+    
+    handleUpdateTactics({ slots: newSlots });
+    setIsCardModalOpen(false);
+    setSelectedCardSlot(null);
+  };
+
+  const handleMakeProposal = async (player: Player) => {
+    if (!userTeam) {
+      alert('Você precisa estar em um time para fazer uma proposta!');
+      return;
+    }
+
+    if (userTeam.squad.length >= 20) {
+      alert('Seu elenco já está cheio (máximo 20 jogadores)!');
+      return;
+    }
+
+    // No mercado livre, o valor é o valor de mercado
+    const value = player.contract.marketValue;
+    
+    // Calcular pontos totais se o jogador for contratado
+    const nextTotalPoints = totalPoints + player.totalRating;
+    if (nextTotalPoints > powerCap) {
+      alert(`Contratação excede o Power Cap de ${powerCap / 100}k!`);
+      return;
+    }
+
+    if (window.confirm(`Deseja contratar ${player.nickname} por $${(value / 1000000).toFixed(1)}M?`)) {
+      try {
+        const newNotification: Notification = {
+          id: `transf_${Date.now()}`,
+          date: new Date().toISOString(),
+          title: 'Transferência Concluída',
+          message: `${player.nickname} assinou com o ${userTeam.name}!`,
+          type: 'transfer',
+          read: false
+        };
+
+        setState(prev => {
+          const newState = { ...prev };
+          
+          // Atualizar o jogador
+          newState.players[player.id] = {
+            ...player,
+            contract: {
+              ...player.contract,
+              teamId: userTeam.id
+            }
+          };
+
+          // Atualizar o time
+          newState.teams[userTeam.id] = {
+            ...newState.teams[userTeam.id],
+            squad: [...newState.teams[userTeam.id].squad, player.id]
+          };
+
+          // Adicionar notificação
+          newState.notifications = [newNotification, ...newState.notifications];
+
+          return newState;
+        });
+
+        // Persistir no Supabase se estiver online
+        if (isOnline) {
+          // Criar registro na tabela de transferências
+          await supabase.from('transfers').insert({
+            player_id: player.id,
+            from_team_id: null, // Free agent
+            to_team_id: userTeam.id,
+            value: value,
+            user_id: (await supabase.auth.getUser()).data.user?.id
+          });
+
+          // Adicionar notificação no banco
+          await supabase.from('notifications').insert({
+            user_id: (await supabase.auth.getUser()).data.user?.id,
+            title: newNotification.title,
+            message: newNotification.message,
+            type: newNotification.type
+          });
+        }
+
+        alert(`${player.nickname} agora faz parte do seu elenco!`);
+      } catch (error) {
+        console.error('Erro ao processar transferência:', error);
+        alert('Erro ao processar transferência. Tente novamente.');
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!gmRandomPlayer && Object.values(state.players).length > 0) {
+      handleOpenRandomPlayer();
+    }
+  }, [state.players]);
+
+  const handleOpenRandomPlayer = () => {
+    console.log('GM: Selecionando jogador aleatório para mini card...');
+    const allPlayers = Object.values(state.players);
+    console.log(`GM: Total de jogadores disponíveis: ${allPlayers.length}`);
+    if (allPlayers.length > 0) {
+      const randomPlayer = allPlayers[Math.floor(Math.random() * allPlayers.length)];
+      console.log(`GM: Jogador selecionado: ${randomPlayer.nickname} (${randomPlayer.id})`);
+      setGmRandomPlayer(randomPlayer);
+    } else {
+      console.warn('GM: Nenhum jogador encontrado no estado!');
+    }
+  };
+
+  const handleSimulateGameReport = () => {
+    handleMockVod();
+  };
+
+  const handleAdvanceDay = () => {
+    console.log('GM: Avançando dia do jogo...');
+    setState(prev => {
+      const newState = advanceGameDay(prev);
+      return newState;
+    });
+  };
+
+  const handleUpdateTactics = (updates: Partial<any>) => {
+    if (!userTeam) return;
+    setState(prev => ({
+      ...prev,
+      teams: {
+        ...prev.teams,
+        [userTeam.id]: {
+          ...prev.teams[userTeam.id],
+          tactics: {
+            ...prev.teams[userTeam.id].tactics,
+            ...updates
+          }
+        }
+      }
+    }));
+  };
 
   // Market Filters
   const [marketSearch, setMarketSearch] = useState('');
   const [marketDistrict, setMarketDistrict] = useState<string>('all');
   const [marketPointsMin, setMarketPointsMin] = useState(0);
+  const [marketPointsMax, setMarketPointsMax] = useState(1000);
   const [marketPotentialMin, setMarketPotentialMin] = useState(0);
   const [marketPosition, setMarketPosition] = useState<string>('all');
+  const [marketLimit, setMarketLimit] = useState(20);
 
   // Get user team
   const userManager = state.userManagerId ? state.managers[state.userManagerId] : null;
@@ -52,7 +248,7 @@ export const Dashboard: React.FC = () => {
     : 0;
   const seasonProgress = Math.round((daysPassed / seasonDays) * 100);
   
-  const upcomingMatches = React.useMemo(() => {
+  const userTeamMatches = React.useMemo(() => {
     if (!userTeam || !state.world?.leagues) return [];
 
     const leagues = Object.values(state.world.leagues) as League[];
@@ -62,24 +258,27 @@ export const Dashboard: React.FC = () => {
 
     const currentRound = state.world.currentRound;
     
-    // Filter matches for user team
+    // Get all matches for user team
     const matches = userLeague.matches
-      .filter(m => (m.homeTeamId === userTeam.id || m.awayTeamId === userTeam.id) && m.round >= currentRound)
-      .sort((a, b) => a.round - b.round)
-      .slice(0, 10);
+      .filter(m => (m.homeTeamId === userTeam.id || m.awayTeamId === userTeam.id))
+      .sort((a, b) => a.round - b.round);
 
     return matches.map(m => {
        const homeTeam = state.teams[m.homeTeamId];
        const awayTeam = state.teams[m.awayTeamId];
+       
+       // Calculate match date based on round
        const matchDate = new Date(state.world.currentDate);
-       matchDate.setDate(matchDate.getDate() + (m.round - currentRound) * 2);
+       const daysDiff = (m.round - currentRound) * 2;
+       matchDate.setDate(matchDate.getDate() + daysDiff);
 
-       // Horários pré-definidos baseados no ID da partida para consistência
+       // Fixed times based on round/id
        const hours = [16, 18, 19, 21];
        const matchHour = hours[parseInt(m.id.split('_')[1]) % hours.length] || 16;
 
        return {
          id: m.id,
+         round: m.round,
          date: matchDate.toISOString().split('T')[0],
          time: `${matchHour}:00`,
          home: homeTeam?.name || 'Unknown',
@@ -90,10 +289,15 @@ export const Dashboard: React.FC = () => {
          awayLogo: awayTeam?.logo,
          homeScore: m.homeScore,
          awayScore: m.awayScore,
+         played: m.played,
          type: 'League'
        };
     });
   }, [userTeam, state.world.leagues, state.world.currentRound, state.teams, state.world.currentDate]);
+
+  const upcomingMatches = React.useMemo(() => {
+    return userTeamMatches.filter(m => !m.played);
+  }, [userTeamMatches]);
 
   // Computed League Data
   const leaguesData = React.useMemo(() => {
@@ -179,15 +383,85 @@ export const Dashboard: React.FC = () => {
     });
   }, [userTeam?.id, userTeam?.squad.length, state.players]);
 
-  const renderHome = () => {
-    // Get last notification for Headline card
-    const lastHeadline = state.notifications.length > 0 
-      ? state.notifications[state.notifications.length - 1] 
-      : { title: 'Temporada Iniciada', message: 'Bem-vindo à Elite 2050. O mercado está aquecido e os motores rugem.' };
+  // Match Locking & Simulation Logic
+  useEffect(() => {
+    if (!state.world?.leagues) return;
 
+    const leagues = Object.entries(state.world.leagues);
+    let stateChanged = false;
+    const nextState = JSON.parse(JSON.stringify(state));
+
+    leagues.forEach(([leagueKey, league]) => {
+      league.matches.forEach((match: Match, idx: number) => {
+        if (match.status === 'FINISHED') return;
+
+        const status = getMatchStatus(match, state.world.currentDate);
+        
+        // If match should be LOCKED or PLAYING but isn't simulated yet
+        if ((status === 'LOCKED' || status === 'PLAYING') && match.status === 'SCHEDULED') {
+          console.log(`Locking and simulating match: ${match.id}`);
+          
+          // Use the real simulation engine with actual attributes and evolution
+          const result = simulateAndRecordMatch(nextState, match, null); // Don't update standings yet
+
+          nextState.world.leagues[leagueKey].matches[idx] = {
+            ...match,
+            status: status === 'LOCKED' ? 'LOCKED' : 'PLAYING',
+            result
+          };
+          stateChanged = true;
+        } else if (status === 'PLAYING' && match.status === 'LOCKED') {
+           nextState.world.leagues[leagueKey].matches[idx].status = 'PLAYING';
+           stateChanged = true;
+        } else if (status === 'FINISHED' && (match.status === 'PLAYING' || match.status === 'LOCKED' || match.status === 'SCHEDULED')) {
+           // Ensure it's simulated if it skipped straight to FINISHED
+           if (!match.result) {
+             console.log(`Simulating skipped match: ${match.id}`);
+             match.result = simulateAndRecordMatch(nextState, match, null);
+           }
+
+           nextState.world.leagues[leagueKey].matches[idx].status = 'FINISHED';
+           nextState.world.leagues[leagueKey].matches[idx].played = true;
+           nextState.world.leagues[leagueKey].matches[idx].homeScore = nextState.world.leagues[leagueKey].matches[idx].result?.homeScore || 0;
+           nextState.world.leagues[leagueKey].matches[idx].awayScore = nextState.world.leagues[leagueKey].matches[idx].result?.awayScore || 0;
+           
+           // Update league standings
+           updateStandings(
+             nextState.world.leagues[leagueKey].standings,
+             match.homeTeamId,
+             match.awayTeamId,
+             nextState.world.leagues[leagueKey].matches[idx].homeScore,
+             nextState.world.leagues[leagueKey].matches[idx].awayScore
+           );
+           
+           stateChanged = true;
+        }
+      });
+    });
+
+    if (stateChanged) {
+      setState(nextState);
+    }
+  }, [state.world.currentDate]);
+
+  useEffect(() => {
+    let interval: any;
+    if (isWatchingVod && vodSecond < 360) {
+      interval = setInterval(() => {
+        setVodSecond(prev => Math.min(360, prev + 1));
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isWatchingVod, vodSecond]);
+
+  const handleStartVod = () => {
+    setVodSecond(0);
+    setIsWatchingVod(true);
+  };
+
+  const renderHome = () => {
     // Get next match info
     const nextMatch = upcomingMatches[0];
-    const opponentId = nextMatch ? (nextMatch.home === userTeam?.name ? upcomingMatches[0].id : upcomingMatches[0].id) : null; // This is a bit complex, let's simplify
     
     // Better next match logic
     const nextMatchData = (() => {
@@ -195,22 +469,208 @@ export const Dashboard: React.FC = () => {
       const leagues = Object.values(state.world.leagues) as League[];
       const userLeague = leagues.find(l => l.standings.some(s => s.teamId === userTeam.id));
       if (!userLeague) return null;
-      const match = userLeague.matches.find(m => (m.homeTeamId === userTeam.id || m.awayTeamId === userTeam.id) && !m.played);
+      const match = userLeague.matches.find(m => (m.homeTeamId === userTeam.id || m.awayTeamId === userTeam.id) && m.status !== 'FINISHED');
       if (!match) return null;
       
       const opponentId = match.homeTeamId === userTeam.id ? match.awayTeamId : match.homeTeamId;
       const opponent = state.teams[opponentId];
       const opponentPower = opponent ? calculateTeamPower(opponent, state.players) : 0;
       const userPower = calculateTeamPower(userTeam, state.players);
+      const status = getMatchStatus(match, state.world.currentDate);
       
       return {
         match,
         opponent,
         opponentPower,
         userPower,
-        isHome: match.homeTeamId === userTeam.id
+        isHome: match.homeTeamId === userTeam.id,
+        status
       };
     })();
+
+    const lastHeadline = state.lastHeadline || {
+      title: "Mercado Aquecido",
+      message: "Novas promessas surgem nos distritos periféricos de Neo-City."
+    };
+
+    const handleMockVod = () => {
+      console.log('GM: Simulando relatório de jogo (VOD mock)...');
+      
+      const teams = Object.values(state.teams);
+      if (teams.length < 2) {
+        console.error('GM: Necessário pelo menos 2 times no estado para mockar VOD');
+        return;
+      }
+
+      const homeTeam = userTeam || teams[0];
+      const awayTeam = teams.find(t => t.id !== homeTeam.id) || teams[1];
+      
+      const allPlayers = Object.values(state.players);
+      if (allPlayers.length < 10) {
+        console.error('GM: Necessário pelo menos 10 jogadores no estado para mockar VOD');
+        return;
+      }
+
+      const homePlayers = allPlayers.filter(p => p.contract.teamId === homeTeam.id);
+      const awayPlayers = allPlayers.filter(p => p.contract.teamId === awayTeam.id);
+      
+      const scorer1 = homePlayers[0] || allPlayers[0];
+      const scorer2 = homePlayers[1] || allPlayers[1];
+      const scorer3 = awayPlayers[0] || allPlayers[2];
+      
+      const assist1 = homePlayers[2] || allPlayers[3];
+      const defender1 = awayPlayers[1] || allPlayers[4];
+      const injured1 = homePlayers[3] || allPlayers[5];
+
+      const commentaryTemplates = [
+        { title: "INÍCIO DE JOGO", description: "O árbitro apita e a bola rola no gramado sintético de Neo-City!" },
+        { title: "ESTRATÉGIA", description: "Os técnicos gesticulam muito na beira do campo, ajuste tático detectado." },
+        { title: "CLIMA", description: "A chuva ácida começa a cair, deixando o gramado mais veloz." },
+        { title: "TORCIDA", description: "Os hologramas da torcida vibram com a intensidade da partida!" },
+        { title: "ANÁLISE", description: "A posse de bola está muito disputada no círculo central." },
+      ];
+
+      const mockEvents = [];
+      for (let i = 0; i < 25; i++) {
+        const second = i * 15;
+        const minute = Math.floor((second / 360) * 90);
+        const template = commentaryTemplates[i % commentaryTemplates.length];
+        
+        mockEvents.push({
+          id: `comm_${i}_${Date.now()}`,
+          minute,
+          realTimeSecond: second,
+          type: 'COMMENTARY',
+          title: template.title,
+          description: template.description,
+          teamId: 'system'
+        });
+      }
+
+      mockEvents.push({
+        id: 'ev1', minute: 12, realTimeSecond: 48, type: 'GOAL', title: 'GOL!',
+        description: `GOLAÇO! ${scorer1.nickname} abre o placar com um chute de fora da área!`,
+        playerId: scorer1.id, teamId: homeTeam.id
+      });
+
+      mockEvents.push({
+        id: 'ev2', minute: 35, realTimeSecond: 140, type: 'CARD_YELLOW', title: 'CARTÃO AMARELO',
+        description: `Entrada dura de ${defender1.nickname} no meio de campo.`,
+        playerId: defender1.id, teamId: awayTeam.id
+      });
+
+      mockEvents.push({
+        id: 'ev3', minute: 45, realTimeSecond: 180, type: 'GOAL', title: 'GOL!',
+        description: `${scorer2.nickname} amplia de cabeça após escanteio cobrado por ${assist1.nickname}!`,
+        playerId: scorer2.id, teamId: homeTeam.id
+      });
+
+      mockEvents.push({
+        id: 'ev4', minute: 78, realTimeSecond: 312, type: 'GOAL', title: 'GOL!',
+        description: `Diminuiu! ${scorer3.nickname} marca para o time visitante após falha na zaga.`,
+        playerId: scorer3.id, teamId: awayTeam.id
+      });
+
+      const mockMatch: Match = {
+        id: `mock_${Date.now()}`,
+        homeTeamId: homeTeam.id,
+        awayTeamId: awayTeam.id,
+        status: 'FINISHED',
+        date: new Date().toISOString(),
+        time: '20:00',
+        round: 1,
+        played: true,
+        homeScore: 2,
+        awayScore: 1,
+        result: {
+          homeScore: 2,
+          awayScore: 1,
+          scorers: [
+            { playerId: scorer1.id, teamId: homeTeam.id },
+            { playerId: scorer2.id, teamId: homeTeam.id },
+            { playerId: scorer3.id, teamId: awayTeam.id }
+          ],
+          assists: [{ playerId: assist1.id, teamId: homeTeam.id }],
+          events: mockEvents,
+          headline: `${homeTeam.name} vence em casa com autoridade!`,
+          stats: {
+            possession: { home: 58, away: 42 },
+            shots: { home: 14, away: 7 },
+            shotsOnTarget: { home: 6, away: 3 }
+          },
+          ratings: {
+            [scorer1.id]: 85, [scorer2.id]: 79, [scorer3.id]: 72,
+            [assist1.id]: 75, [defender1.id]: 61, [injured1.id]: 68
+          }
+        }
+      };
+
+      setVodSecond(0);
+      setIsWatchingVod(true);
+      setSelectedMatchReport(mockMatch);
+    };
+
+    if (selectedMatchReport) {
+      const homeTeam = state.teams[selectedMatchReport.homeTeamId];
+      const awayTeam = state.teams[selectedMatchReport.awayTeamId];
+      
+      if (homeTeam && awayTeam) {
+        // Use the status from the match object, which might be FINISHED for VODs
+        const matchStatus = selectedMatchReport.status;
+        
+        if (matchStatus === 'PLAYING' || isWatchingVod) {
+          return (
+            <div className="max-w-2xl mx-auto py-8">
+              <LiveReport 
+                match={selectedMatchReport}
+                homeTeam={homeTeam}
+                awayTeam={awayTeam}
+                players={state.players}
+                currentSecond={isWatchingVod ? vodSecond : getLiveMatchSecond(selectedMatchReport, state.world.currentDate)}
+              />
+              <div className="flex gap-4 mt-6">
+                {isWatchingVod && (
+                  <button 
+                    onClick={() => setVodSecond(0)}
+                    className="flex-1 py-4 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black text-white/40 uppercase tracking-[0.3em] hover:bg-white/10 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <History size={14} /> REINICIAR VOD
+                  </button>
+                )}
+                <button 
+                  onClick={() => {
+                    setSelectedMatchReport(null);
+                    setIsWatchingVod(false);
+                    setVodSecond(0);
+                  }}
+                  className="flex-1 py-4 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black text-white/40 uppercase tracking-[0.3em] hover:bg-white/10 transition-colors"
+                >
+                  VOLTAR AO DASHBOARD
+                </button>
+              </div>
+            </div>
+          );
+        } else if (matchStatus === 'FINISHED') {
+          return (
+            <div className="max-w-2xl mx-auto py-8 animate-in zoom-in-95 duration-500">
+              <PostGameReport 
+                match={selectedMatchReport}
+                homeTeam={homeTeam}
+                awayTeam={awayTeam}
+                players={state.players}
+                onClose={() => setSelectedMatchReport(null)}
+              />
+              <button 
+                onClick={handleStartVod}
+                className="mt-6 w-full py-4 bg-cyan-500 rounded-2xl text-[10px] font-black text-black uppercase tracking-[0.3em] hover:bg-cyan-400 transition-all flex items-center justify-center gap-2 shadow-[0_10px_30px_rgba(6,182,212,0.3)]"
+              >
+                <Play size={16} fill="black" /> ASSISTIR VOD COMPLETO (6 MINUTOS)
+              </button>
+            </div>
+          );
+        }
+      }
+    }
 
     return (
       <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-5xl mx-auto pb-8">
@@ -218,109 +678,192 @@ export const Dashboard: React.FC = () => {
         {/* TOP ROW: Premium Status Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           
-          {/* CARD 1: PRÓXIMO JOGO (Premium Design) */}
-          <div className="relative group overflow-hidden rounded-[2rem] border border-white/5 bg-black/40 backdrop-blur-2xl p-6 transition-all hover:border-cyan-500/30 shadow-2xl">
-            {/* Background Glow */}
-            <div className="absolute -top-24 -right-24 w-48 h-48 bg-cyan-500/10 blur-[100px] group-hover:bg-cyan-500/20 transition-all duration-700" />
+          <div className="relative group overflow-hidden rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-slate-900/90 to-black/90 backdrop-blur-2xl p-6 transition-all hover:border-cyan-500/40 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+            {/* Dynamic Background Effects */}
+            <div className="absolute -top-24 -right-24 w-64 h-64 bg-cyan-500/10 blur-[120px] group-hover:bg-cyan-500/20 transition-all duration-1000" />
+            <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-fuchsia-500/5 blur-[120px] group-hover:bg-fuchsia-500/10 transition-all duration-1000" />
             
-            <div className="relative z-10 flex flex-col h-full justify-between gap-6">
+            <div className="relative z-10 flex flex-col h-full justify-between gap-4">
+              {/* Header */}
               <div className="flex justify-between items-start">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.3em] mb-1">Próxima Rodada</span>
-                  <h3 className="text-xl font-black text-white tracking-tighter uppercase italic">Confronto Direto</h3>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`flex h-2 w-2 rounded-full ${nextMatchData.status === 'PLAYING' ? 'bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.8)]' : 'bg-cyan-500'}`} />
+                    <span className={`text-[10px] font-black uppercase tracking-[0.4em] ${nextMatchData.status === 'PLAYING' ? 'text-red-500' : 'text-cyan-400'}`}>
+                      {nextMatchData.status === 'PLAYING' ? 'AO VIVO' : (nextMatchData.status === 'FINISHED' || nextMatchData.match.played) ? 'FINALIZADO' : 'Live Match Engine'}
+                        </span>
+                      </div>
+                      <h3 className="text-2xl font-black text-white tracking-tighter uppercase italic drop-shadow-lg">
+                        {nextMatchData.status === 'PLAYING' ? 'Partida em' : (nextMatchData.status === 'FINISHED' || nextMatchData.match.played) ? 'Último' : 'Próximo'} <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-500">{nextMatchData.status === 'PLAYING' ? 'Curso' : (nextMatchData.status === 'FINISHED' || nextMatchData.match.played) ? 'Resultado' : 'Confronto'}</span>
+                      </h3>
                 </div>
-                <div className="p-2 bg-cyan-500/10 rounded-xl border border-cyan-500/20">
-                  <Target size={18} className="text-cyan-400 animate-pulse" />
+                <div className="flex flex-col items-end gap-1">
+                  <div className="p-2.5 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-md group-hover:border-cyan-500/30 transition-colors shadow-inner">
+                    <Target size={20} className="text-cyan-400" />
+                  </div>
                 </div>
               </div>
 
               {nextMatchData ? (
-                <div className="flex flex-col gap-4 py-2">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex flex-col items-center gap-2 flex-1">
-                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500 relative overflow-hidden">
-                        {userTeam?.logo ? (
-                          <TeamLogo 
-                            primaryColor={userTeam.logo.primary}
-                            secondaryColor={userTeam.logo.secondary}
-                            patternId={userTeam.logo.patternId as any}
-                            symbolId={userTeam.logo.symbolId}
-                            size={44}
-                          />
-                        ) : (
-                          <div className="w-11 h-11 flex items-center justify-center">
+                <div className="relative flex flex-col items-center py-4">
+                  {/* VS Central Badge */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-cyan-500/20 blur-xl rounded-full animate-pulse" />
+                      <div className="relative w-12 h-12 rounded-full bg-black border-2 border-white/10 flex items-center justify-center shadow-2xl overflow-hidden group-hover:border-cyan-500/50 transition-colors">
+                        <span className="text-sm font-black text-white italic tracking-tighter">VS</span>
+                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-cyan-500 shadow-[0_0_10px_rgba(34,211,238,1)]" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between w-full gap-8">
+                    {/* Home Team */}
+                    <div className="flex flex-col items-center gap-3 flex-1 group/team">
+                      <div className="relative">
+                        <div className="w-20 h-20 rounded-[2rem] bg-gradient-to-br from-white/10 to-transparent border border-white/10 flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform duration-500 relative overflow-hidden group-hover/team:border-white/30">
+                          {userTeam?.logo ? (
                             <TeamLogo 
-                              primaryColor={userTeam?.colors.primary || '#fff'}
-                              secondaryColor={userTeam?.colors.secondary || '#333'}
-                              patternId="none"
-                              symbolId="Shield"
-                              size={32}
+                              primaryColor={userTeam.logo.primary}
+                              secondaryColor={userTeam.logo.secondary}
+                              patternId={userTeam.logo.patternId as any}
+                              symbolId={userTeam.logo.symbolId}
+                              size={56}
                             />
-                          </div>
-                        )}
-                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-black rounded-full border border-white/10 flex items-center justify-center z-10">
-                           <span className="text-[8px] font-bold text-white">H</span>
+                          ) : (
+                            <div className="w-14 h-14 flex items-center justify-center">
+                              <TeamLogo 
+                                primaryColor={userTeam?.colors.primary || '#fff'}
+                                secondaryColor={userTeam?.colors.secondary || '#333'}
+                                patternId="none"
+                                symbolId="Shield"
+                                size={40}
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 px-2 py-0.5 bg-cyan-500 rounded-full border border-black text-[8px] font-black text-black shadow-lg">
+                          CASA
                         </div>
                       </div>
-                      <span className="text-[10px] font-black text-white uppercase truncate w-full text-center tracking-tight">{userTeam?.name}</span>
-                    </div>
-
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="px-3 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-full">
-                         <span className="text-[10px] font-black text-cyan-400 tabular-nums">{upcomingMatches[0]?.time}</span>
+                      <div className="text-center">
+                        <span className="text-[11px] font-black text-white uppercase tracking-tight block truncate w-24 drop-shadow-md">
+                          {userTeam?.name}
+                        </span>
+                        <span className="text-[8px] font-bold text-cyan-400 uppercase tracking-widest opacity-70">
+                          {(nextMatchData.userPower / 100).toFixed(1)}k PWR
+                        </span>
                       </div>
-                      <span className="text-xs font-black text-cyan-500/50 italic tracking-widest">VS</span>
-                      <div className="h-[1px] w-12 bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
                     </div>
 
-                    <div className="flex flex-col items-center gap-2 flex-1">
-                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500 relative overflow-hidden">
-                        {nextMatchData.opponent?.logo ? (
-                          <TeamLogo 
-                            primaryColor={nextMatchData.opponent.logo.primary}
-                            secondaryColor={nextMatchData.opponent.logo.secondary}
-                            patternId={nextMatchData.opponent.logo.patternId as any}
-                            symbolId={nextMatchData.opponent.logo.symbolId}
-                            size={44}
-                          />
-                        ) : (
-                          <div className="w-11 h-11 flex items-center justify-center">
+                    {/* Spacer for VS */}
+                    <div className="w-12 h-12 shrink-0" />
+
+                    {/* Away Team */}
+                    <div className="flex flex-col items-center gap-3 flex-1 group/team">
+                      <div className="relative">
+                        <div className="w-20 h-20 rounded-[2rem] bg-gradient-to-br from-white/10 to-transparent border border-white/10 flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform duration-500 relative overflow-hidden group-hover/team:border-white/30">
+                          {nextMatchData.opponent?.logo ? (
                             <TeamLogo 
-                              primaryColor={nextMatchData.opponent?.colors.primary || '#fff'}
-                              secondaryColor={nextMatchData.opponent?.colors.secondary || '#333'}
-                              patternId="none"
-                              symbolId="Shield"
-                              size={32}
+                              primaryColor={nextMatchData.opponent.logo.primary}
+                              secondaryColor={nextMatchData.opponent.logo.secondary}
+                              patternId={nextMatchData.opponent.logo.patternId as any}
+                              symbolId={nextMatchData.opponent.logo.symbolId}
+                              size={56}
                             />
-                          </div>
-                        )}
-                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-black rounded-full border border-white/10 flex items-center justify-center z-10">
-                           <span className="text-[8px] font-bold text-white">A</span>
+                          ) : (
+                            <div className="w-14 h-14 flex items-center justify-center">
+                              <TeamLogo 
+                                primaryColor={nextMatchData.opponent?.colors.primary || '#fff'}
+                                secondaryColor={nextMatchData.opponent?.colors.secondary || '#333'}
+                                patternId="none"
+                                symbolId="Shield"
+                                size={40}
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 px-2 py-0.5 bg-slate-700 rounded-full border border-black text-[8px] font-black text-white shadow-lg">
+                          FORA
                         </div>
                       </div>
-                      <span className="text-[10px] font-black text-white uppercase truncate w-full text-center tracking-tight">{nextMatchData.opponent?.name}</span>
+                      <div className="text-center">
+                        <span className="text-[11px] font-black text-white uppercase tracking-tight block truncate w-24 drop-shadow-md">
+                          {nextMatchData.opponent?.name}
+                        </span>
+                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest opacity-70">
+                          {(nextMatchData.opponentPower / 100).toFixed(1)}k PWR
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Match Info Badge */}
+                  <div className="mt-6 flex items-center gap-4 px-4 py-2 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-md shadow-inner">
+                    <div className="flex items-center gap-1.5">
+                      {nextMatchData.status === 'LOCKED' ? <Lock size={12} className="text-yellow-500" /> : <Clock size={12} className="text-cyan-400" />}
+                      <span className={`text-[10px] font-black tabular-nums ${nextMatchData.status === 'LOCKED' ? 'text-yellow-500' : 'text-white'}`}>
+                        {nextMatchData.status === 'LOCKED' ? 'LOCK' : nextMatchData.match.time}
+                      </span>
+                    </div>
+                    <div className="w-[1px] h-3 bg-white/20" />
+                    <div className="flex items-center gap-1.5">
+                      <Calendar size={12} className="text-cyan-400" />
+                      <span className="text-[10px] font-black text-white uppercase">HOJE</span>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="h-20 flex items-center justify-center text-slate-500 text-xs font-bold uppercase tracking-widest italic">
-                  Nenhum jogo agendado
+                <div className="h-40 flex flex-col items-center justify-center text-slate-500 gap-3">
+                  <div className="p-4 bg-white/5 rounded-full border border-white/5 opacity-20">
+                    <Activity size={32} />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em] italic">Aguardando Calendário</span>
                 </div>
               )}
 
               <div className="flex items-center justify-between pt-4 border-t border-white/5">
                 <div className="flex flex-col">
-                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Rating Previsto</span>
+                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Expectativa</span>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-lg font-black text-white tabular-nums">
-                      {nextMatchData ? (nextMatchData.userPower / 100).toFixed(1) : '0.0'}
+                    <span className="text-lg font-black text-emerald-400 tabular-nums">
+                      {nextMatchData ? (nextMatchData.userPower > nextMatchData.opponentPower ? 'Favorito' : 'Desafiante') : '---'}
                     </span>
-                    <span className="text-[10px] font-black text-cyan-500 italic">pts</span>
                   </div>
                 </div>
-                <button className="px-5 py-2.5 bg-cyan-500 text-black font-black text-[10px] uppercase tracking-widest rounded-full hover:bg-white transition-all shadow-[0_0_20px_rgba(34,211,238,0.3)] hover:shadow-cyan-500/50 active:scale-95">
-                  AO VIVO
-                </button>
+                {nextMatchData && (
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={handleMockVod}
+                      className="px-4 py-3 bg-white/5 text-white/40 hover:text-cyan-400 hover:bg-white/10 border border-white/5 rounded-2xl transition-all flex items-center gap-2 group"
+                      title="Testar VOD com dados simulados"
+                    >
+                      <Activity size={12} className="group-hover:animate-pulse" />
+                      <span className="text-[9px] font-black uppercase tracking-widest">Mock</span>
+                    </button>
+                    <button 
+                      disabled={nextMatchData.status === 'SCHEDULED'}
+                      onClick={() => {
+                        if (nextMatchData.status === 'LOCKED') {
+                          // For LOCKED, show the report as a "preview" (PostGameReport but with logic to show it's a preview)
+                          setSelectedMatchReport(nextMatchData.match);
+                        } else {
+                          setSelectedMatchReport(nextMatchData.match);
+                        }
+                      }}
+                      className={`px-6 py-3 font-black text-[10px] uppercase tracking-[0.2em] rounded-2xl transition-all shadow-[0_10px_20px_rgba(34,211,238,0.2)] hover:shadow-cyan-500/40 active:scale-95 flex items-center gap-2 ${
+                        nextMatchData.status === 'PLAYING' 
+                          ? 'bg-red-500 text-white hover:bg-red-600 shadow-red-500/20' 
+                          : nextMatchData.status === 'LOCKED' || nextMatchData.status === 'FINISHED'
+                            ? 'bg-cyan-500 text-black hover:bg-white'
+                            : 'bg-white/5 text-white/20 cursor-not-allowed'
+                      }`}
+                    >
+                      {nextMatchData.status === 'PLAYING' ? <Eye size={12} fill="currentColor" /> : <Zap size={12} fill="currentColor" />}
+                      {nextMatchData.status === 'PLAYING' ? 'ASSISTIR' : nextMatchData.status === 'LOCKED' ? 'VER PRÉVIA' : nextMatchData.status === 'FINISHED' || nextMatchData.match.played ? 'VER VOD' : 'AGUARDANDO'}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -504,58 +1047,69 @@ export const Dashboard: React.FC = () => {
     e.dataTransfer.setData('playerId', player.id);
   };
 
-  const renderSquad = () => (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      {userTeam ? (
-        <>
-          <div className="flex justify-end mb-4">
-            <div className="flex bg-black/40 backdrop-blur-md border border-cyan-500/30 rounded-xl p-1 shadow-[0_0_10px_rgba(34,211,238,0.1)]">
-              <button 
-                onClick={() => setSquadViewMode('grid')}
-                className={`p-2 rounded-lg transition-all ${squadViewMode === 'grid' ? 'bg-cyan-500/20 text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.3)]' : 'text-slate-500 hover:text-cyan-400/50'}`}
-              >
-                <Database size={16} />
-              </button>
-              <button 
-                onClick={() => setSquadViewMode('list')}
-                className={`p-2 rounded-lg transition-all ${squadViewMode === 'list' ? 'bg-cyan-500/20 text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.3)]' : 'text-slate-500 hover:text-cyan-400/50'}`}
-              >
-                <Sliders size={16} />
-              </button>
-            </div>
-          </div>
-          
-          {squadViewMode === 'grid' ? (
-            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2">
-              {userTeam.squad.map(playerId => {
-                const player = state.players[playerId];
-                return player ? <PlayerCard key={player.id} player={player} onClick={setSelectedPlayer} /> : null;
-              })}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {userTeam.squad.map((playerId, index) => {
-                const player = state.players[playerId];
-                if (!player) return null;
-                return (
-                  <PlayerCard 
-                    key={player.id} 
-                    player={player} 
-                    onClick={setSelectedPlayer} 
-                    variant="banner" 
-                  />
-                );
-              })}
-            </div>
-          )}
-        </>
-      ) : (
+  const renderSquad = () => {
+    if (!userTeam) {
+      return (
         <div className="text-center py-20 text-slate-500 font-medium bg-slate-900/40 backdrop-blur-xl border border-white/10 rounded-xl">
           Você ainda não assumiu um clube.
         </div>
-      )}
-    </div>
-  );
+      );
+    }
+
+    const playersByPosition: Record<string, Player[]> = {
+      'GOL': [],
+      'DEF': [],
+      'MEI': [],
+      'ATA': []
+    };
+
+    userTeam.squad.forEach(playerId => {
+      const player = state.players[playerId];
+      if (player) {
+        playersByPosition[player.role]?.push(player);
+      }
+    });
+
+    return (
+      <div className="space-y-8 animate-in fade-in duration-500 pb-10">
+        {(Object.keys(playersByPosition) as (keyof typeof playersByPosition)[]).map(pos => {
+          const players = playersByPosition[pos];
+          if (players.length === 0) return null;
+
+          return (
+            <div key={pos} className="space-y-3">
+              <div className="flex items-center gap-3 px-1">
+                <div className={`w-1 h-4 rounded-full ${
+                  pos === 'GOL' ? 'bg-amber-500' : 
+                  pos === 'DEF' ? 'bg-blue-500' : 
+                  pos === 'MEI' ? 'bg-purple-500' : 'bg-red-500'
+                }`} />
+                <h3 className="text-xs font-black text-white uppercase tracking-[0.3em]">{
+                  pos === 'GOL' ? 'Goleiros' : 
+                  pos === 'DEF' ? 'Defensores' : 
+                  pos === 'MEI' ? 'Meio-Campistas' : 'Atacantes'
+                }</h3>
+                <span className="text-[10px] font-bold text-slate-600">{players.length}</span>
+              </div>
+
+              <div className="flex overflow-x-auto gap-4 px-1 pb-4 snap-x snap-mandatory no-scrollbar">
+                {players.map(player => (
+                  <div key={player.id} className="w-[160px] sm:w-[180px] shrink-0 snap-start">
+                    <PlayerCard 
+                      player={player} 
+                      onClick={setSelectedPlayer} 
+                      variant="full"
+                      teamLogo={userTeam.logo}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   const renderLineup = () => (
     <div className="h-full">
@@ -573,122 +1127,512 @@ export const Dashboard: React.FC = () => {
     </div>
   );
 
-  const renderTactics = () => (
-    <div className="space-y-6 animate-in fade-in duration-500 max-w-md mx-auto">
-      {/* BASE TÁTICA */}
-      <div className="bg-black/40 backdrop-blur-md border border-cyan-500/30 rounded-xl p-5 shadow-[0_0_20px_rgba(34,211,238,0.15)] relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-cyan-500/10 to-transparent pointer-events-none" />
-        <h3 className="text-center text-cyan-300 font-black tracking-widest uppercase mb-4 text-sm drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]">
-          Base Tática <span className="text-cyan-500/70 font-medium">(Regulamento)</span>
-        </h3>
-        
-        <div className="grid grid-cols-2 gap-3">
-          <button className="col-span-2 bg-black/40 border border-cyan-500/30 rounded-xl p-3 flex flex-col items-center justify-center hover:bg-cyan-900/40 transition-colors shadow-[0_0_10px_rgba(34,211,238,0.1)] hover:border-cyan-400">
-            <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-widest mb-1 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]">Estilo de Jogo:</span>
-            <span className="text-white font-bold drop-shadow-md">Contra-Ataque</span>
+  const renderTactics = () => {
+    if (!userTeam) return null;
+    const { tactics } = userTeam;
+
+    const playStyles: PlayStyle[] = ['Blitzkrieg', 'Tiki-Taka', 'Retranca Armada', 'Motor Lento', 'Equilibrado', 'Gegenpressing', 'Catenaccio'];
+    const mentalities: Mentality[] = ['Calculista', 'Emocional', 'Predadora'];
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-500 max-w-md mx-auto pb-10">
+        <div className="grid grid-cols-2 gap-4">
+          {/* ESTILO DE JOGO CARD */}
+          <button
+            onClick={() => setIsPlayStyleModalOpen(true)}
+            className="bg-black/40 backdrop-blur-md border border-cyan-500/30 rounded-xl p-4 shadow-[0_0_20px_rgba(34,211,238,0.15)] relative overflow-hidden group hover:bg-cyan-900/10 hover:border-cyan-500/50 transition-all flex flex-col items-center justify-center gap-3 aspect-[4/5]"
+          >
+            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-cyan-500/5 to-transparent pointer-events-none" />
+            
+            <h3 className="text-cyan-500/70 font-black tracking-widest uppercase text-[10px] mb-1">
+              Estilo de Jogo
+            </h3>
+
+            <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-110 group-hover:bg-cyan-500/20 transition-all shadow-[0_0_15px_rgba(34,211,238,0.2)]">
+              {tactics.playStyle === 'Blitzkrieg' && <Zap size={32} />}
+              {tactics.playStyle === 'Tiki-Taka' && <Activity size={32} />}
+              {tactics.playStyle === 'Retranca Armada' && <Shield size={32} />}
+              {tactics.playStyle === 'Motor Lento' && <Clock size={32} />}
+              {tactics.playStyle === 'Equilibrado' && <Target size={32} />}
+              {tactics.playStyle === 'Gegenpressing' && <Flame size={32} />}
+              {tactics.playStyle === 'Catenaccio' && <Lock size={32} />}
+            </div>
+            
+            <span className="text-sm text-white font-black uppercase tracking-tight text-center px-2">
+              {tactics.playStyle}
+            </span>
+
+            <div className="mt-auto pt-2">
+              <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider border border-cyan-500/30 rounded-full px-2 py-0.5 bg-cyan-500/5">
+                Alterar
+              </span>
+            </div>
           </button>
-          <button className="bg-black/40 border border-cyan-500/30 rounded-xl p-3 flex flex-col items-center justify-center hover:bg-cyan-900/40 transition-colors shadow-[0_0_10px_rgba(34,211,238,0.1)] hover:border-cyan-400">
-            <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-widest mb-1 text-center drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]">Mentalidade / Bola:</span>
-            <span className="text-white font-bold text-sm text-center drop-shadow-md">Pressão Média</span>
-          </button>
-          <button className="bg-black/40 border border-cyan-500/30 rounded-xl p-3 flex flex-col items-center justify-center hover:bg-cyan-900/40 transition-colors shadow-[0_0_10px_rgba(34,211,238,0.1)] hover:border-cyan-400">
-            <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-widest mb-1 text-center drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]">Modo de Criação:</span>
-            <span className="text-white font-bold text-sm text-center drop-shadow-md">Pelos Pontos</span>
+
+          {/* MENTALIDADE CARD */}
+          <button
+            onClick={() => setIsMentalityModalOpen(true)}
+            className="bg-black/40 backdrop-blur-md border border-indigo-500/30 rounded-xl p-4 shadow-[0_0_20px_rgba(99,102,241,0.15)] relative overflow-hidden group hover:bg-indigo-900/10 hover:border-indigo-500/50 transition-all flex flex-col items-center justify-center gap-3 aspect-[4/5]"
+          >
+            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-indigo-500/5 to-transparent pointer-events-none" />
+            
+            <h3 className="text-indigo-500/70 font-black tracking-widest uppercase text-[10px] mb-1">
+              Mentalidade
+            </h3>
+
+            <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 group-hover:scale-110 group-hover:bg-indigo-500/20 transition-all shadow-[0_0_15px_rgba(99,102,241,0.2)]">
+              <Brain size={32} />
+            </div>
+            
+            <span className="text-sm text-white font-black uppercase tracking-tight text-center px-2">
+              {tactics.mentality}
+            </span>
+
+            <div className="mt-auto pt-2">
+              <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider border border-indigo-500/30 rounded-full px-2 py-0.5 bg-indigo-500/5">
+                Alterar
+              </span>
+            </div>
           </button>
         </div>
-      </div>
 
-      {/* DIRETRIZES TÁTICAS */}
-      <div className="bg-black/40 backdrop-blur-md border border-indigo-500/30 rounded-xl p-5 shadow-[0_0_20px_rgba(99,102,241,0.15)] relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-indigo-500/10 to-transparent pointer-events-none" />
-        <h3 className="text-center text-indigo-300 font-black tracking-widest uppercase mb-4 text-sm drop-shadow-[0_0_8px_rgba(99,102,241,0.5)]">
-          Diretrizes de Jogo <span className="text-indigo-500/70 font-medium">(Modificadores)</span>
-        </h3>
-        
-        <div className="space-y-4">
-          <button className="w-full bg-black/40 border border-indigo-500/30 rounded-xl p-3 flex flex-col items-center justify-center hover:bg-indigo-900/40 transition-colors shadow-[0_0_10px_rgba(99,102,241,0.1)] hover:border-indigo-400">
-            <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mb-1 drop-shadow-[0_0_5px_rgba(99,102,241,0.5)]">Foco Ofensivo:</span>
-            <span className="text-white font-bold flex items-center gap-2 drop-shadow-md">Armador Principal <span className="text-indigo-500">▼</span></span>
-          </button>
-
-          <div className="bg-black/40 border border-indigo-500/30 rounded-xl p-4 shadow-[0_0_10px_rgba(99,102,241,0.1)]">
-            <div className="flex justify-between items-end mb-2">
-              <div className="flex flex-col">
-                <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest drop-shadow-[0_0_5px_rgba(99,102,241,0.5)]">Gestão de Sobrecarga</span>
-                <span className="text-xs text-slate-400">(Stamina)</span>
-              </div>
-              <div className="flex flex-col items-end">
-                <Clock size={14} className="text-indigo-400 mb-1 drop-shadow-[0_0_5px_rgba(99,102,241,0.5)]" />
-                <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-widest text-right drop-shadow-[0_0_5px_rgba(99,102,241,0.5)]">Despertar Tardio<br/><span className="text-slate-400 font-normal">(Final Épico)</span></span>
+        {/* PLAYSTYLE MODAL */}
+        {isPlayStyleModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-slate-900 border border-cyan-500/30 rounded-2xl p-6 w-full max-w-lg shadow-[0_0_50px_rgba(34,211,238,0.2)]">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
+                    <Activity className="text-cyan-400" /> Selecionar Estilo
+                  </h3>
+                  <button onClick={() => setIsPlayStyleModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                    <X size={20} className="text-slate-400" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                  {playStyles.map(style => (
+                    <button
+                      key={style}
+                      onClick={() => {
+                        handleUpdateTactics({ playStyle: style });
+                        setIsPlayStyleModalOpen(false);
+                      }}
+                      className={`relative p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-3 group ${
+                        tactics.playStyle === style 
+                          ? 'border-cyan-500 bg-cyan-950/50 shadow-[0_0_20px_rgba(34,211,238,0.2)]' 
+                          : 'border-white/5 bg-white/5 hover:border-cyan-500/50 hover:bg-white/10'
+                      }`}
+                    >
+                      <div className={`p-3 rounded-full ${tactics.playStyle === style ? 'bg-cyan-500 text-black' : 'bg-white/5 text-slate-400 group-hover:text-cyan-400 group-hover:bg-cyan-500/20'} transition-colors`}>
+                        {style === 'Blitzkrieg' && <Zap size={20} />}
+                        {style === 'Tiki-Taka' && <Activity size={20} />}
+                        {style === 'Retranca Armada' && <Shield size={20} />}
+                        {style === 'Motor Lento' && <Clock size={20} />}
+                        {style === 'Equilibrado' && <Target size={20} />}
+                        {style === 'Gegenpressing' && <Flame size={20} />}
+                        {style === 'Catenaccio' && <Lock size={20} />}
+                      </div>
+                      <span className={`text-xs font-black uppercase tracking-wide ${tactics.playStyle === style ? 'text-cyan-400' : 'text-slate-300'}`}>
+                        {style}
+                      </span>
+                      {tactics.playStyle === style && (
+                        <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_5px_rgba(34,211,238,0.8)]" />
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-            <div className="relative h-2 bg-black/50 border border-white/5 rounded-full mt-4">
-              <div className="absolute top-0 left-0 h-full w-3/4 bg-gradient-to-r from-indigo-600 to-cyan-400 rounded-full shadow-[0_0_10px_rgba(34,211,238,0.8)]" />
-              <div className="absolute top-1/2 left-3/4 -translate-y-1/2 -translate-x-1/2 w-4 h-4 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.8)]" />
+        )}
+
+        {/* MENTALITY MODAL */}
+        {isMentalityModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-slate-900 border border-indigo-500/30 rounded-2xl p-6 w-full max-w-lg shadow-[0_0_50px_rgba(99,102,241,0.2)]">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
+                    <Brain className="text-indigo-400" /> Selecionar Mentalidade
+                  </h3>
+                  <button onClick={() => setIsMentalityModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                    <X size={20} className="text-slate-400" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  {mentalities.map(m => (
+                    <button
+                      key={m}
+                      onClick={() => {
+                        handleUpdateTactics({ mentality: m });
+                        setIsMentalityModalOpen(false);
+                      }}
+                      className={`relative p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-3 group aspect-square ${
+                        tactics.mentality === m 
+                          ? 'border-indigo-500 bg-indigo-950/50 shadow-[0_0_20px_rgba(99,102,241,0.2)]' 
+                          : 'border-white/5 bg-white/5 hover:border-indigo-500/50 hover:bg-white/10'
+                      }`}
+                    >
+                      <div className={`p-3 rounded-full ${tactics.mentality === m ? 'bg-indigo-500 text-black' : 'bg-white/5 text-slate-400 group-hover:text-indigo-400 group-hover:bg-indigo-500/20'} transition-colors`}>
+                        <Brain size={24} />
+                      </div>
+                      <span className={`text-[10px] font-black uppercase tracking-wide text-center ${tactics.mentality === m ? 'text-indigo-400' : 'text-slate-300'}`}>
+                        {m}
+                      </span>
+                      {tactics.mentality === m && (
+                        <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_5px_rgba(99,102,241,0.8)]" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2 mt-4">
-              <Flame size={16} className="text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]" />
-              <span className="text-[10px] text-orange-400 font-bold uppercase tracking-widest drop-shadow-[0_0_5px_rgba(249,115,22,0.5)]">Blitzkrieg <span className="text-slate-400 font-normal">(Início Explosivo)</span></span>
+        )}
+
+        {/* SLIDERS TÁTICOS */}
+        <div className="bg-black/40 backdrop-blur-md border border-purple-500/30 rounded-xl p-5 shadow-[0_0_20px_rgba(168,85,247,0.15)] relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-purple-500/10 to-transparent pointer-events-none" />
+          <h3 className="text-center text-purple-300 font-black tracking-widest uppercase mb-4 text-sm drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]">
+            Diretrizes de Campo
+          </h3>
+          
+          <div className="space-y-6">
+            {/* Linha Defensiva */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center px-1">
+                <span className="text-[10px] text-purple-400 font-black uppercase tracking-widest">Linha: {tactics.linePosition <= 30 ? 'Recuada' : tactics.linePosition >= 70 ? 'Alta' : 'Média'}</span>
+                <span className="text-[10px] text-white font-black">{tactics.linePosition}</span>
+              </div>
+              <input 
+                type="range" 
+                min="0" 
+                max="100" 
+                value={tactics.linePosition} 
+                onChange={(e) => handleUpdateTactics({ linePosition: parseInt(e.target.value) })}
+                className="w-full h-1.5 bg-black/60 rounded-full appearance-none cursor-pointer accent-purple-500 border border-white/5"
+              />
+            </div>
+
+            {/* Agressividade */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center px-1">
+                <span className="text-[10px] text-red-400 font-black uppercase tracking-widest">Agressividade: {tactics.aggressiveness <= 30 ? 'Sombra' : tactics.aggressiveness >= 70 ? 'Caçada' : 'Padrão'}</span>
+                <span className="text-[10px] text-white font-black">{tactics.aggressiveness}</span>
+              </div>
+              <input 
+                type="range" 
+                min="0" 
+                max="100" 
+                value={tactics.aggressiveness} 
+                onChange={(e) => handleUpdateTactics({ aggressiveness: parseInt(e.target.value) })}
+                className="w-full h-1.5 bg-black/60 rounded-full appearance-none cursor-pointer accent-red-500 border border-white/5"
+              />
             </div>
           </div>
+        </div>
 
-          <button className="w-full bg-black/40 border border-indigo-500/30 rounded-xl p-3 flex flex-col items-center justify-center hover:bg-indigo-900/40 transition-colors shadow-[0_0_10px_rgba(99,102,241,0.1)] hover:border-indigo-400">
-            <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mb-1 drop-shadow-[0_0_5px_rgba(99,102,241,0.5)]">Diretriz de Caça:</span>
-            <span className="text-white font-bold drop-shadow-md">Caça ao Meio</span>
-          </button>
+        {/* SLOTS DE CARTAS TÁTICAS (TRUNFOS) */}
+        <div className="bg-black/40 backdrop-blur-md border border-amber-500/30 rounded-xl p-5 shadow-[0_0_20px_rgba(245,158,11,0.15)] relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-amber-500/10 to-transparent pointer-events-none" />
+          <h3 className="text-center text-amber-300 font-black tracking-widest uppercase mb-4 text-sm drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]">
+            Trunfos de Jogo <span className="text-amber-500/70 font-medium">(Cartas)</span>
+          </h3>
+          
+          <div className="grid grid-cols-3 gap-3">
+            {([0, 1, 2] as const).map(slotIdx => {
+              const card = tactics.slots ? tactics.slots[slotIdx] : null;
+              return (
+                <button
+                  key={slotIdx}
+                  onClick={() => {
+                    setSelectedCardSlot(slotIdx);
+                    setIsCardModalOpen(true);
+                  }}
+                  className={`aspect-[3/4] rounded-xl border-2 border-dashed ${card ? 'border-amber-500 bg-amber-900/20' : 'border-amber-500/20 bg-black/40'} flex flex-col items-center justify-center p-2 hover:border-amber-400 transition-colors group`}
+                >
+                  {card ? (
+                    <>
+                      <Star size={16} className="text-amber-400 mb-2 drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]" />
+                      <span className="text-[8px] text-white font-black text-center uppercase leading-tight">{card.name}</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-6 h-6 rounded-full border border-amber-500/30 flex items-center justify-center mb-1 group-hover:border-amber-500/60">
+                        <span className="text-amber-500/40 text-xs font-black">+</span>
+                      </div>
+                      <span className="text-[8px] text-amber-500/40 font-bold uppercase tracking-widest">Vazio</span>
+                    </>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
+    );
+  };;
 
-      {/* GATILHOS DE PODER */}
-      <div className="bg-black/40 backdrop-blur-md border border-fuchsia-500/30 rounded-xl p-5 shadow-[0_0_20px_rgba(217,70,239,0.15)] relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-fuchsia-500/10 to-transparent pointer-events-none" />
-        <h3 className="text-center text-fuchsia-300 font-black tracking-widest uppercase mb-4 text-sm drop-shadow-[0_0_8px_rgba(217,70,239,0.5)]">
-          Gatilhos de Poder <span className="text-fuchsia-500/70 font-medium">(Ki Risco)</span>
-        </h3>
-        
-        <div className="flex justify-between items-center gap-4">
-          <div className="flex-1 bg-black/40 border border-fuchsia-500/30 rounded-xl p-3 flex items-center justify-between shadow-[0_0_10px_rgba(217,70,239,0.1)]">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-4 bg-red-500 rounded-full relative shadow-[0_0_10px_rgba(239,68,68,0.8)] border border-red-400">
-                <div className="absolute right-0.5 top-0.5 w-3 h-3 bg-white rounded-full shadow-[0_0_5px_rgba(255,255,255,0.8)]" />
-                <span className="absolute -left-6 top-0 text-[8px] font-bold text-red-400 drop-shadow-[0_0_5px_rgba(239,68,68,0.8)]">ON</span>
-              </div>
-            </div>
-            <div className="flex flex-col items-end">
-              <span className="text-[10px] text-fuchsia-400 font-bold uppercase tracking-widest drop-shadow-[0_0_5px_rgba(217,70,239,0.5)]">Fúria Cega</span>
-              <span className="text-[9px] text-slate-400">(Carrinhos Letais)</span>
-            </div>
-          </div>
+  const [isEvolutionModalOpen, setIsEvolutionModalOpen] = useState(false);
+  const [isStabilizationModalOpen, setIsStabilizationModalOpen] = useState(false);
+  const [isCardLabModalOpen, setIsCardLabModalOpen] = useState(false);
+  const [isPlayStyleModalOpen, setIsPlayStyleModalOpen] = useState(false);
+  const [isMentalityModalOpen, setIsMentalityModalOpen] = useState(false);
+  const [selectedLabSlot, setSelectedLabSlot] = useState<number | null>(null);
 
-          <div className="flex-1 bg-black/40 border border-fuchsia-500/30 rounded-xl p-3 flex items-center justify-between shadow-[0_0_10px_rgba(217,70,239,0.1)] opacity-60">
-            <div className="flex flex-col items-start">
-              <span className="text-[10px] text-fuchsia-400 font-bold uppercase tracking-widest drop-shadow-[0_0_5px_rgba(217,70,239,0.5)]">Última Dança</span>
-              <span className="text-[9px] text-slate-400">(Kamikaze)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-4 bg-slate-800 border border-slate-600 rounded-full relative">
-                <div className="absolute left-0.5 top-0.5 w-3 h-3 bg-slate-500 rounded-full" />
-                <span className="absolute -right-8 top-0 text-[8px] font-bold text-slate-500">OFF</span>
-              </div>
-            </div>
+  const handleSetFocus = (type: 'evolution' | 'stabilization', playerId: string | null) => {
+    setState(prev => ({
+      ...prev,
+      training: {
+        ...prev.training,
+        individualFocus: {
+          ...prev.training.individualFocus,
+          [type === 'evolution' ? 'evolutionSlot' : 'stabilizationSlot']: playerId
+        }
+      }
+    }));
+    setIsEvolutionModalOpen(false);
+    setIsStabilizationModalOpen(false);
+  };
+
+  const handleStartCardLab = (cardType: string) => {
+    if (selectedLabSlot === null) return;
+    
+    const finishDate = new Date(state.world.currentDate);
+    finishDate.setDate(finishDate.getDate() + 3); // 3 days to produce a card
+
+    setState(prev => {
+      const newSlots = [...prev.training.cardLaboratory.slots];
+      newSlots[selectedLabSlot] = {
+        cardId: cardType,
+        finishTime: finishDate.toISOString()
+      };
+      return {
+        ...prev,
+        training: {
+          ...prev.training,
+          cardLaboratory: {
+            ...prev.training.cardLaboratory,
+            slots: newSlots
+          }
+        }
+      };
+    });
+    setIsCardLabModalOpen(false);
+    setSelectedLabSlot(null);
+  };
+
+  const handleChemistryBoost = () => {
+    if (!userTeam) return;
+    
+    const lastUsed = state.training.chemistryBoostLastUsed;
+    const now = new Date(state.world.currentDate);
+    
+    if (lastUsed) {
+      const last = new Date(lastUsed);
+      const diffDays = Math.floor((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays < 7) {
+        alert('O Treinamento Coletivo está em cooldown (7 dias).');
+        return;
+      }
+    }
+
+    setState(prev => ({
+      ...prev,
+      training: {
+        ...prev.training,
+        chemistryBoostLastUsed: now.toISOString()
+      },
+      teams: {
+        ...prev.teams,
+        [userTeam.id]: {
+          ...prev.teams[userTeam.id],
+          chemistry: Math.min(100, (prev.teams[userTeam.id].chemistry || 50) + 10)
+        }
+      }
+    }));
+    alert('Treinamento Coletivo realizado! Entrosamento aumentado em +10.');
+  };
+
+  const renderTraining = () => {
+    if (!state.training || !state.training.individualFocus) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center space-y-2">
+            <TrendingUp className="w-10 h-10 text-cyan-400 mx-auto animate-bounce" />
+            <p className="text-white font-bold">Inicializando módulo de treinamento...</p>
           </div>
         </div>
-      </div>
-    </div>
-  );
+      );
+    }
 
-  const renderTraining = () => (
-    <div className="space-y-6 animate-in fade-in duration-500 max-w-md mx-auto">
-      <header className="mb-8">
-        <h2 className="text-4xl font-black text-white tracking-tight drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] flex items-center gap-3">
-          <TrendingUp className="text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]" /> Treinamento
-        </h2>
-      </header>
-      <div className="text-center py-20 text-slate-400 font-bold uppercase tracking-widest bg-black/40 backdrop-blur-md border border-cyan-500/30 rounded-xl shadow-[0_0_20px_rgba(34,211,238,0.1)]">
-        Área de evolução de atributos e cura de traços/badges em breve.
+    const evoPlayer = state.training.individualFocus.evolutionSlot ? state.players[state.training.individualFocus.evolutionSlot] : null;
+    const stabPlayer = state.training.individualFocus.stabilizationSlot ? state.players[state.training.individualFocus.stabilizationSlot] : null;
+    const squadPlayers = userTeam ? userTeam.squad.map(id => state.players[id]).filter(p => !!p) : [];
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-500 max-w-md mx-auto">
+        <header className="mb-4 flex items-center justify-between">
+          <h2 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
+            <TrendingUp className="text-cyan-400" /> Treinamento
+          </h2>
+          <button 
+            onClick={handleManualSave}
+            disabled={isSaving}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-bold transition-all shadow-lg border text-xs uppercase tracking-wider ${
+              isSaving 
+              ? 'bg-cyan-900/20 border-cyan-500/30 text-cyan-500/50 cursor-wait' 
+              : 'bg-black/40 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500 hover:scale-105 active:scale-95'
+            }`}
+          >
+            <Save size={14} />
+            {isSaving ? 'Salvando...' : 'Salvar'}
+          </button>
+        </header>
+
+        {/* Coletivo */}
+        <section className="bg-black/40 backdrop-blur-md border border-cyan-500/30 rounded-2xl p-5 shadow-lg">
+          <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <Users size={14} /> Treinamento Coletivo
+          </h3>
+          <button 
+            onClick={handleChemistryBoost}
+            className="w-full bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-500 hover:to-blue-600 text-white font-black uppercase tracking-wider py-4 rounded-xl transition-all shadow-[0_0_20px_rgba(34,211,238,0.3)] flex flex-col items-center"
+          >
+            <span className="text-sm">Palestra Motivacional</span>
+            <span className="text-[10px] opacity-80">+10 Entrosamento (Cooldown: 7 dias)</span>
+          </button>
+        </section>
+
+        {/* Foco Individual */}
+        <section className="bg-black/40 backdrop-blur-md border border-purple-500/30 rounded-2xl p-5 shadow-lg">
+          <h3 className="text-xs font-bold text-purple-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <Target size={14} /> Foco Individual
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            {/* Evolution Slot */}
+            <div 
+              onClick={() => setIsEvolutionModalOpen(true)}
+              className="bg-black/60 border border-emerald-500/20 rounded-xl p-3 cursor-pointer hover:border-emerald-500/50 transition-all text-center"
+            >
+              <div className="text-[9px] font-bold text-emerald-400 uppercase mb-2">Evolução (1.5x)</div>
+              {evoPlayer ? (
+                <div className="space-y-1">
+                  <div className="text-xs font-bold text-white truncate">{evoPlayer.nickname}</div>
+                  <div className="text-[10px] text-slate-400">{evoPlayer.totalRating} OVR</div>
+                </div>
+              ) : (
+                <div className="text-[10px] text-slate-500 py-2">Vazio</div>
+              )}
+            </div>
+            
+            {/* Stabilization Slot */}
+            <div 
+              onClick={() => setIsStabilizationModalOpen(true)}
+              className="bg-black/60 border border-amber-500/20 rounded-xl p-3 cursor-pointer hover:border-amber-500/50 transition-all text-center"
+            >
+              <div className="text-[9px] font-bold text-amber-400 uppercase mb-2">Estabilização</div>
+              {stabPlayer ? (
+                <div className="space-y-1">
+                  <div className="text-xs font-bold text-white truncate">{stabPlayer.nickname}</div>
+                  <div className="text-[10px] text-slate-400">{stabPlayer.totalRating} OVR</div>
+                </div>
+              ) : (
+                <div className="text-[10px] text-slate-500 py-2">Vazio</div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Laboratório de Cartas */}
+        <section className="bg-black/40 backdrop-blur-md border border-amber-500/30 rounded-2xl p-5 shadow-lg">
+          <h3 className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <Zap size={14} /> Laboratório de Cartas
+          </h3>
+          <div className="space-y-3">
+            {state.training.cardLaboratory.slots.map((slot, idx) => (
+              <div 
+                key={idx}
+                onClick={() => !slot.cardId && (setSelectedLabSlot(idx), setIsCardLabModalOpen(true))}
+                className={`bg-black/60 border ${slot.cardId ? 'border-amber-500/50' : 'border-white/10 hover:border-white/30 cursor-pointer'} rounded-xl p-4 transition-all`}
+              >
+                {slot.cardId ? (
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <div className="text-xs font-bold text-white uppercase">Produzindo: {slot.cardId}</div>
+                      <div className="text-[9px] text-amber-400">Finaliza em: {new Date(slot.finishTime!).toLocaleDateString()}</div>
+                    </div>
+                    <div className="animate-pulse text-amber-500"><Clock size={16} /></div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-2 text-slate-500 py-1">
+                    <Star size={14} />
+                    <span className="text-[10px] font-bold uppercase">Iniciar Nova Pesquisa</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Selection Modals */}
+        {(isEvolutionModalOpen || isStabilizationModalOpen) && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => { setIsEvolutionModalOpen(false); setIsStabilizationModalOpen(false); }} />
+            <div className="relative bg-[#0a0f1d] border border-cyan-500/30 rounded-2xl w-full max-w-md max-h-[70vh] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+              <header className="p-4 border-b border-white/5 bg-white/5">
+                <h3 className="text-lg font-black text-white uppercase tracking-tight">Selecionar Jogador</h3>
+              </header>
+              <div className="overflow-y-auto p-2 space-y-1 max-h-[50vh]">
+                <button 
+                  onClick={() => handleSetFocus(isEvolutionModalOpen ? 'evolution' : 'stabilization', null)}
+                  className="w-full text-left p-3 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/10 flex items-center justify-between group"
+                >
+                  <span className="text-sm font-bold text-red-400 uppercase">Remover Foco</span>
+                </button>
+                {squadPlayers.map(p => (
+                  <button 
+                    key={p.id}
+                    onClick={() => handleSetFocus(isEvolutionModalOpen ? 'evolution' : 'stabilization', p.id)}
+                    className="w-full text-left p-3 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/10 flex items-center justify-between group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-cyan-900/30 flex items-center justify-center text-cyan-400 font-bold text-xs">{p.totalRating}</div>
+                      <div className="text-sm font-bold text-white">{p.nickname}</div>
+                    </div>
+                    <ChevronRight size={16} className="text-slate-600 group-hover:text-cyan-400 transition-colors" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isCardLabModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setIsCardLabModalOpen(false)} />
+            <div className="relative bg-[#0a0f1d] border border-amber-500/30 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+              <header className="p-4 border-b border-white/5 bg-white/5 text-center">
+                <h3 className="text-lg font-black text-white uppercase tracking-tight">Pesquisar Carta</h3>
+              </header>
+              <div className="p-4 space-y-3">
+                {[
+                  { id: 'ataque', name: 'Ataque Total', desc: 'Foco ofensivo (3 dias)' },
+                  { id: 'defesa', name: 'Muralha', desc: 'Foco defensivo (3 dias)' },
+                  { id: 'meio', name: 'Meio Criativo', desc: 'Controle de jogo (3 dias)' }
+                ].map(c => (
+                  <button 
+                    key={c.id}
+                    onClick={() => handleStartCardLab(c.id)}
+                    className="w-full p-4 rounded-xl bg-black/40 border border-white/5 hover:border-amber-500/50 transition-all text-left group"
+                  >
+                    <div className="text-sm font-bold text-white uppercase group-hover:text-amber-400 transition-colors">{c.name}</div>
+                    <div className="text-[10px] text-slate-400">{c.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderLockerRoom = () => (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-md mx-auto">
@@ -792,6 +1736,41 @@ export const Dashboard: React.FC = () => {
     </div>
   );
 
+  const calendarEvents = React.useMemo(() => {
+    if (!userTeam) return [];
+    
+    const events: any[] = [];
+    
+    // Add all user team matches to events
+    userTeamMatches.forEach(match => {
+      events.push({
+        id: `match_${match.id}`,
+        type: 'match',
+        date: new Date(match.date),
+        title: `${match.home} vs ${match.away}`,
+        subtitle: `Rodada ${match.round} • ${match.time}`,
+        data: match,
+        status: match.played ? 'played' : 'upcoming'
+      });
+    });
+
+    // Add news/notices as events
+    state.notifications.forEach(notif => {
+      events.push({
+        id: `notif_${notif.id}`,
+        type: 'news',
+        date: new Date(notif.date),
+        title: notif.title,
+        subtitle: notif.message,
+        data: notif,
+        status: 'news'
+      });
+    });
+
+    // Sort by date (nearest future or most recent past)
+    return events.sort((a, b) => a.date.getTime() - b.date.getTime());
+  }, [userTeamMatches, state.notifications]);
+
   const renderCompetition = () => {
     const nextMatch = upcomingMatches[0];
     if (!nextMatch) return (
@@ -805,224 +1784,215 @@ export const Dashboard: React.FC = () => {
     const awayTeam = state.teams[nextMatch.awayId];
 
     return (
-      <div className="space-y-8 animate-in fade-in duration-700 max-w-5xl mx-auto pb-12">
-        {/* Main Highlight Match */}
-        <div className="relative overflow-hidden rounded-[2.5rem] bg-black/40 backdrop-blur-3xl border border-white/5 p-8 shadow-2xl group">
-          {/* Dynamic Background Glow */}
-          <div className="absolute -top-24 -left-24 w-96 h-96 bg-cyan-500/10 blur-[120px] animate-pulse" />
-          <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-purple-500/10 blur-[120px] animate-pulse" />
+      <div className="space-y-8 animate-in fade-in duration-700 max-w-6xl mx-auto pb-12">
+        {/* Main Highlight Match - Compact Redesign */}
+        <div className="relative overflow-hidden rounded-3xl bg-black/40 backdrop-blur-3xl border border-white/10 p-6 shadow-2xl group hover:border-cyan-500/30 transition-all">
+          <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-purple-500/5 opacity-50" />
           
-          <div className="relative z-10 flex flex-col gap-8">
-            <div className="flex justify-between items-center">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.4em] mb-1">Próximo Grande Desafio</span>
-                <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic">Rodada {nextMatch.id.split('_')[1]} • {nextMatch.type}</h2>
-              </div>
+          <div className="relative z-10">
+            <div className="flex justify-between items-center mb-6">
               <div className="flex items-center gap-3">
-                <div className="px-4 py-2 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl flex flex-col items-center">
-                  <span className="text-[10px] font-black text-white tabular-nums">{nextMatch.time}</span>
-                  <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Kick-off</span>
+                <div className="p-2 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
+                  <Trophy size={16} className="text-cyan-400" />
                 </div>
+                <div>
+                  <h2 className="text-lg font-black text-white uppercase tracking-tight italic">
+                    {nextMatch.type} <span className="text-slate-500 text-sm not-italic font-bold">• Rodada {nextMatch.id.split('_')[1]}</span>
+                  </h2>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
+                <Clock size={12} className="text-cyan-400" />
+                <span className="text-xs font-bold text-white tabular-nums">{nextMatch.time}</span>
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-4 py-8 border-y border-white/5 my-4">
+            <div className="flex items-center justify-between gap-4">
               {/* Home Team */}
-              <div className="flex items-center gap-6 flex-1 justify-end group/home">
-                <div className="flex flex-col items-end text-right">
-                  <span className={`text-2xl font-black uppercase tracking-tight group-hover/home:text-cyan-300 transition-colors ${nextMatch.homeId === userTeam?.id ? 'text-cyan-400' : 'text-white'}`}>
-                    {nextMatch.home}
-                  </span>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em]">Mandante</span>
-                </div>
-                <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center shadow-2xl group-hover/home:scale-110 transition-transform duration-700 relative overflow-hidden group-hover/home:border-cyan-500/50">
+              <div className="flex items-center gap-4 flex-1 justify-end group/home">
+                <span className={`text-lg font-black uppercase tracking-tight ${nextMatch.homeId === userTeam?.id ? 'text-cyan-400' : 'text-white'}`}>
+                  {nextMatch.home}
+                </span>
+                <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-lg relative overflow-hidden group-hover/home:border-cyan-500/50 transition-colors">
                   {homeTeam?.logo ? (
                     <TeamLogo 
                       primaryColor={homeTeam.logo.primary}
                       secondaryColor={homeTeam.logo.secondary}
                       patternId={homeTeam.logo.patternId as any}
                       symbolId={homeTeam.logo.symbolId}
-                      size={64}
+                      size={40}
                     />
                   ) : (
-                    <div className="w-20 h-20 flex items-center justify-center">
-                      <TeamLogo 
-                        primaryColor={homeTeam?.colors.primary || '#fff'}
-                        secondaryColor={homeTeam?.colors.secondary || '#333'}
-                        patternId="none"
-                        symbolId="Shield"
-                        size={48}
-                      />
-                    </div>
+                    <TeamLogo 
+                      primaryColor={homeTeam?.colors.primary || '#fff'}
+                      secondaryColor={homeTeam?.colors.secondary || '#333'}
+                      patternId="none"
+                      symbolId="Shield"
+                      size={32}
+                    />
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none" />
                 </div>
               </div>
 
-              {/* VS Section */}
-              <div className="flex flex-col items-center gap-3 shrink-0">
-                <div className="text-6xl font-black text-white/5 italic tracking-tighter select-none drop-shadow-[0_0_20px_rgba(255,255,255,0.05)]">VS</div>
-                <div className="px-4 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-full backdrop-blur-md">
-                  <span className="text-[9px] font-black text-cyan-400 uppercase tracking-[0.2em] animate-pulse">Live Soon</span>
-                </div>
+              {/* VS */}
+              <div className="flex flex-col items-center px-4">
+                <span className="text-2xl font-black text-white/10 italic">VS</span>
               </div>
 
               {/* Away Team */}
-              <div className="flex items-center gap-6 flex-1 group/away">
-                <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center shadow-2xl group-hover/away:scale-110 transition-transform duration-700 relative overflow-hidden group-hover/away:border-purple-500/50">
+              <div className="flex items-center gap-4 flex-1 group/away">
+                <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-lg relative overflow-hidden group-hover/away:border-purple-500/50 transition-colors">
                   {awayTeam?.logo ? (
                     <TeamLogo 
                       primaryColor={awayTeam.logo.primary}
                       secondaryColor={awayTeam.logo.secondary}
                       patternId={awayTeam.logo.patternId as any}
                       symbolId={awayTeam.logo.symbolId}
-                      size={64}
+                      size={40}
                     />
                   ) : (
-                    <div className="w-20 h-20 flex items-center justify-center">
-                      <TeamLogo 
-                        primaryColor={awayTeam?.colors.primary || '#fff'}
-                        secondaryColor={awayTeam?.colors.secondary || '#333'}
-                        patternId="none"
-                        symbolId="Shield"
-                        size={48}
-                      />
-                    </div>
+                    <TeamLogo 
+                      primaryColor={awayTeam?.colors.primary || '#fff'}
+                      secondaryColor={awayTeam?.colors.secondary || '#333'}
+                      patternId="none"
+                      symbolId="Shield"
+                      size={32}
+                    />
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none" />
                 </div>
-                <div className="flex flex-col items-start text-left">
-                  <span className={`text-2xl font-black uppercase tracking-tight group-hover/away:text-purple-300 transition-colors ${nextMatch.awayId === userTeam?.id ? 'text-purple-400' : 'text-white'}`}>
-                    {nextMatch.away}
-                  </span>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em]">Visitante</span>
-                </div>
+                <span className={`text-lg font-black uppercase tracking-tight ${nextMatch.awayId === userTeam?.id ? 'text-purple-400' : 'text-white'}`}>
+                  {nextMatch.away}
+                </span>
               </div>
             </div>
-
-            <div className="flex items-center justify-between pt-6 border-t border-white/5">
-              <div className="flex items-center gap-4">
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Local</span>
-                  <span className="text-xs font-bold text-white uppercase italic">Neo-Stadium Alpha</span>
-                </div>
-                <div className="w-[1px] h-8 bg-white/5" />
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Clima</span>
-                  <span className="text-xs font-bold text-cyan-400 uppercase italic">Céu Limpo • 22°C</span>
-                </div>
-              </div>
-              <button className="px-8 py-3 bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] rounded-2xl hover:bg-cyan-400 transition-all shadow-xl hover:scale-105 active:scale-95">
-                GERENCIAR ESCALAÇÃO
-              </button>
-            </div>
+            
+             <div className="mt-6 flex justify-center">
+                <button className="w-full max-w-xs py-2 bg-white/5 hover:bg-cyan-500 hover:text-black border border-white/10 text-xs font-black uppercase tracking-[0.2em] rounded-xl transition-all">
+                  Gerenciar Escalação
+                </button>
+             </div>
           </div>
         </div>
 
-        {/* Upcoming Matches List - Redesigned to Horizontal Strips */}
+        {/* Timeline Events Redesign */}
         <div className="space-y-6">
           <div className="flex items-center justify-between px-2">
             <h3 className="text-xs font-black text-white uppercase tracking-[0.3em] flex items-center gap-3">
               <Calendar size={16} className="text-cyan-400" />
-              Calendário de Jogos
+              Cronograma & Notícias
             </h3>
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Temporada 2050</span>
           </div>
 
-          <div className="grid grid-cols-1 gap-3">
-            {upcomingMatches.slice(1).map((match) => {
-              const hTeam = state.teams[match.homeId];
-              const aTeam = state.teams[match.awayId];
-              
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {calendarEvents.map((event: any) => {
+              if (event.type === 'match') {
+                const homeTeam = state.teams[event.data.homeId];
+                const awayTeam = state.teams[event.data.awayId];
+                const isPlayed = event.status === 'played';
+                const isHomeUser = event.data.homeId === userTeam?.id;
+                const isAwayUser = event.data.awayId === userTeam?.id;
+
+                return (
+                  <div 
+                    key={event.id}
+                    className={`group relative overflow-hidden rounded-lg border transition-all duration-300 ${
+                      isPlayed 
+                        ? 'bg-slate-900/40 border-slate-500/10 opacity-60 hover:opacity-100' 
+                        : 'bg-gradient-to-r from-cyan-950/20 to-black/40 border-cyan-500/20 hover:border-cyan-400/50 hover:shadow-[0_0_10px_rgba(34,211,238,0.1)]'
+                    }`}
+                  >
+                    {/* Hover Effect */}
+                    <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    
+                    <div className="p-2 flex items-center justify-between gap-2 relative z-10 h-10">
+                      {/* Date & Time */}
+                      <div className="flex flex-col items-center justify-center min-w-[2.5rem] pr-2 border-r border-white/5 h-full">
+                        <span className="text-[9px] font-black text-white/50 uppercase leading-none mb-0.5">
+                          {event.date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}
+                        </span>
+                        <span className={`text-[9px] font-bold ${isPlayed ? 'text-slate-500' : 'text-cyan-400'} leading-none`}>
+                          {isPlayed ? 'FIM' : event.data.time}
+                        </span>
+                      </div>
+
+                      {/* Teams & Score */}
+                      <div className="flex-1 flex items-center justify-between gap-1.5 min-w-0">
+                        {/* Home */}
+                        <div className="flex items-center gap-1.5 flex-1 justify-end min-w-0">
+                          <span className={`text-[9px] font-bold uppercase truncate text-right ${isHomeUser ? 'text-cyan-400' : 'text-slate-400'}`}>
+                            {homeTeam?.name || event.data.home}
+                          </span>
+                          <div className="w-5 h-5 shrink-0 flex items-center justify-center">
+                            {homeTeam?.logo ? (
+                              <TeamLogo 
+                                primaryColor={homeTeam.logo.primary}
+                                secondaryColor={homeTeam.logo.secondary}
+                                patternId={homeTeam.logo.patternId as any}
+                                symbolId={homeTeam.logo.symbolId}
+                                size={20}
+                              />
+                            ) : (
+                               <div className="w-4 h-4 rounded-full bg-slate-700" />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* VS/Score */}
+                        <div className="flex items-center justify-center min-w-[1.5rem]">
+                          {isPlayed ? (
+                            <span className="text-[10px] font-black text-white tracking-widest bg-white/5 px-1 rounded border border-white/5">
+                              {event.data.homeScore}-{event.data.awayScore}
+                            </span>
+                          ) : (
+                            <span className="text-[8px] font-black text-white/10 italic">VS</span>
+                          )}
+                        </div>
+
+                        {/* Away */}
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                          <div className="w-5 h-5 shrink-0 flex items-center justify-center">
+                             {awayTeam?.logo ? (
+                              <TeamLogo 
+                                primaryColor={awayTeam.logo.primary}
+                                secondaryColor={awayTeam.logo.secondary}
+                                patternId={awayTeam.logo.patternId as any}
+                                symbolId={awayTeam.logo.symbolId}
+                                size={20}
+                              />
+                            ) : (
+                               <div className="w-4 h-4 rounded-full bg-slate-700" />
+                            )}
+                          </div>
+                          <span className={`text-[9px] font-bold uppercase truncate ${isAwayUser ? 'text-cyan-400' : 'text-slate-400'}`}>
+                            {awayTeam?.name || event.data.away}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              // News Item (Simplified)
               return (
                 <div 
-                  key={match.id} 
-                  className="group relative bg-black/40 backdrop-blur-xl border border-white/5 rounded-2xl p-4 hover:bg-white/[0.05] hover:border-cyan-500/30 transition-all flex items-center justify-between gap-6 overflow-hidden shadow-lg"
+                  key={event.id}
+                  className="group relative overflow-hidden rounded-xl border border-purple-500/20 bg-purple-900/10 p-3 flex items-center gap-3 hover:border-purple-500/50 transition-all"
                 >
-                  {/* Status Indicator */}
-                  <div className={`absolute left-0 top-0 bottom-0 w-1 ${match.type === 'League' ? 'bg-cyan-500/50' : 'bg-purple-500/50'}`} />
-                  
-                  {/* Time & Competition */}
-                  <div className="flex flex-col items-center justify-center min-w-[100px] py-2 border-r border-white/5 pr-6">
-                    <span className="text-base font-black text-white tabular-nums tracking-tighter group-hover:text-cyan-400 transition-colors">{match.time}</span>
-                    <div className="px-2 py-0.5 bg-white/5 rounded-md border border-white/5 mt-1">
-                       <span className="text-[7px] font-black text-slate-500 uppercase tracking-[0.2em]">{match.type}</span>
-                    </div>
+                  <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400">
+                    <Newspaper size={16} />
                   </div>
-
-                  {/* Teams Row */}
-                  <div className="flex-1 flex items-center justify-between px-4">
-                    {/* Home */}
-                    <div className="flex items-center gap-4 flex-1 justify-end group/h">
-                      <span className={`text-sm font-black uppercase tracking-tight truncate text-right group-hover/h:text-cyan-300 transition-colors ${match.homeId === userTeam?.id ? 'text-cyan-400' : 'text-white'}`}>
-                        {match.home}
-                      </span>
-                      <div className="w-14 h-14 rounded-2xl bg-black/60 border border-white/10 flex items-center justify-center shrink-0 shadow-2xl group-hover/h:scale-110 transition-transform duration-500 relative overflow-hidden group-hover/h:border-cyan-500/30">
-                        {hTeam?.logo ? (
-                          <TeamLogo 
-                            primaryColor={hTeam.logo.primary}
-                            secondaryColor={hTeam.logo.secondary}
-                            patternId={hTeam.logo.patternId as any}
-                            symbolId={hTeam.logo.symbolId}
-                            size={40}
-                          />
-                        ) : (
-                          <div className="w-10 h-10 flex items-center justify-center">
-                            <TeamLogo 
-                              primaryColor={hTeam?.colors.primary || '#fff'}
-                              secondaryColor={hTeam?.colors.secondary || '#333'}
-                              patternId="none"
-                              symbolId="Shield"
-                              size={28}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* VS */}
-                    <div className="mx-8">
-                      <span className="text-xl font-black text-white/5 italic tracking-tighter">VS</span>
-                    </div>
-
-                    {/* Away */}
-                    <div className="flex items-center gap-4 flex-1 justify-start group/a">
-                      <div className="w-14 h-14 rounded-2xl bg-black/60 border border-white/10 flex items-center justify-center shrink-0 shadow-2xl group-hover/a:scale-110 transition-transform duration-500 relative overflow-hidden group-hover/a:border-purple-500/30">
-                        {aTeam?.logo ? (
-                          <TeamLogo 
-                            primaryColor={aTeam.logo.primary}
-                            secondaryColor={aTeam.logo.secondary}
-                            patternId={aTeam.logo.patternId as any}
-                            symbolId={aTeam.logo.symbolId}
-                            size={40}
-                          />
-                        ) : (
-                          <div className="w-10 h-10 flex items-center justify-center">
-                            <TeamLogo 
-                              primaryColor={aTeam?.colors.primary || '#fff'}
-                              secondaryColor={aTeam?.colors.secondary || '#333'}
-                              patternId="none"
-                              symbolId="Shield"
-                              size={28}
-                            />
-                          </div>
-                        )}
-                      </div>
-                      <span className={`text-sm font-black uppercase tracking-tight truncate group-hover/a:text-purple-300 transition-colors ${match.awayId === userTeam?.id ? 'text-purple-400' : 'text-white'}`}>
-                        {match.away}
-                      </span>
-                    </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-xs font-bold text-white truncate group-hover:text-purple-400 transition-colors">
+                      {event.title}
+                    </h4>
+                    <p className="text-[10px] text-slate-400 truncate">
+                      {event.subtitle}
+                    </p>
                   </div>
-
-                  {/* Round & Date */}
-                  <div className="flex flex-col items-end min-w-[120px] pl-6 border-l border-white/5">
-                    <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Rodada {match.id.split('_')[1]}</span>
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">
-                      {new Date(match.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}
-                    </span>
-                    <button className="mt-2 text-[8px] font-black text-cyan-400 hover:text-white transition-colors uppercase tracking-[0.2em] flex items-center gap-1 group/btn">
-                      PREPARAR <ChevronRight size={10} className="group-hover/btn:translate-x-0.5 transition-transform" />
-                    </button>
+                  <div className="text-[9px] font-bold text-slate-500 uppercase">
+                     {event.date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
                   </div>
                 </div>
               );
@@ -1146,6 +2116,9 @@ export const Dashboard: React.FC = () => {
                           <div className="flex items-center gap-2 mt-1">
                             <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest bg-cyan-900/50 px-2 py-0.5 rounded-lg border border-cyan-500/50 shadow-[0_0_5px_rgba(34,211,238,0.2)]">
                               {player.position}
+                            </span>
+                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded-lg border border-white/10">
+                              {state.teams[player.contract.teamId]?.name || player.district}
                             </span>
                           </div>
                         </div>
@@ -1474,23 +2447,44 @@ export const Dashboard: React.FC = () => {
 
               {activeCompetition === 'league' && (
                 <>
-                  <div className="flex items-center justify-between px-1">
-                    <div className="flex gap-2 bg-black/40 p-0.5 rounded-lg w-fit border border-white/10">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-1">
+                    <div className="flex flex-wrap gap-2 bg-black/40 p-0.5 rounded-lg border border-white/10">
                       <button 
                         onClick={() => setActiveLeagueTab('standings')}
                         className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all ${activeLeagueTab === 'standings' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-500 hover:text-white'}`}
                       >
-                        Classificação
+                        Tabelas
                       </button>
                       <button 
                         onClick={() => setActiveLeagueTab('scorers')}
                         className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all ${activeLeagueTab === 'scorers' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-500 hover:text-white'}`}
                       >
-                        Artilheiros
+                        Gols
+                      </button>
+                      <button 
+                        onClick={() => setActiveLeagueTab('all-teams')}
+                        className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all ${activeLeagueTab === 'all-teams' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-500 hover:text-white'}`}
+                      >
+                        Clubes
                       </button>
                     </div>
-                    <div className="text-cyan-400 font-black uppercase tracking-widest text-[10px] drop-shadow-[0_0_5px_rgba(34,211,238,0.5)] bg-cyan-950/30 px-2 py-1 rounded-lg border border-cyan-500/20">
-                      {activeLeagueData?.name || 'Liga'}
+                    
+                    <div className="flex items-center gap-2">
+                      <div className="text-cyan-400 font-black uppercase tracking-widest text-[10px] drop-shadow-[0_0_5px_rgba(34,211,238,0.5)] bg-cyan-950/30 px-2 py-1 rounded-lg border border-cyan-500/20">
+                        {activeLeagueData?.name || 'Liga'}
+                      </div>
+                      <select 
+                        value={activeLeague}
+                        onChange={(e) => {
+                          setActiveLeague(e.target.value);
+                          setActiveCompetition('league');
+                        }}
+                        className="bg-black/60 border border-white/10 rounded-lg px-2 py-1 text-[9px] text-white font-bold focus:outline-none focus:border-cyan-500/50 transition-all uppercase tracking-tighter"
+                      >
+                        {Object.entries(state.world.leagues).map(([id, l]: [string, any]) => (
+                          <option key={id} value={id}>{l.name}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
@@ -1542,7 +2536,7 @@ export const Dashboard: React.FC = () => {
                         </tbody>
                       </table>
                     </div>
-                  ) : (
+                  ) : activeLeagueTab === 'scorers' ? (
                     <div className="bg-black/40 backdrop-blur-md border border-amber-500/30 rounded-xl overflow-hidden shadow-[0_0_20px_rgba(245,158,11,0.15)]">
                       <table className="w-full text-left text-xs">
                         <thead className="bg-amber-900/20 text-[9px] uppercase tracking-widest text-amber-400 font-bold border-b border-amber-500/20">
@@ -1565,6 +2559,41 @@ export const Dashboard: React.FC = () => {
                           ))}
                         </tbody>
                       </table>
+                    </div>
+                  ) : activeLeagueTab === 'all-teams' ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                      {activeLeagueData?.standings?.map((row) => {
+                        const team = state.teams[row.teamId];
+                        return (
+                          <div 
+                            key={row.teamId} 
+                            className="bg-black/40 border border-white/5 rounded-xl p-3 flex flex-col items-center gap-2 hover:border-cyan-500/30 transition-all group cursor-pointer"
+                          >
+                            <div className="w-10 h-10 group-hover:scale-110 transition-transform">
+                              {team?.logo && (
+                                <TeamLogo 
+                                  primaryColor={team.logo.primary}
+                                  secondaryColor={team.logo.secondary}
+                                  patternId={team.logo.patternId as any}
+                                  symbolId={team.logo.symbolId}
+                                  size={40}
+                                />
+                              )}
+                            </div>
+                            <div className="text-center overflow-hidden w-full">
+                              <span className="text-[9px] font-black text-white uppercase truncate block tracking-tighter">{row.team}</span>
+                              <div className="flex items-center justify-center gap-1 mt-0.5">
+                                <div className="w-1 h-1 rounded-full bg-emerald-500" />
+                                <span className="text-[7px] text-slate-500 font-bold uppercase tracking-widest">{row.points} PTS</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-40 text-slate-500 text-[10px] font-black uppercase tracking-widest italic">
+                      Selecione uma aba
                     </div>
                   )}
                 </>
@@ -1939,29 +2968,27 @@ export const Dashboard: React.FC = () => {
                          </div>
                        </div>
 
-                       {/* Position Filter */}
-                       <div className="space-y-2">
-                         <label className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                            <Activity size={12} className="drop-shadow-[0_0_5px_rgba(251,191,36,0.5)]" /> Especialidade
-                         </label>
-                         <div className="relative group/input">
-                           <div className="absolute inset-0 bg-amber-500/5 rounded-lg group-focus-within/input:bg-amber-500/10 transition-colors" />
-                           <select 
-                             value={marketPosition}
-                             onChange={(e) => setMarketPosition(e.target.value)}
-                             className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs text-white font-bold focus:border-amber-500/50 focus:outline-none transition-all appearance-none uppercase tracking-widest relative z-10 cursor-pointer shadow-inner"
-                           >
-                             <option value="all">TODAS POSIÇÕES</option>
-                             <option value="Goleiro">GOLEIRO</option>
-                             <option value="Zagueiro">ZAGUEIRO</option>
-                             <option value="Lateral">LATERAL</option>
-                             <option value="Volante">VOLANTE</option>
-                             <option value="Meia">MEIA</option>
-                             <option value="Atacante">ATACANTE</option>
-                           </select>
-                           <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none z-20" />
-                         </div>
-                       </div>
+                      {/* Position Filter */}
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                           <Activity size={12} className="drop-shadow-[0_0_5px_rgba(251,191,36,0.5)]" /> Especialidade
+                        </label>
+                        <div className="relative group/input">
+                          <div className="absolute inset-0 bg-amber-500/5 rounded-lg group-focus-within/input:bg-amber-500/10 transition-colors" />
+                          <select 
+                            value={marketPosition}
+                            onChange={(e) => setMarketPosition(e.target.value)}
+                            className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs text-white font-bold focus:border-amber-500/50 focus:outline-none transition-all appearance-none uppercase tracking-widest relative z-10 cursor-pointer shadow-inner"
+                          >
+                            <option value="all">TODAS POSIÇÕES</option>
+                            <option value="GOL">GOLEIRO</option>
+                            <option value="DEF">DEFENSOR</option>
+                            <option value="MEI">MEIO-CAMPISTA</option>
+                            <option value="ATA">ATACANTE</option>
+                          </select>
+                          <ChevronRight size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none z-20" />
+                        </div>
+                      </div>
 
                      {/* Points Sliders Group */}
                      <div className="flex flex-col gap-4">
@@ -1969,19 +2996,32 @@ export const Dashboard: React.FC = () => {
                         <div className="space-y-2">
                            <div className="flex justify-between items-center">
                               <label className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                                 <TeamLogo primaryColor="#22d3ee" secondaryColor="#0891b2" patternId="none" symbolId="Shield" size={12} className="drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]" /> Rating Mín
+                                 <TeamLogo primaryColor="#22d3ee" secondaryColor="#0891b2" patternId="none" symbolId="Shield" size={12} className="drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]" /> Rating Range
                               </label>
-                              <span className="text-[10px] font-mono text-cyan-400 font-black bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/30 shadow-[0_0_10px_rgba(34,211,238,0.2)]">{marketPointsMin}</span>
+                              <span className="text-[10px] font-mono text-cyan-400 font-black bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/30 shadow-[0_0_10px_rgba(34,211,238,0.2)]">
+                                {marketPointsMin} - {marketPointsMax}
+                              </span>
                            </div>
-                           <input 
-                             type="range" 
-                             min="0" 
-                             max="1000" 
-                             step="10"
-                             value={marketPointsMin}
-                             onChange={(e) => setMarketPointsMin(parseInt(e.target.value))}
-                             className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-500 shadow-inner"
-                           />
+                           <div className="flex gap-2">
+                             <input 
+                               type="range" 
+                               min="0" 
+                               max="1000" 
+                               step="10"
+                               value={marketPointsMin}
+                               onChange={(e) => setMarketPointsMin(parseInt(e.target.value))}
+                               className="flex-1 h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-500 shadow-inner"
+                             />
+                             <input 
+                               type="range" 
+                               min="0" 
+                               max="1000" 
+                               step="10"
+                               value={marketPointsMax}
+                               onChange={(e) => setMarketPointsMax(parseInt(e.target.value))}
+                               className="flex-1 h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-500 shadow-inner"
+                             />
+                           </div>
                         </div>
 
                         {/* Potential Slider */}
@@ -2002,6 +3042,25 @@ export const Dashboard: React.FC = () => {
                              className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-fuchsia-500 shadow-inner"
                            />
                         </div>
+
+                        {/* Result Limit */}
+                        <div className="space-y-2">
+                           <div className="flex justify-between items-center">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                 <Database size={12} className="drop-shadow-[0_0_5px_rgba(255,255,255,0.2)]" /> Limite de Resultados
+                              </label>
+                              <span className="text-[10px] font-mono text-slate-400 font-black bg-white/5 px-2 py-0.5 rounded border border-white/10 shadow-[0_0_10px_rgba(255,255,255,0.1)]">{marketLimit}</span>
+                           </div>
+                           <input 
+                             type="range" 
+                             min="10" 
+                             max="100" 
+                             step="10"
+                             value={marketLimit}
+                             onChange={(e) => setMarketLimit(parseInt(e.target.value))}
+                             className="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-slate-400 shadow-inner"
+                           />
+                        </div>
                      </div>
                    </div>
                 </div>
@@ -2013,14 +3072,14 @@ export const Dashboard: React.FC = () => {
                   .filter(p => {
                     const matchesSearch = p.name.toLowerCase().includes(marketSearch.toLowerCase()) || p.nickname.toLowerCase().includes(marketSearch.toLowerCase());
                     const matchesDistrict = marketDistrict === 'all' || p.district === marketDistrict;
-                    const matchesPosition = marketPosition === 'all' || p.position === marketPosition;
-                    const matchesPoints = p.totalRating >= marketPointsMin;
+                    const matchesPosition = marketPosition === 'all' || p.role === marketPosition;
+                    const matchesPoints = p.totalRating >= marketPointsMin && p.totalRating <= marketPointsMax;
                     const matchesPotential = p.potential >= marketPotentialMin;
                     return matchesSearch && matchesDistrict && matchesPosition && matchesPoints && matchesPotential;
                   })
-                  .slice(0, 20)
+                  .slice(0, marketLimit)
                   .map(player => (
-                    <PlayerCard key={player.id} player={player} onClick={setSelectedPlayer} />
+                    <PlayerCard key={player.id} player={player} onClick={setSelectedPlayer} onProposta={handleMakeProposal} />
                 ))}
              </div>
           </div>
@@ -2256,7 +3315,9 @@ export const Dashboard: React.FC = () => {
     );
   };
 
-  const renderCareer = () => (
+  const renderCareer = () => {
+    console.log('Dashboard: Renderizando aba Carreira...');
+    return (
     <div className="space-y-3 animate-in fade-in duration-500 max-w-2xl mx-auto py-2">
       {/* Current Team Modal / Find Team Section */}
       <div className="px-1">
@@ -2457,15 +3518,93 @@ export const Dashboard: React.FC = () => {
            </div>
         </div>
       </div>
+
+      {/* GM Panel */}
+      <div className="bg-slate-900/60 backdrop-blur-md border border-red-500/30 rounded-lg p-3 shadow-[0_0_15px_rgba(239,68,68,0.1)] flex flex-col gap-2 relative overflow-hidden mt-4 mx-1">
+         <div className="absolute top-0 right-0 w-20 h-20 bg-red-500/5 rounded-full blur-2xl -mr-10 -mt-10" />
+         <h3 className="text-[8px] font-black text-red-400 uppercase tracking-[0.2em] flex items-center gap-1.5 mb-1 relative z-10">
+            <Database size={10} className="drop-shadow-[0_0_5px_rgba(239,68,68,0.5)]" />
+            Painel do GM <span className="text-[6px] opacity-50 font-normal ml-1">(MODO DEV)</span>
+         </h3>
+
+         <div className="grid grid-cols-2 gap-2 relative z-10">
+            <div className="flex flex-col gap-2">
+               <button 
+                 onClick={handleOpenRandomPlayer}
+                 className="flex items-center gap-2 bg-black/40 border border-white/5 hover:border-red-500/50 p-2 rounded-md transition-all group"
+               >
+                 <div className="w-6 h-6 rounded bg-red-500/10 flex items-center justify-center text-red-400 group-hover:bg-red-500/20 transition-colors">
+                   <User size={12} />
+                 </div>
+                 <div className="flex flex-col items-start text-left">
+                   <span className="text-[8px] font-bold text-white uppercase tracking-tighter">Testar Skins</span>
+                   <span className="text-[6px] text-slate-500 uppercase">Gerar Novo Mini Card</span>
+                 </div>
+               </button>
+
+               <button 
+                 onClick={handleSimulateGameReport}
+                 className="flex items-center gap-2 bg-black/40 border border-white/5 hover:border-red-500/50 p-2 rounded-md transition-all group"
+               >
+                 <div className="w-6 h-6 rounded bg-red-500/10 flex items-center justify-center text-red-400 group-hover:bg-red-500/20 transition-colors">
+                   <Activity size={12} />
+                 </div>
+                 <div className="flex flex-col items-start text-left">
+                   <span className="text-[8px] font-bold text-white uppercase tracking-tighter">MOCK VOD</span>
+                   <span className="text-[6px] text-slate-500 uppercase">Testar Relatório VOD</span>
+                 </div>
+               </button>
+
+               <button 
+                 onClick={handleAdvanceDay}
+                 className="flex items-center gap-2 bg-black/40 border border-white/5 hover:border-red-500/50 p-2 rounded-md transition-all group"
+               >
+                 <div className="w-6 h-6 rounded bg-red-500/10 flex items-center justify-center text-red-400 group-hover:bg-red-500/20 transition-colors">
+                   <FastForward size={12} />
+                 </div>
+                 <div className="flex flex-col items-start text-left">
+                   <span className="text-[8px] font-bold text-white uppercase tracking-tighter">Avançar Dia</span>
+                   <span className="text-[6px] text-slate-500 uppercase">Testar Calendário</span>
+                 </div>
+               </button>
+            </div>
+
+            {/* Mini Card Display Area */}
+            <div className="bg-black/60 rounded-xl border border-white/10 flex items-center justify-center p-6 relative min-h-[340px] shadow-inner overflow-hidden">
+               {/* Background Glow */}
+               <div className="absolute inset-0 bg-gradient-to-t from-red-500/5 to-transparent pointer-events-none" />
+               
+               {gmRandomPlayer ? (
+                  <div className="w-[180px] sm:w-[200px] transform hover:scale-105 transition-transform duration-500 relative z-10 group">
+                     <div className="absolute -inset-4 bg-red-500/20 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                     <PlayerCard 
+                        player={gmRandomPlayer} 
+                        variant="full" 
+                        onClick={() => setSelectedPlayer(gmRandomPlayer)} 
+                     />
+                     <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-red-600 text-[7px] font-black text-white px-3 py-1.5 rounded-full uppercase tracking-[0.2em] shadow-[0_0_20px_rgba(220,38,38,0.5)] z-20 border border-white/20 whitespace-nowrap">
+                        Skin Preview Mode
+                     </div>
+                  </div>
+               ) : (
+                  <div className="flex flex-col items-center gap-1 opacity-20 text-slate-500">
+                     <User size={32} />
+                     <span className="text-[8px] uppercase font-bold">Aguardando...</span>
+                  </div>
+               )}
+            </div>
+         </div>
+      </div>
     </div>
-  );
+    );
+  };
 
   const navItems = [
-    { id: 'home', icon: Home, label: '' },
-    { id: 'team', icon: (props: any) => <TeamLogo primaryColor="#22d3ee" secondaryColor="#0891b2" patternId="none" symbolId="Shield" size={props.size || 20} />, label: '' },
-    { id: 'calendar', icon: Calendar, label: '' },
-    { id: 'world', icon: Globe, label: '' },
-    { id: 'career', icon: Briefcase, label: '' },
+    { id: 'home', icon: Home, label: 'Início' },
+    { id: 'team', icon: (props: any) => <TeamLogo primaryColor="#22d3ee" secondaryColor="#0891b2" patternId="none" symbolId="Shield" size={props.size || 20} />, label: 'Time' },
+    { id: 'calendar', icon: Calendar, label: 'Agenda' },
+    { id: 'world', icon: Globe, label: 'Mundo' },
+    { id: 'career', icon: Briefcase, label: 'Carreira' },
   ] as const;
 
   if (!state.userTeamId) {
@@ -2492,10 +3631,10 @@ export const Dashboard: React.FC = () => {
             <Globe size={12} className={isOnline ? "text-emerald-400" : "text-red-400"} />
             <div className="flex flex-col leading-none">
               <span className="text-[9px] font-black text-white uppercase tracking-tighter">
-                {isOnline ? 'Online' : 'Offline'}
+                {state.world.name || (isOnline ? 'Online' : 'Offline')}
               </span>
               <span className="text-[6px] text-slate-400 uppercase font-bold tracking-tighter">
-                Universo Sync
+                {state.world.name ? 'Multiverso' : 'Universo Sync'}
               </span>
             </div>
             
@@ -2529,6 +3668,18 @@ export const Dashboard: React.FC = () => {
               </span>
             </div>
           </div>
+
+          <button 
+            onClick={() => {
+              localStorage.removeItem('elite_mock_user');
+              supabase.auth.signOut();
+            }}
+            className="bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-full h-8 px-3 flex items-center gap-2 shadow-lg transition-all group pointer-events-auto"
+            title="Encerrar Sessão"
+          >
+            <Lock size={12} className="text-red-400 group-hover:scale-110 transition-transform" />
+            <span className="text-[8px] font-black text-red-400 uppercase tracking-widest hidden sm:inline">Sair</span>
+          </button>
           
           <div className="bg-black/60 backdrop-blur-xl border border-purple-500/30 rounded-full h-8 px-2.5 flex items-center gap-2 shadow-lg">
             <Zap size={12} className="text-purple-400" />
@@ -2711,6 +3862,14 @@ export const Dashboard: React.FC = () => {
                     <span>Gerenciar Equipe</span>
                     <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
                   </button>
+
+                  <button 
+                    onClick={() => setWorldId(null)}
+                    className="w-full mt-2 bg-white/5 hover:bg-white/10 text-slate-400 font-black text-[9px] uppercase tracking-[0.2em] py-2 rounded-xl transition-all flex items-center justify-center gap-2"
+                  >
+                    <Globe size={12} />
+                    <span>Mudar de Universo</span>
+                  </button>
                 </>
               ) : (
                 <>
@@ -2738,6 +3897,14 @@ export const Dashboard: React.FC = () => {
                     <span>Explorar Mercado</span>
                     <Globe size={14} className="group-hover:rotate-12 transition-transform" />
                   </button>
+
+                  <button 
+                    onClick={() => setWorldId(null)}
+                    className="w-full mt-2 bg-white/5 hover:bg-white/10 text-slate-400 font-black text-[9px] uppercase tracking-[0.2em] py-2 rounded-xl transition-all flex items-center justify-center gap-2"
+                  >
+                    <Globe size={12} />
+                    <span>Mudar de Universo</span>
+                  </button>
                 </>
               )}
             </div>
@@ -2745,6 +3912,64 @@ export const Dashboard: React.FC = () => {
             {/* Modal Footer */}
             <div className="bg-black/40 p-3 flex justify-center border-t border-white/5">
               <span className="text-[7px] text-slate-600 font-bold uppercase tracking-[0.3em]">Elite 2050 Professional System</span>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Card Selection Modal */}
+      {isCardModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center px-4">
+          <div 
+            className="absolute inset-0 bg-black/90 backdrop-blur-md transition-opacity animate-in fade-in duration-300" 
+            onClick={() => {
+              setIsCardModalOpen(false);
+              setSelectedCardSlot(null);
+            }} 
+          />
+          
+          <div className="relative bg-[#0a0f1d] border border-amber-500/30 rounded-2xl w-full max-w-sm overflow-hidden shadow-[0_0_50px_rgba(245,158,11,0.2)] animate-in zoom-in-95 duration-300">
+            <div className="bg-gradient-to-r from-amber-900/40 to-orange-900/40 border-b border-amber-500/20 p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Star size={16} className="text-amber-400" />
+                <h3 className="text-xs font-black text-white uppercase tracking-widest">Selecionar Trunfo</h3>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsCardModalOpen(false);
+                  setSelectedCardSlot(null);
+                }}
+                className="text-slate-500 hover:text-white transition-colors"
+              >
+                <AlertCircle size={18} className="rotate-45" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto hide-scrollbar">
+              {/* Opção para remover carta */}
+              <button
+                onClick={() => handleSelectCard(null)}
+                className="w-full bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 p-4 rounded-xl flex items-center justify-center transition-all group"
+              >
+                <span className="text-red-400 text-[10px] font-black uppercase tracking-widest group-hover:scale-105 transition-transform">Remover Carta</span>
+              </button>
+
+              {availableCards.map(card => (
+                <button
+                  key={card.id}
+                  onClick={() => handleSelectCard(card)}
+                  className="w-full bg-white/5 border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/5 p-4 rounded-xl text-left transition-all group"
+                >
+                  <div className="flex justify-between items-start mb-1">
+                    <h4 className="text-sm font-black text-white uppercase tracking-tight group-hover:text-amber-400 transition-colors">{card.name}</h4>
+                    <span className="text-[8px] bg-amber-500/20 text-amber-500 px-1.5 py-0.5 rounded font-black">{card.effect}</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-relaxed">{card.description}</p>
+                </button>
+              ))}
+            </div>
+
+            <div className="bg-black/40 p-3 flex justify-center border-t border-white/5">
+              <span className="text-[7px] text-slate-600 font-bold uppercase tracking-[0.3em]">Tactical Asset Selection</span>
             </div>
           </div>
         </div>

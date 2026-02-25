@@ -23,7 +23,7 @@ import { PlayerCard } from './PlayerCard';
 type Step = 'path-selection' | 'heir-choice' | 'founder-identity' | 'founder-draft';
 
 export const NewGameFlow: React.FC = () => {
-  const { state, setState, saveGame, isSyncing } = useGame();
+  const { state, setState, saveGame, isSyncing, userId } = useGame();
   const [step, setStep] = useState<Step>('path-selection');
   const [selectedHeirTeamId, setSelectedHeirTeamId] = useState('');
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
@@ -107,8 +107,9 @@ export const NewGameFlow: React.FC = () => {
     const team = state.teams[selectedHeirTeamId];
     if (!team) return;
 
+    const managerId = userId || 'm_user';
     const userManager = {
-      id: 'm_user',
+      id: managerId,
       name: 'Manager User',
       district: team.district,
       reputation: 50,
@@ -166,16 +167,16 @@ export const NewGameFlow: React.FC = () => {
         ...state.teams,
         [selectedHeirTeamId]: {
           ...team,
-          managerId: 'm_user',
+          managerId: managerId,
           lineup: newLineup
         }
       },
       managers: {
         ...state.managers,
-        'm_user': userManager
+        [managerId]: userManager
       },
       userTeamId: selectedHeirTeamId,
-      userManagerId: 'm_user'
+      userManagerId: managerId
     };
 
     setState(newState);
@@ -273,8 +274,9 @@ export const NewGameFlow: React.FC = () => {
     });
 
     // 4. Create or update user manager
+    const managerId = userId || 'm_user';
     const userManager = {
-      id: 'm_user',
+      id: managerId,
       name: 'Manager User',
       district: founderData.district,
       reputation: 50,
@@ -299,14 +301,14 @@ export const NewGameFlow: React.FC = () => {
       players: updatedPlayers,
       managers: {
         ...state.managers,
-        'm_user': userManager
+        [managerId]: userManager
       },
       world: {
         ...state.world,
         leagues: updatedLeagues
       },
       userTeamId: newTeamId,
-      userManagerId: 'm_user'
+      userManagerId: managerId
     };
 
     setState(newState);
