@@ -69,23 +69,25 @@ export interface Player {
 
 export type LeagueColor = 'Cyan' | 'Orange' | 'Green' | 'Purple';
 
-export type PlayStyle = 'Blitzkrieg' | 'Tiki-Taka' | 'Retranca Armada' | 'Motor Lento' | 'Equilibrado' | 'Gegenpressing' | 'Catenaccio';
+export type PlayStyle = 'Blitzkrieg' | 'Tiki-Taka' | 'Retranca Armada' | 'Motor Lento' | 'Equilibrado' | 'Gegenpressing' | 'Catenaccio' | 'Vertical';
 
 export type Mentality = 'Calculista' | 'Emocional' | 'Predadora';
 
 export interface TacticalCard {
   id: string;
   name: string;
-  description: string;
+  description?: string;
+  type?: string;
+  rarity?: string;
   effect: string;
 }
 
 export interface TeamTactics {
   playStyle: PlayStyle;
-  mentality: Mentality;
-  linePosition: number; // 0 (Recuada) to 100 (Alta)
-  aggressiveness: number; // 0 (Sombra) to 100 (Caçada)
-  slots: (TacticalCard | null)[]; // Max 3 slots
+  mentality?: Mentality;
+  linePosition?: number; // 0 (Recuada) to 100 (Alta)
+  aggressiveness?: number; // 0 (Sombra) to 100 (Caçada)
+  slots?: (TacticalCard | null)[]; // Max 3 slots
   preferredFormation: string;
 }
 
@@ -114,14 +116,14 @@ export interface Team {
     primary: string;
     secondary: string;
   };
-  logo: TeamLogoMetadata;
+  logo?: TeamLogoMetadata;
   finances: TeamFinances;
   tactics: TeamTactics;
-  inventory: TacticalCard[]; // Cards available to use in slots
+  inventory?: TacticalCard[]; // Cards available to use in slots
   managerId: string | null;
   squad: string[]; // Player IDs
   lineup: Record<string, string>; // Position -> Player ID
-  chemistry: number; // 0-100
+  chemistry?: number; // 0-100
 }
 
 export interface Manager {
@@ -176,10 +178,10 @@ export interface Match {
   id: string;
   homeTeamId: string;
   awayTeamId: string;
-  time: string; // HH:mm
+  time?: string; // HH:mm
   date: string; // ISO String
-  status: MatchStatus;
-  result: MatchResult | null;
+  status?: MatchStatus;
+  result?: MatchResult | null;
   homeScore?: number;
   awayScore?: number;
   played?: boolean;
@@ -192,13 +194,16 @@ export interface Round {
 
 export interface LeagueTeamStats {
   teamId: string;
-  team: string;
+  team?: string;
+  position?: number;
+  logo?: TeamLogoMetadata;
   played: number;
   won: number;
   drawn: number;
   lost: number;
   goalsFor: number;
   goalsAgainst: number;
+  gd?: number;
   points: number;
 }
 
@@ -210,20 +215,84 @@ export interface LeagueScorer {
   teamId: string;
 }
 
-export interface WorldState {
+export type LogoPattern = string;
+
+export interface GameNotification {
+  id: string;
+  date: string;
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'alert' | 'match' | 'transfer' | 'warning' | 'crisis';
+  read: boolean;
+}
+
+// Re-export as Notification so existing code doesn't break
+export { type GameNotification as Notification };
+
+export interface TeamStats {
   id: string;
   name: string;
+  attack: number;
+  midfield: number;
+  defense: number;
+  goalkeeper: number;
+  playStyle: PlayStyle;
+  mentality: Mentality;
+  linePosition: number;
+  aggressiveness: number;
+  slots: (TacticalCard | null)[];
+  chemistry: number;
+}
+
+export interface EliteCupBracket {
+  round1: Match[];
+  quarters: Match[];
+  semis: Match[];
+  final: Match | null;
+}
+
+export interface EliteCupState {
+  teams: string[];
+  round: number;
+  bracket: EliteCupBracket;
+  winnerId: string | null;
+}
+
+export interface DistrictCupState {
+  teams: string[];
+  round: number;
+  matches: Match[];
+  standings: LeagueTeamStats[];
+  final: Match | null;
+  winnerId: string | null;
+}
+
+export interface LeagueState {
+  id: string;
+  name: string;
+  district?: District;
+  standings: LeagueTeamStats[];
+  scorers?: LeagueScorer[];
+  rounds?: Round[];
+  matches: Match[];
+  tvQuota?: string;
+  difficulty?: string;
+  teams?: string[];
+}
+
+export interface WorldState {
+  id?: string;
+  name?: string;
   currentDate: string;
   currentRound: number;
-  totalRounds: number;
-  leagues: Record<string, {
-    id: string;
-    name: string;
-    district: District;
-    standings: LeagueTeamStats[];
-    scorers: LeagueScorer[];
-    rounds: Round[];
-  }>;
+  currentSeason?: number;
+  totalRounds?: number;
+  transferWindowOpen?: boolean;
+  seasonStartReal?: string | null;
+  rank1000PlayerId?: string | null;
+  leagues: Record<string, LeagueState>;
+  eliteCup: EliteCupState;
+  districtCup: DistrictCupState;
 }
 
 export interface TrainingState {
@@ -249,7 +318,7 @@ export interface GameState {
   managers: Record<string, Manager>;
   userTeamId: string | null;
   userManagerId?: string | null;
-  notifications?: Notification[];
+  notifications: GameNotification[];
   lastHeadline?: {
     title: string;
     message: string;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Match, MatchEvent, Team, Player } from '../types';
-import { 
-  Trophy, Clock, Activity, Zap, Shield, 
+import {
+  Trophy, Clock, Activity, Zap, Shield,
   ChevronRight, AlertCircle, Award, Target,
   TrendingUp, Users, Play, Pause, FastForward,
   Info, BarChart3, Star, History
@@ -16,12 +16,12 @@ interface LiveReportProps {
   currentSecond: number; // 0-360
 }
 
-export const LiveReport: React.FC<LiveReportProps> = ({ 
-  match, 
-  homeTeam, 
-  awayTeam, 
+export const LiveReport: React.FC<LiveReportProps> = ({
+  match,
+  homeTeam,
+  awayTeam,
   players,
-  currentSecond 
+  currentSecond
 }) => {
   const result = match.result;
   if (!result) return null;
@@ -34,7 +34,7 @@ export const LiveReport: React.FC<LiveReportProps> = ({
   const currentHomeScore = result.events
     .filter(e => e.type === 'GOAL' && e.teamId === homeTeam.id && e.realTimeSecond <= currentSecond)
     .length;
-    
+
   const currentAwayScore = result.events
     .filter(e => e.type === 'GOAL' && e.teamId === awayTeam.id && e.realTimeSecond <= currentSecond)
     .length;
@@ -63,7 +63,7 @@ export const LiveReport: React.FC<LiveReportProps> = ({
           {/* Home Team */}
           <div className="flex flex-col items-center flex-1">
             <div className="mb-2">
-              <TeamLogo 
+              <TeamLogo
                 primaryColor={homeTeam.logo.primary}
                 secondaryColor={homeTeam.logo.secondary}
                 patternId={homeTeam.logo.patternId as any}
@@ -86,7 +86,7 @@ export const LiveReport: React.FC<LiveReportProps> = ({
           {/* Away Team */}
           <div className="flex flex-col items-center flex-1">
             <div className="mb-2">
-              <TeamLogo 
+              <TeamLogo
                 primaryColor={awayTeam.logo.primary}
                 secondaryColor={awayTeam.logo.secondary}
                 patternId={awayTeam.logo.patternId as any}
@@ -100,7 +100,7 @@ export const LiveReport: React.FC<LiveReportProps> = ({
 
         {/* Progress Bar */}
         <div className="mt-6 h-1 w-full bg-white/5 rounded-full overflow-hidden">
-          <div 
+          <div
             className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-1000"
             style={{ width: `${progress}%` }}
           />
@@ -134,23 +134,22 @@ const Timeline: React.FC<{ events: MatchEvent[], players: Record<string, Player>
     <div className="relative">
       {/* Vertical Line */}
       <div className="absolute left-[19px] top-2 bottom-2 w-0.5 bg-gradient-to-b from-cyan-500/50 via-purple-500/50 to-cyan-500/50 rounded-full" />
-      
+
       <div className="space-y-6">
         {events.length > 0 ? (
           events.map((event, idx) => (
-            <div 
+            <div
               key={event.id}
               className="relative pl-12 animate-in slide-in-from-left-4 duration-500"
               style={{ animationDelay: `${idx * 100}ms` }}
             >
               {/* Event Dot/Icon */}
-              <div className={`absolute left-0 top-0 w-10 h-10 rounded-full border-2 flex items-center justify-center z-10 shadow-lg ${
-                event.type === 'GOAL' 
-                  ? 'bg-cyan-500 border-cyan-400 shadow-cyan-500/40' 
+              <div className={`absolute left-0 top-0 w-10 h-10 rounded-full border-2 flex items-center justify-center z-10 shadow-lg ${event.type === 'GOAL'
+                  ? 'bg-cyan-500 border-cyan-400 shadow-cyan-500/40'
                   : event.type === 'CARD_RED'
-                  ? 'bg-red-500 border-red-400 shadow-red-500/40'
-                  : 'bg-slate-900 border-white/20 shadow-black'
-              }`}>
+                    ? 'bg-red-500 border-red-400 shadow-red-500/40'
+                    : 'bg-slate-900 border-white/20 shadow-black'
+                }`}>
                 {event.type === 'GOAL' && <Trophy className="text-white" size={18} />}
                 {event.type === 'CHANCE' && <Zap className="text-yellow-400" size={18} />}
                 {event.type === 'CARD_YELLOW' && <div className="w-3 h-4 bg-yellow-400 rounded-sm" />}
@@ -160,15 +159,13 @@ const Timeline: React.FC<{ events: MatchEvent[], players: Record<string, Player>
               </div>
 
               {/* Balloon / Card */}
-              <div className={`relative p-4 rounded-2xl border transition-all hover:scale-[1.02] duration-300 ${
-                event.type === 'GOAL' 
-                  ? 'bg-cyan-500/10 border-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.1)]' 
+              <div className={`relative p-4 rounded-2xl border transition-all hover:scale-[1.02] duration-300 ${event.type === 'GOAL'
+                  ? 'bg-cyan-500/10 border-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.1)]'
                   : 'bg-white/5 border-white/10'
-              }`}>
+                }`}>
                 {/* Connector Arrow */}
-                <div className={`absolute left-[-8px] top-4 w-4 h-4 rotate-45 border-l border-b ${
-                  event.type === 'GOAL' ? 'bg-cyan-950 border-cyan-500/30' : 'bg-slate-900 border-white/10'
-                }`} />
+                <div className={`absolute left-[-8px] top-4 w-4 h-4 rotate-45 border-l border-b ${event.type === 'GOAL' ? 'bg-cyan-950 border-cyan-500/30' : 'bg-slate-900 border-white/10'
+                  }`} />
 
                 <div className="relative z-10">
                   <div className="flex justify-between items-start mb-2">
@@ -185,7 +182,7 @@ const Timeline: React.FC<{ events: MatchEvent[], players: Record<string, Player>
                       </div>
                     )}
                   </div>
-                  
+
                   <h4 className="text-sm font-black text-white uppercase mb-1 leading-tight tracking-tight">
                     {event.title}
                   </h4>
@@ -215,12 +212,12 @@ interface PostGameReportProps {
   onClose?: () => void;
 }
 
-export const PostGameReport: React.FC<PostGameReportProps> = ({ 
-  match, 
-  homeTeam, 
-  awayTeam, 
+export const PostGameReport: React.FC<PostGameReportProps> = ({
+  match,
+  homeTeam,
+  awayTeam,
   players,
-  onClose 
+  onClose
 }) => {
   const result = match.result;
   const [activeTab, setActiveTab] = useState<'stats' | 'timeline'>('stats');
@@ -228,10 +225,10 @@ export const PostGameReport: React.FC<PostGameReportProps> = ({
   if (!result) return null;
 
   const topPlayers = Object.entries(result.ratings)
-    .sort(([, a], [, b]) => b - a)
+    .sort(([, a], [, b]) => (b as number) - (a as number))
     .slice(0, 3)
-    .map(([id, rating]) => ({ player: players[id], rating }));
-  
+    .map(([id, rating]) => ({ player: players[id], rating: rating as number }));
+
   // Sort events for timeline (newest first)
   const sortedEvents = [...result.events].sort((a, b) => b.realTimeSecond - a.realTimeSecond);
 
@@ -242,20 +239,20 @@ export const PostGameReport: React.FC<PostGameReportProps> = ({
         <div className="absolute top-0 right-0 p-8 opacity-10">
           <Award size={120} />
         </div>
-        
+
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-4">
             <div className="px-2 py-0.5 bg-cyan-500 rounded text-[8px] font-black text-black uppercase tracking-widest">RELATÓRIO FINAL</div>
             <span className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">{match.date}</span>
           </div>
-          
+
           <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic mb-6 leading-[0.9]">
             {result.headline || 'Fim de Jogo'}
           </h2>
 
           <div className="flex items-center gap-12">
             <div className="flex flex-col items-center gap-2">
-              <TeamLogo 
+              <TeamLogo
                 primaryColor={homeTeam.logo.primary}
                 secondaryColor={homeTeam.logo.secondary}
                 patternId={homeTeam.logo.patternId as any}
@@ -268,7 +265,7 @@ export const PostGameReport: React.FC<PostGameReportProps> = ({
             <div className="text-xl font-black text-white/20 italic">VS</div>
 
             <div className="flex flex-col items-center gap-2">
-              <TeamLogo 
+              <TeamLogo
                 primaryColor={awayTeam.logo.primary}
                 secondaryColor={awayTeam.logo.secondary}
                 patternId={awayTeam.logo.patternId as any}
@@ -283,19 +280,17 @@ export const PostGameReport: React.FC<PostGameReportProps> = ({
 
       {/* Tabs */}
       <div className="flex border-b border-white/5 bg-white/5">
-        <button 
+        <button
           onClick={() => setActiveTab('stats')}
-          className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${
-            activeTab === 'stats' ? 'bg-cyan-500 text-black' : 'text-slate-500 hover:text-white hover:bg-white/5'
-          }`}
+          className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${activeTab === 'stats' ? 'bg-cyan-500 text-black' : 'text-slate-500 hover:text-white hover:bg-white/5'
+            }`}
         >
           Estatísticas
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('timeline')}
-          className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${
-            activeTab === 'timeline' ? 'bg-cyan-500 text-black' : 'text-slate-500 hover:text-white hover:bg-white/5'
-          }`}
+          className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${activeTab === 'timeline' ? 'bg-cyan-500 text-black' : 'text-slate-500 hover:text-white hover:bg-white/5'
+            }`}
         >
           Linha do Tempo
         </button>
@@ -330,9 +325,8 @@ export const PostGameReport: React.FC<PostGameReportProps> = ({
                 {topPlayers.map(({ player, rating }, idx) => (
                   <div key={player?.id || idx} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
                     <div className="flex items-center gap-3">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${
-                        idx === 0 ? 'bg-yellow-500 text-black' : 'bg-white/10 text-white/40'
-                      }`}>
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${idx === 0 ? 'bg-yellow-500 text-black' : 'bg-white/10 text-white/40'
+                        }`}>
                         {idx + 1}
                       </div>
                       <div>
@@ -353,7 +347,7 @@ export const PostGameReport: React.FC<PostGameReportProps> = ({
 
       {/* Action Bar */}
       <div className="p-6 bg-slate-900/50 flex justify-end shrink-0 border-t border-white/5">
-        <button 
+        <button
           onClick={onClose}
           className="px-6 py-2 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-cyan-400 transition-colors"
         >

@@ -1,0 +1,225 @@
+﻿src/components/dashboard/CompetitionTab.tsx(142,14): error TS2304: Cannot find name 'calendarEvents'.
+src/components/dashboard/DatabaseTab.tsx(29,31): error TS2304: Cannot find name 'players'.
+src/components/dashboard/DatabaseTab.tsx(61,126): error TS2304: Cannot find name 'setSelectedPlayer'.
+src/components/dashboard/DatabaseTab.tsx(90,54): error TS2304: Cannot find name 'setSelectedPlayer'.
+src/components/dashboard/SquadTab.tsx(37,45): error TS2304: Cannot find name 'Player'.
+src/components/dashboard/SquadTab.tsx(77,32): error TS2304: Cannot find name 'setSelectedPlayer'.
+src/components/dashboard/WorldTab.tsx(29,9): error TS2304: Cannot find name 'selectedTeamView'.
+src/components/dashboard/WorldTab.tsx(30,32): error TS2304: Cannot find name 'selectedTeamView'.
+src/components/dashboard/WorldTab.tsx(36,30): error TS2304: Cannot find name 'setSelectedTeamView'.
+src/components/dashboard/WorldTab.tsx(77,30): error TS2304: Cannot find name 'setWorldTeamSubTab'.
+src/components/dashboard/WorldTab.tsx(78,122): error TS2304: Cannot find name 'worldTeamSubTab'.
+src/components/dashboard/WorldTab.tsx(83,30): error TS2304: Cannot find name 'setWorldTeamSubTab'.
+src/components/dashboard/WorldTab.tsx(84,122): error TS2304: Cannot find name 'worldTeamSubTab'.
+src/components/dashboard/WorldTab.tsx(90,12): error TS2304: Cannot find name 'worldTeamSubTab'.
+src/components/dashboard/WorldTab.tsx(99,36): error TS2304: Cannot find name 'setSelectedPlayer'.
+src/components/dashboard/WorldTab.tsx(161,12): error TS2304: Cannot find name 'worldTeamSubTab'.
+src/components/dashboard/WorldTab.tsx(220,28): error TS2304: Cannot find name 'setActiveWorldTab'.
+src/components/dashboard/WorldTab.tsx(221,125): error TS2304: Cannot find name 'activeWorldTab'.
+src/components/dashboard/WorldTab.tsx(227,28): error TS2304: Cannot find name 'setActiveWorldTab'.
+src/components/dashboard/WorldTab.tsx(228,125): error TS2304: Cannot find name 'activeWorldTab'.
+src/components/dashboard/WorldTab.tsx(234,28): error TS2304: Cannot find name 'setActiveWorldTab'.
+src/components/dashboard/WorldTab.tsx(235,125): error TS2304: Cannot find name 'activeWorldTab'.
+src/components/dashboard/WorldTab.tsx(241,28): error TS2304: Cannot find name 'setActiveWorldTab'.
+src/components/dashboard/WorldTab.tsx(242,125): error TS2304: Cannot find name 'activeWorldTab'.
+src/components/dashboard/WorldTab.tsx(248,28): error TS2304: Cannot find name 'setActiveWorldTab'.
+src/components/dashboard/WorldTab.tsx(249,125): error TS2304: Cannot find name 'activeWorldTab'.
+src/components/dashboard/WorldTab.tsx(256,10): error TS2304: Cannot find name 'activeWorldTab'.
+src/components/dashboard/WorldTab.tsx(260,40): error TS2339: Property 'id' does not exist on type 'Notification'.
+src/components/dashboard/WorldTab.tsx(260,138): error TS2339: Property 'read' does not exist on type 'Notification'.
+src/components/dashboard/WorldTab.tsx(261,114): error TS2339: Property 'type' does not exist on type 'Notification'.
+src/components/dashboard/WorldTab.tsx(262,36): error TS2339: Property 'type' does not exist on type 'Notification'.
+src/components/dashboard/WorldTab.tsx(263,38): error TS2339: Property 'type' does not exist on type 'Notification'.
+src/components/dashboard/WorldTab.tsx(266,35): error TS2339: Property 'type' does not exist on type 'Notification'.
+src/components/dashboard/WorldTab.tsx(267,36): error TS2339: Property 'message' does not exist on type 'Notification'.
+src/components/dashboard/WorldTab.tsx(268,55): error TS2339: Property 'message' does not exist on type 'Notification'.
+src/components/dashboard/WorldTab.tsx(281,36): error TS2339: Property 'type' does not exist on type 'Notification'.
+src/components/dashboard/WorldTab.tsx(282,38): error TS2339: Property 'message' does not exist on type 'Notification'.
+src/components/dashboard/WorldTab.tsx(283,59): error TS2339: Property 'message' does not exist on type 'Notification'.
+src/components/dashboard/WorldTab.tsx(317,38): error TS2339: Property 'type' does not exist on type 'Notification'.
+src/components/dashboard/WorldTab.tsx(323,38): error TS2339: Property 'read' does not exist on type 'Notification'.
+src/components/dashboard/WorldTab.tsx(326,37): error TS2339: Property 'message' does not exist on type 'Notification'.
+src/components/dashboard/WorldTab.tsx(328,41): error TS2339: Property 'message' does not exist on type 'Notification'.
+src/components/dashboard/WorldTab.tsx(335,38): error TS2339: Property 'message' does not exist on type 'Notification'.
+src/components/dashboard/WorldTab.tsx(339,46): error TS2339: Property 'date' does not exist on type 'Notification'.
+src/components/dashboard/WorldTab.tsx(350,10): error TS2304: Cannot find name 'activeWorldTab'.
+src/components/dashboard/WorldTab.tsx(351,36): error TS2304: Cannot find name 'leaguesData'.
+src/components/dashboard/WorldTab.tsx(351,48): error TS2304: Cannot find name 'activeLeague'.
+src/components/dashboard/WorldTab.tsx(351,77): error TS2304: Cannot find name 'leaguesData'.
+src/components/dashboard/WorldTab.tsx(359,34): error TS2304: Cannot find name 'setActiveCompetition'.
+src/components/dashboard/WorldTab.tsx(360,215): error TS2304: Cannot find name 'activeCompetition'.
+src/components/dashboard/WorldTab.tsx(365,126): error TS2304: Cannot find name 'activeCompetition'.
+src/components/dashboard/WorldTab.tsx(369,83): error TS2304: Cannot find name 'activeCompetition'.
+src/components/dashboard/WorldTab.tsx(379,34): error TS2304: Cannot find name 'setActiveCompetition'.
+src/components/dashboard/WorldTab.tsx(380,215): error TS2304: Cannot find name 'activeCompetition'.
+src/components/dashboard/WorldTab.tsx(385,126): error TS2304: Cannot find name 'activeCompetition'.
+src/components/dashboard/WorldTab.tsx(389,83): error TS2304: Cannot find name 'activeCompetition'.
+src/components/dashboard/WorldTab.tsx(401,31): error TS2304: Cannot find name 'leaguesData'.
+src/components/dashboard/WorldTab.tsx(401,66): error TS2304: Cannot find name 'leaguesData'.
+src/components/dashboard/WorldTab.tsx(402,34): error TS2304: Cannot find name 'leaguesData'.
+src/components/dashboard/WorldTab.tsx(404,36): error TS2304: Cannot find name 'activeLeague'.
+src/components/dashboard/WorldTab.tsx(404,66): error TS2304: Cannot find name 'activeCompetition'.
+src/components/dashboard/WorldTab.tsx(447,25): error TS2304: Cannot find name 'setActiveLeague'.
+src/components/dashboard/WorldTab.tsx(448,25): error TS2304: Cannot find name 'setActiveCompetition'.
+src/components/dashboard/WorldTab.tsx(464,16): error TS2304: Cannot find name 'activeCompetition'.
+src/components/dashboard/WorldTab.tsx(469,40): error TS2304: Cannot find name 'setActiveLeagueTab'.
+src/components/dashboard/WorldTab.tsx(470,125): error TS2304: Cannot find name 'activeLeagueTab'.
+src/components/dashboard/WorldTab.tsx(475,40): error TS2304: Cannot find name 'setActiveLeagueTab'.
+src/components/dashboard/WorldTab.tsx(476,125): error TS2304: Cannot find name 'activeLeagueTab'.
+src/components/dashboard/WorldTab.tsx(481,40): error TS2304: Cannot find name 'setActiveLeagueTab'.
+src/components/dashboard/WorldTab.tsx(482,125): error TS2304: Cannot find name 'activeLeagueTab'.
+src/components/dashboard/WorldTab.tsx(493,32): error TS2304: Cannot find name 'activeLeague'.
+src/components/dashboard/WorldTab.tsx(495,27): error TS2304: Cannot find name 'setActiveLeague'.
+src/components/dashboard/WorldTab.tsx(496,27): error TS2304: Cannot find name 'setActiveCompetition'.
+src/components/dashboard/WorldTab.tsx(507,20): error TS2304: Cannot find name 'activeLeagueTab'.
+src/components/dashboard/WorldTab.tsx(555,23): error TS2304: Cannot find name 'activeLeagueTab'.
+src/components/dashboard/WorldTab.tsx(579,23): error TS2304: Cannot find name 'activeLeagueTab'.
+src/components/dashboard/WorldTab.tsx(618,16): error TS2304: Cannot find name 'activeCompetition'.
+src/components/dashboard/WorldTab.tsx(622,36): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(623,37): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(624,54): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(624,101): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(624,148): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(632,36): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(674,36): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(680,36): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(722,36): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(728,36): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(770,36): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(776,36): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(777,63): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(778,63): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(781,99): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(781,146): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(796,50): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(796,94): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(798,94): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(798,141): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(813,50): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(813,94): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(825,16): error TS2304: Cannot find name 'activeCompetition'.
+src/components/dashboard/WorldTab.tsx(829,36): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(830,37): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(831,39): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(835,32): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(851,40): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(888,33): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(888,66): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(891,36): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(892,51): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(895,54): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(927,33): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/components/dashboard/WorldTab.tsx(938,10): error TS2304: Cannot find name 'activeWorldTab'.
+src/components/dashboard/WorldTab.tsx(957,32): error TS2304: Cannot find name 'marketSearch'.
+src/components/dashboard/WorldTab.tsx(958,42): error TS2304: Cannot find name 'setMarketSearch'.
+src/components/dashboard/WorldTab.tsx(973,32): error TS2304: Cannot find name 'marketDistrict'.
+src/components/dashboard/WorldTab.tsx(974,42): error TS2304: Cannot find name 'setMarketDistrict'.
+src/components/dashboard/WorldTab.tsx(995,32): error TS2304: Cannot find name 'marketPosition'.
+src/components/dashboard/WorldTab.tsx(996,42): error TS2304: Cannot find name 'setMarketPosition'.
+src/components/dashboard/WorldTab.tsx(1018,28): error TS2304: Cannot find name 'marketPointsMin'.
+src/components/dashboard/WorldTab.tsx(1018,48): error TS2304: Cannot find name 'marketPointsMax'.
+src/components/dashboard/WorldTab.tsx(1027,34): error TS2304: Cannot find name 'marketPointsMin'.
+src/components/dashboard/WorldTab.tsx(1028,44): error TS2304: Cannot find name 'setMarketPointsMin'.
+src/components/dashboard/WorldTab.tsx(1036,34): error TS2304: Cannot find name 'marketPointsMax'.
+src/components/dashboard/WorldTab.tsx(1037,44): error TS2304: Cannot find name 'setMarketPointsMax'.
+src/components/dashboard/WorldTab.tsx(1049,200): error TS2304: Cannot find name 'marketPotentialMin'.
+src/components/dashboard/WorldTab.tsx(1056,32): error TS2304: Cannot find name 'marketPotentialMin'.
+src/components/dashboard/WorldTab.tsx(1057,42): error TS2304: Cannot find name 'setMarketPotentialMin'.
+src/components/dashboard/WorldTab.tsx(1068,186): error TS2304: Cannot find name 'marketLimit'.
+src/components/dashboard/WorldTab.tsx(1075,32): error TS2304: Cannot find name 'marketLimit'.
+src/components/dashboard/WorldTab.tsx(1076,42): error TS2304: Cannot find name 'setMarketLimit'.
+src/components/dashboard/WorldTab.tsx(1086,16): error TS2304: Cannot find name 'players'.
+src/components/dashboard/WorldTab.tsx(1089,71): error TS2304: Cannot find name 'marketSearch'.
+src/components/dashboard/WorldTab.tsx(1089,136): error TS2304: Cannot find name 'marketSearch'.
+src/components/dashboard/WorldTab.tsx(1090,43): error TS2304: Cannot find name 'marketDistrict'.
+src/components/dashboard/WorldTab.tsx(1090,86): error TS2304: Cannot find name 'marketDistrict'.
+src/components/dashboard/WorldTab.tsx(1091,43): error TS2304: Cannot find name 'marketPosition'.
+src/components/dashboard/WorldTab.tsx(1091,82): error TS2304: Cannot find name 'marketPosition'.
+src/components/dashboard/WorldTab.tsx(1092,58): error TS2304: Cannot find name 'marketPointsMin'.
+src/components/dashboard/WorldTab.tsx(1092,94): error TS2304: Cannot find name 'marketPointsMax'.
+src/components/dashboard/WorldTab.tsx(1093,59): error TS2304: Cannot find name 'marketPotentialMin'.
+src/components/dashboard/WorldTab.tsx(1096,27): error TS2304: Cannot find name 'marketLimit'.
+src/components/dashboard/WorldTab.tsx(1098,72): error TS2304: Cannot find name 'setSelectedPlayer'.
+src/components/dashboard/WorldTab.tsx(1104,10): error TS2304: Cannot find name 'activeWorldTab'.
+src/components/dashboard/WorldTab.tsx(1129,20): error TS2304: Cannot find name 'players'.
+src/components/dashboard/WorldTab.tsx(1139,36): error TS2304: Cannot find name 'setSelectedPlayer'.
+src/components/dashboard/WorldTab.tsx(1192,10): error TS2304: Cannot find name 'activeWorldTab'.
+src/components/dashboard/WorldTab.tsx(1199,47): error TS2304: Cannot find name 'Team'.
+src/components/dashboard/WorldTab.tsx(1208,36): error TS2304: Cannot find name 'setSelectedTeamView'.
+src/components/ErrorBoundary.tsx(56,21): error TS2339: Property 'props' does not exist on type 'ErrorBoundary'.
+src/components/LineupBuilder.tsx(74,27): error TS2304: Cannot find name 'state'.
+src/components/LineupBuilder.tsx(99,28): error TS2304: Cannot find name 'state'.
+src/components/MatchReports.tsx(231,29): error TS2362: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+src/components/MatchReports.tsx(231,33): error TS2363: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+src/components/MatchReports.tsx(343,80): error TS2362: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+src/components/NewGameFlow.tsx(245,9): error TS2322: Type '"Vertical"' is not assignable to type 'PlayStyle'.
+src/components/NewGameFlow.tsx(269,14): error TS2339: Property 'matches' does not exist on type '{ id: string; name: string; district: District; standings: LeagueTeamStats[]; scorers: LeagueScorer[]; rounds: Round[]; }'.
+src/components/NewGameFlow.tsx(269,31): error TS2339: Property 'matches' does not exist on type '{ id: string; name: string; district: District; standings: LeagueTeamStats[]; scorers: LeagueScorer[]; rounds: Round[]; }'.
+src/components/PlayerModal.tsx(145,31): error TS2740: Type '{ id: string; type: "transfer"; title: string; message: string; date: string; read: boolean; }' is missing the following properties from type 'Notification': badge, body, data, dir, and 13 more.
+src/components/WorldSelector.tsx(175,28): error TS2304: Cannot find name 'Users'.
+src/engine/gameLogic.ts(1,52): error TS2305: Module '"../types"' has no exported member 'Notification'.
+src/engine/gameLogic.ts(1,89): error TS2305: Module '"../types"' has no exported member 'TeamStats'.
+src/engine/gameLogic.ts(2,25): error TS2305: Module '"./MatchEngine"' has no exported member 'Tactic'.
+src/engine/gameLogic.ts(383,9): error TS2339: Property 'transferWindowOpen' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(396,57): error TS2304: Cannot find name 'TacticalCard'.
+src/engine/gameLogic.ts(420,28): error TS2304: Cannot find name 'TacticalCard'.
+src/engine/gameLogic.ts(430,15): error TS2353: Object literal may only specify known properties, and 'id' does not exist in type 'Notification'.
+src/engine/gameLogic.ts(452,9): error TS2353: Object literal may only specify known properties, and 'id' does not exist in type 'Notification'.
+src/engine/gameLogic.ts(463,37): error TS2339: Property 'matches' does not exist on type '{ id: string; name: string; district: District; standings: LeagueTeamStats[]; scorers: LeagueScorer[]; rounds: Round[]; }'.
+src/engine/gameLogic.ts(475,37): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(476,15): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(484,9): error TS2353: Object literal may only specify known properties, and 'id' does not exist in type 'Notification'.
+src/engine/gameLogic.ts(496,19): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(497,42): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(499,20): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(505,31): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(507,19): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(508,30): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(511,20): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(517,31): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(519,19): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(520,30): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(523,20): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(529,31): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(531,20): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(532,30): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(534,17): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(539,32): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(547,13): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(549,37): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(550,29): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(559,15): error TS2339: Property 'eliteCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(563,11): error TS2353: Object literal may only specify known properties, and 'id' does not exist in type 'Notification'.
+src/engine/gameLogic.ts(576,40): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(578,15): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(579,15): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(585,9): error TS2353: Object literal may only specify known properties, and 'id' does not exist in type 'Notification'.
+src/engine/gameLogic.ts(603,31): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(604,31): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(605,18): error TS2739: Type '{ id: string; round: number; homeTeamId: any; awayTeamId: any; homeScore: number; awayScore: number; played: false; date: string; status: "FINISHED"; }' is missing the following properties from type 'Match': time, result
+src/engine/gameLogic.ts(609,18): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(610,55): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(613,16): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(617,44): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(620,15): error TS2739: Type '{ id: string; round: number; homeTeamId: string; awayTeamId: string; homeScore: number; awayScore: number; played: false; date: string; status: "FINISHED"; }' is missing the following properties from type 'Match': time, result
+src/engine/gameLogic.ts(624,15): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(637,15): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(638,15): error TS2339: Property 'districtCup' does not exist on type 'WorldState'.
+src/engine/gameLogic.ts(642,11): error TS2353: Object literal may only specify known properties, and 'id' does not exist in type 'Notification'.
+src/engine/gameLogic.ts(657,9): error TS2353: Object literal may only specify known properties, and 'id' does not exist in type 'Notification'.
+src/engine/gameLogic.ts(667,9): error TS2353: Object literal may only specify known properties, and 'id' does not exist in type 'Notification'.
+src/engine/generator.ts(249,21): error TS2304: Cannot find name 'LogoPattern'.
+src/engine/generator.ts(316,45): error TS2353: Object literal may only specify known properties, and 'type' does not exist in type 'TacticalCard'.
+src/engine/generator.ts(317,40): error TS2353: Object literal may only specify known properties, and 'type' does not exist in type 'TacticalCard'.
+src/engine/generator.ts(318,52): error TS2353: Object literal may only specify known properties, and 'type' does not exist in type 'TacticalCard'.
+src/engine/generator.ts(402,18): error TS2322: Type '"Vertical"' is not assignable to type 'PlayStyle'.
+src/engine/generator.ts(481,5): error TS2322: Type '{ teamId: string; points: number; played: number; won: number; drawn: number; lost: number; goalsFor: number; goalsAgainst: number; }[]' is not assignable to type 'LeagueTeamStats[]'.
+  Property 'team' is missing in type '{ teamId: string; points: number; played: number; won: number; drawn: number; lost: number; goalsFor: number; goalsAgainst: number; }' but required in type 'LeagueTeamStats'.
+src/engine/generator.ts(503,11): error TS2353: Object literal may only specify known properties, and 'matches' does not exist in type '{ id: string; name: string; district: District; standings: LeagueTeamStats[]; scorers: LeagueScorer[]; rounds: Round[]; }'.
+src/engine/generator.ts(511,11): error TS2353: Object literal may only specify known properties, and 'matches' does not exist in type '{ id: string; name: string; district: District; standings: LeagueTeamStats[]; scorers: LeagueScorer[]; rounds: Round[]; }'.
+src/engine/generator.ts(519,11): error TS2353: Object literal may only specify known properties, and 'matches' does not exist in type '{ id: string; name: string; district: District; standings: LeagueTeamStats[]; scorers: LeagueScorer[]; rounds: Round[]; }'.
+src/engine/generator.ts(527,11): error TS2353: Object literal may only specify known properties, and 'matches' does not exist in type '{ id: string; name: string; district: District; standings: LeagueTeamStats[]; scorers: LeagueScorer[]; rounds: Round[]; }'.
+src/hooks/useDashboardData.ts(4,10): error TS2305: Module '"../types"' has no exported member 'League'.
+src/hooks/useDashboardData.ts(13,41): error TS2339: Property 'seasonStartReal' does not exist on type 'WorldState'.
+src/hooks/useDashboardData.ts(13,80): error TS2339: Property 'seasonStartReal' does not exist on type 'WorldState'.
+src/hooks/useTransfers.ts(2,18): error TS2305: Module '"../types"' has no exported member 'Notification'.

@@ -1,4 +1,5 @@
 import { Player, MatchEvent, MatchResult as MatchResultType, PlayStyle, Mentality, TacticalCard } from '../types';
+import { COMMENTARY_COUNT, COMMENTARY_INTERVAL_SECONDS, MATCH_DURATION_MINUTES, MATCH_REAL_TIME_SECONDS } from '../constants/gameConstants';
 import { calculateMatchEvent, SectorInput } from './simulation';
 
 export interface TeamStats {
@@ -23,7 +24,8 @@ const PLAYSTYLE_EFFECTS: Record<PlayStyle, { att: number, mid: number, def: numb
   'Motor Lento': { att: 1.0, mid: 1.0, def: 1.0, staminaDrain: 1.0, lateBonus: 1.4 },
   'Equilibrado': { att: 1.0, mid: 1.0, def: 1.0, staminaDrain: 1.0 },
   'Gegenpressing': { att: 1.15, mid: 1.15, def: 0.9, staminaDrain: 1.4 },
-  'Catenaccio': { att: 0.7, mid: 1.1, def: 1.5, staminaDrain: 0.9 }
+  'Catenaccio': { att: 0.7, mid: 1.1, def: 1.5, staminaDrain: 0.9 },
+  'Vertical': { att: 1.15, mid: 1.0, def: 0.9, staminaDrain: 1.2 }
 };
 
 const MENTALITY_EFFECTS: Record<Mentality, { attBonus: number, defPenalty: number, staminaPenalty: number }> = {
@@ -36,7 +38,7 @@ const pickWeightedRandom = (players: Player[], count: number, attributeKey: keyo
   const weightedPlayers = players.map(p => {
     // Add 200 for "Chaos/Zebra" factor to ensure everyone has a chance
     const attrValue = attributeKey === 'totalRating' ? p.totalRating : p.pentagon[attributeKey as keyof Player['pentagon']];
-    const weight = (attrValue || 0) + 200; 
+    const weight = (attrValue || 0) + 200;
     return { player: p, weight };
   });
 
@@ -46,7 +48,7 @@ const pickWeightedRandom = (players: Player[], count: number, attributeKey: keyo
   for (let i = 0; i < count && tempWeighted.length > 0; i++) {
     const totalWeight = tempWeighted.reduce((sum, p) => sum + p.weight, 0);
     let roll = Math.random() * totalWeight;
-    
+
     for (let j = 0; j < tempWeighted.length; j++) {
       roll -= tempWeighted[j].weight;
       if (roll <= 0) {
@@ -88,21 +90,21 @@ const COMMENTARY_TEMPLATES = [
 ];
 
 export function simulateMatch(
-  home: TeamStats, 
-  away: TeamStats, 
-  homePlayers: Player[] = [], 
+  home: TeamStats,
+  away: TeamStats,
+  homePlayers: Player[] = [],
   awayPlayers: Player[] = []
 ): MatchResultType {
   const events: MatchEvent[] = [];
   let homeScore = 0;
   let awayScore = 0;
-  
+
   let homePossessionWon = 0;
   let awayPossessionWon = 0;
-  
+
   let homeShots = 0;
   let awayShots = 0;
-  
+
   let homeShotsOnTarget = 0;
   let awayShotsOnTarget = 0;
 
@@ -111,10 +113,10 @@ export function simulateMatch(
   const assists: Array<{ playerId: string; teamId: string }> = [];
 
   const addRatings = (ratings: Record<string, number>) => {
-     Object.entries(ratings).forEach(([id, rating]) => {
-        if (!playerRatings[id]) playerRatings[id] = [];
-        playerRatings[id].push(rating);
-     });
+    Object.entries(ratings).forEach(([id, rating]) => {
+      if (!playerRatings[id]) playerRatings[id] = [];
+      playerRatings[id].push(rating);
+    });
   };
 
   const defaultSector = { chemistry: 100, phase: 6, stamina: 100, tacticalBonus: 1.0, chaosMax: 10 };
@@ -146,38 +148,38 @@ export function simulateMatch(
   const homeCards = getCardEffects(home.slots);
   const awayCards = getCardEffects(away.slots);
 
-  const homeAttackSector: SectorInput = { 
-    ...defaultSector, 
+  const homeAttackSector: SectorInput = {
+    ...defaultSector,
     averageAttribute: home.attack,
     chemistry: home.chemistry,
     tacticalBonus: homeEffect.att * homeCards.att * (1 + (home.linePosition - 50) / 200) + homeMentality.attBonus
   };
-  const homeDefenseSector: SectorInput = { 
-    ...defaultSector, 
+  const homeDefenseSector: SectorInput = {
+    ...defaultSector,
     averageAttribute: home.defense,
     chemistry: home.chemistry,
     tacticalBonus: homeEffect.def * homeCards.def * (1 + (50 - home.linePosition) / 200) - homeMentality.defPenalty
   };
-  
-  const awayAttackSector: SectorInput = { 
-    ...defaultSector, 
+
+  const awayAttackSector: SectorInput = {
+    ...defaultSector,
     averageAttribute: away.attack,
     chemistry: away.chemistry,
     tacticalBonus: awayEffect.att * awayCards.att * (1 + (away.linePosition - 50) / 200) + awayMentality.attBonus
   };
-  const awayDefenseSector: SectorInput = { 
-    ...defaultSector, 
+  const awayDefenseSector: SectorInput = {
+    ...defaultSector,
     averageAttribute: away.defense,
     chemistry: away.chemistry,
     tacticalBonus: awayEffect.def * awayCards.def * (1 + (50 - away.linePosition) / 200) - awayMentality.defPenalty
   };
 
   // --- INJECT 25 COMMENTARY CARDS (Every 15s in 360s window) ---
-  for (let i = 0; i < 25; i++) {
-    const second = i * 15;
-    const minute = Math.floor((second / 360) * 90);
+  for (let i = 0; i < COMMENTARY_COUNT; i++) {
+    const second = i * COMMENTARY_INTERVAL_SECONDS;
+    const minute = Math.floor((second / MATCH_REAL_TIME_SECONDS) * MATCH_DURATION_MINUTES);
     const template = COMMENTARY_TEMPLATES[i];
-    
+
     events.push({
       id: `comm_${i}_${Date.now()}`,
       minute,
@@ -189,27 +191,27 @@ export function simulateMatch(
     });
   }
 
-  for (let minute = 1; minute <= 90; minute++) {
+  for (let minute = 1; minute <= MATCH_DURATION_MINUTES; minute++) {
     // Dynamic bonuses based on time (Motor Lento)
     const homeLateBonus = (minute > 75) ? (homeEffect.lateBonus || 1.0) : 1.0;
     const awayLateBonus = (minute > 75) ? (awayEffect.lateBonus || 1.0) : 1.0;
 
     const homeMid = home.midfield * homeEffect.mid * homeCards.mid * homeLateBonus * (home.chemistry / 100);
     const awayMid = away.midfield * awayEffect.mid * awayCards.mid * awayLateBonus * (away.chemistry / 100);
-    
+
     const totalMid = homeMid + awayMid;
     const possessionRoll = Math.random() * totalMid;
     const hasPossession = possessionRoll < homeMid ? 'home' : 'away';
-    
+
     if (hasPossession === 'home') homePossessionWon++;
     else awayPossessionWon++;
 
     // Calculate second within the 6-minute (360s) window
-    const baseSecond = Math.floor((minute / 90) * 360);
-    const currentEventSecond = Math.max(0, Math.min(359, baseSecond + Math.floor(Math.random() * 7) - 3));
+    const baseSecond = Math.floor((minute / MATCH_DURATION_MINUTES) * MATCH_REAL_TIME_SECONDS);
+    const currentEventSecond = Math.max(0, Math.min(MATCH_REAL_TIME_SECONDS - 1, baseSecond + Math.floor(Math.random() * 7) - 3));
 
     // Event chance: Tiki-Taka reduces opponent ticks
-    let intensity = 0.3 + (minute / 180); 
+    let intensity = 0.3 + (minute / 180);
     if (hasPossession === 'home' && awayEffect.tickReduction) intensity *= (1 - awayEffect.tickReduction);
     if (hasPossession === 'away' && homeEffect.tickReduction) intensity *= (1 - homeEffect.tickReduction);
 
@@ -218,7 +220,7 @@ export function simulateMatch(
     if (hasPossession === 'home') {
       const activeHome = pickWeightedRandom(homePlayers, 3);
       const activeAway = pickWeightedRandom(awayPlayers, 3);
-      
+
       const result = calculateMatchEvent(minute, homeAttackSector, awayDefenseSector, activeHome, activeAway);
       addRatings(result.ratings);
 
@@ -230,7 +232,7 @@ export function simulateMatch(
         homeShots++;
         homeShotsOnTarget++;
         scorers.push({ playerId: mainAttacker.id, teamId: home.id });
-        
+
         const assistant = activeHome[1];
         if (assistant) assists.push({ playerId: assistant.id, teamId: home.id });
 
@@ -254,18 +256,18 @@ export function simulateMatch(
           teamId: home.id
         });
       } else if (result.outcome === 'defense') {
-         homeShots++;
-         if (Math.random() > 0.4) homeShotsOnTarget++;
-         
-         const defenseDescriptions = [
-           `${defender.nickname} intercepta o chute de ${mainAttacker.nickname}!`,
-           `Milagre! O goleiro espalma a bomba de ${mainAttacker.nickname}!`,
-           `${defender.nickname} trava o chute no momento exato!`,
-           `A zaga do ${away.name} se joga na bola para evitar o gol!`,
-           `Que defesa espetacular de ${defender.nickname}! Impediu o gol certo.`
-         ];
+        homeShots++;
+        if (Math.random() > 0.4) homeShotsOnTarget++;
 
-         events.push({
+        const defenseDescriptions = [
+          `${defender.nickname} intercepta o chute de ${mainAttacker.nickname}!`,
+          `Milagre! O goleiro espalma a bomba de ${mainAttacker.nickname}!`,
+          `${defender.nickname} trava o chute no momento exato!`,
+          `A zaga do ${away.name} se joga na bola para evitar o gol!`,
+          `Que defesa espetacular de ${defender.nickname}! Impediu o gol certo.`
+        ];
+
+        events.push({
           id: `event_${away.id}_${minute}_${Date.now()}_${Math.random()}`,
           minute,
           realTimeSecond: currentEventSecond,
@@ -278,17 +280,17 @@ export function simulateMatch(
       } else {
         // --- FOULS, CARDS, INJURIES ---
         const foulRoll = Math.random();
-        
+
         // Chance of event increases with aggression and minute
         const foulChance = 0.12 * (home.aggressiveness / 50);
-        
+
         if (foulRoll < foulChance) {
           const isYellow = Math.random() < 0.65;
           const isRed = !isYellow && Math.random() < 0.2;
           const isInjury = !isYellow && !isRed && Math.random() < 0.15;
-          
+
           if (isInjury) {
-             events.push({
+            events.push({
               id: `event_${home.id}_${minute}_injury`,
               minute,
               realTimeSecond: currentEventSecond,
@@ -299,7 +301,7 @@ export function simulateMatch(
               teamId: home.id
             });
           } else if (isYellow || isRed) {
-             events.push({
+            events.push({
               id: `event_${home.id}_${minute}_card`,
               minute,
               realTimeSecond: currentEventSecond,
@@ -316,7 +318,7 @@ export function simulateMatch(
       // --- AWAY TEAM POSSESSION ---
       const activeAway = pickWeightedRandom(awayPlayers, 3);
       const activeHome = pickWeightedRandom(homePlayers, 3);
-      
+
       const result = calculateMatchEvent(minute, awayAttackSector, homeDefenseSector, activeAway, activeHome);
       addRatings(result.ratings);
 
@@ -328,7 +330,7 @@ export function simulateMatch(
         awayShots++;
         awayShotsOnTarget++;
         scorers.push({ playerId: mainAttacker.id, teamId: away.id });
-        
+
         const assistant = activeAway[1];
         if (assistant) assists.push({ playerId: assistant.id, teamId: away.id });
 
@@ -359,14 +361,14 @@ export function simulateMatch(
       } else {
         const foulRoll = Math.random();
         const foulChance = 0.12 * (away.aggressiveness / 50);
-        
+
         if (foulRoll < foulChance) {
           const isYellow = Math.random() < 0.65;
           const isRed = !isYellow && Math.random() < 0.2;
           const isInjury = !isYellow && !isRed && Math.random() < 0.15;
-          
+
           if (isInjury) {
-             events.push({
+            events.push({
               id: `event_${away.id}_${minute}_injury`,
               minute,
               realTimeSecond: currentEventSecond,
@@ -377,7 +379,7 @@ export function simulateMatch(
               teamId: away.id
             });
           } else if (isYellow || isRed) {
-             events.push({
+            events.push({
               id: `event_${away.id}_${minute}_card`,
               minute,
               realTimeSecond: currentEventSecond,
@@ -396,8 +398,8 @@ export function simulateMatch(
   const totalPossession = homePossessionWon + awayPossessionWon;
   const finalRatings: Record<string, number> = {};
   Object.entries(playerRatings).forEach(([id, ratings]) => {
-     const sum = ratings.reduce((a, b) => a + b, 0);
-     finalRatings[id] = Number((sum / ratings.length).toFixed(1));
+    const sum = ratings.reduce((a, b) => a + b, 0);
+    finalRatings[id] = Number((sum / ratings.length).toFixed(1));
   });
 
   // Generate Headline

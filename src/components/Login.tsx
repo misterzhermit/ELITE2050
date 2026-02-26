@@ -38,7 +38,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       onLogin();
     } catch (err: any) {
       console.error('Login error:', err);
-      
+
       // Detectar erro de conexão (DNS/Network)
       if (err.message?.includes('Failed to fetch') || err.name === 'TypeError' || err.message?.includes('network')) {
         setError('ERRO DE CONEXÃO: Não foi possível alcançar o servidor. Verifique sua internet ou as configurações do banco de dados.');
@@ -59,13 +59,13 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-500/10 blur-[120px] rounded-full animate-pulse" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-fuchsia-500/10 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
         <div className="absolute top-[20%] right-[10%] w-[20%] h-[20%] bg-blue-500/10 blur-[100px] rounded-full animate-pulse" style={{ animationDelay: '1s' }} />
-        
+
         {/* Grid Pattern */}
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 mix-blend-overlay" />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-500/[0.02] to-transparent" />
       </div>
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8 }}
@@ -73,7 +73,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       >
         {/* Logo Section */}
         <div className="flex flex-col items-center mb-10">
-          <motion.div 
+          <motion.div
             initial={{ scale: 0.8, rotate: -10 }}
             animate={{ scale: 1, rotate: 0 }}
             transition={{ type: 'spring', stiffness: 200, damping: 15 }}
@@ -86,14 +86,14 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <span className="text-2xl mt-[-8px] tracking-[0.3em] text-cyan-500 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">2050</span>
           </h1>
           <div className="mt-4 flex gap-4">
-             <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-3 py-1 rounded-full backdrop-blur-md">
-                <Globe size={10} className="text-cyan-400" />
-                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Global Network</span>
-             </div>
-             <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-3 py-1 rounded-full backdrop-blur-md">
-                <Cpu size={10} className="text-fuchsia-400" />
-                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Quantum Engine</span>
-             </div>
+            <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-3 py-1 rounded-full backdrop-blur-md">
+              <Globe size={10} className="text-cyan-400" />
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Global Network</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-3 py-1 rounded-full backdrop-blur-md">
+              <Cpu size={10} className="text-fuchsia-400" />
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Quantum Engine</span>
+            </div>
           </div>
         </div>
 
@@ -101,7 +101,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         <div className="bg-black/40 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-8 md:p-10 shadow-2xl relative overflow-hidden group">
           {/* Internal Glow */}
           <div className="absolute -top-24 -right-24 w-48 h-48 bg-cyan-500/5 blur-[80px] group-hover:bg-cyan-500/10 transition-all duration-700" />
-          
+
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -109,7 +109,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           >
             <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
               {error && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex flex-col gap-3"
@@ -131,8 +131,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within/input:text-cyan-400 transition-colors">
                     <Mail size={18} />
                   </div>
-                  <input 
-                    type="email" 
+                  <input
+                    type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50 focus:bg-white/[0.05] transition-all font-mono"
@@ -148,8 +148,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within/input:text-fuchsia-400 transition-colors">
                     <Lock size={18} />
                   </div>
-                  <input 
-                    type="password" 
+                  <input
+                    type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-fuchsia-500/50 focus:bg-white/[0.05] transition-all"
@@ -159,7 +159,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 </div>
               </div>
 
-              <button 
+              <button
                 type="submit"
                 disabled={isLoading}
                 className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-black py-4 rounded-2xl shadow-[0_0_20px_rgba(34,211,238,0.3)] hover:shadow-[0_0_30px_rgba(34,211,238,0.5)] transition-all active:scale-[0.98] flex items-center justify-center gap-3 group/btn overflow-hidden relative"
@@ -182,15 +182,15 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
           {/* Footer Links */}
           <div className="mt-8 pt-6 border-t border-white/5 flex flex-col items-center gap-4 relative z-10">
-             <div className="flex gap-6">
-                <button className="text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-cyan-400 transition-colors">Recuperar ID</button>
-                <div className="w-[1px] h-3 bg-white/10" />
-                <button className="text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-cyan-400 transition-colors">Suporte</button>
-             </div>
-             <div className="flex items-center gap-2">
-                <Zap size={10} className="text-amber-500 animate-pulse" />
-                <span className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Version 2.0.50-stable</span>
-             </div>
+            <div className="flex gap-6">
+              <button className="text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-cyan-400 transition-colors">Recuperar ID</button>
+              <div className="w-[1px] h-3 bg-white/10" />
+              <button className="text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-cyan-400 transition-colors">Suporte</button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Zap size={10} className="text-amber-500 animate-pulse" />
+              <span className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Version 2.0.50-stable</span>
+            </div>
           </div>
         </div>
 
@@ -201,11 +201,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         </p>
       </motion.div>
 
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes shimmer {
-          100% { transform: translateX(100%); }
-        }
-      `}} />
     </div>
   );
 };

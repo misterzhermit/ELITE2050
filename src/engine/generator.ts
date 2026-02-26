@@ -14,6 +14,7 @@ import {
   LeagueTeamStats,
   District,
   TeamLogoMetadata,
+  LogoPattern,
 } from '../types';
 import { generateCalendar } from './CalendarGenerator';
 
@@ -28,16 +29,16 @@ const generateRatingPool = () => {
 };
 
 const firstNamesMale = [
-  'Bex','Crux','Dorn','Eld','Fitz','Gunn','Holt','Ives','Jude','Kade','Lux','Moss','Nash','Oakes','Piers','Quest','Rex','Slade','Tate','Upton','Vale','Wells','Xand','York','Zale','Asa','Bram','Cruz','Dane','Egan','Fox','Gage','Hart','Ivo','Joss','Kane','Lyle','Mercer','Nye','Oren','Pierce','Quade','Reeve','Saul','Tycho','Urie','Vaughn','Wynn','Xylon','Yates','Zayn','Aldric','Blaise','Corin','Drift','Eldon','Flint','Goram','Harden','Isham','Jarvis','Kellan','Landon','Maddox','Niven','Oberon','Phelan','Quill','Rogan','Stellan','Tristan','Ulysses','Viggo','Warrick','Xerxes','Yardley','Zephyr','Axl','Brod','Corbin','Drax','Elio','Fender','Grayson','Huxley','Icarus','Jagger','Knox','Lior','Murphy','Nero','Ozzy','Paxton','Rook','Sterling','Thorne','Vaughn','Wilder','Xander','Yuri',
-  'Kael','Jax','Rune','Zen','Cade','Finn','Kai','Axel','Blaze','Cole','Dax','Jett','Kian','Lars','Mace','Nox','Orin','Pryce','Quinn','Rix','Seth','Trey','Vance','Wren','Zane','Arlo','Bryn','Cian','Darr','Eron','Fael','Gale','Hale','Ivar','Jory','Kaelen','Lian','Milo','Niall','Odin','Perrin','Rian','Soren','Torin','Ulric','Vance','Wulf','Xylos','Yuri','Zion','Ash','Brock','Croy','Drew','Elias','Fynn','Garth','Haze','Ilan','Jace','Kodi','Loki','Mael','Nico','Orion','Pike','Rhys','Silas','Talon','Vero','Wade','Xavi','Yael','Zeke','Aric','Bane','Cael','Dagon','Einar','Falk','Garen','Hakon','Iago','Jarl','Kaelan','Levin','Marek','Nolan','Oren','Pax','Roric','Sven','Tibor','Ulf','Vidor','Wulfric','Xenon','Ymir','Zoran','Alden'
+  'Bex', 'Crux', 'Dorn', 'Eld', 'Fitz', 'Gunn', 'Holt', 'Ives', 'Jude', 'Kade', 'Lux', 'Moss', 'Nash', 'Oakes', 'Piers', 'Quest', 'Rex', 'Slade', 'Tate', 'Upton', 'Vale', 'Wells', 'Xand', 'York', 'Zale', 'Asa', 'Bram', 'Cruz', 'Dane', 'Egan', 'Fox', 'Gage', 'Hart', 'Ivo', 'Joss', 'Kane', 'Lyle', 'Mercer', 'Nye', 'Oren', 'Pierce', 'Quade', 'Reeve', 'Saul', 'Tycho', 'Urie', 'Vaughn', 'Wynn', 'Xylon', 'Yates', 'Zayn', 'Aldric', 'Blaise', 'Corin', 'Drift', 'Eldon', 'Flint', 'Goram', 'Harden', 'Isham', 'Jarvis', 'Kellan', 'Landon', 'Maddox', 'Niven', 'Oberon', 'Phelan', 'Quill', 'Rogan', 'Stellan', 'Tristan', 'Ulysses', 'Viggo', 'Warrick', 'Xerxes', 'Yardley', 'Zephyr', 'Axl', 'Brod', 'Corbin', 'Drax', 'Elio', 'Fender', 'Grayson', 'Huxley', 'Icarus', 'Jagger', 'Knox', 'Lior', 'Murphy', 'Nero', 'Ozzy', 'Paxton', 'Rook', 'Sterling', 'Thorne', 'Vaughn', 'Wilder', 'Xander', 'Yuri',
+  'Kael', 'Jax', 'Rune', 'Zen', 'Cade', 'Finn', 'Kai', 'Axel', 'Blaze', 'Cole', 'Dax', 'Jett', 'Kian', 'Lars', 'Mace', 'Nox', 'Orin', 'Pryce', 'Quinn', 'Rix', 'Seth', 'Trey', 'Vance', 'Wren', 'Zane', 'Arlo', 'Bryn', 'Cian', 'Darr', 'Eron', 'Fael', 'Gale', 'Hale', 'Ivar', 'Jory', 'Kaelen', 'Lian', 'Milo', 'Niall', 'Odin', 'Perrin', 'Rian', 'Soren', 'Torin', 'Ulric', 'Vance', 'Wulf', 'Xylos', 'Yuri', 'Zion', 'Ash', 'Brock', 'Croy', 'Drew', 'Elias', 'Fynn', 'Garth', 'Haze', 'Ilan', 'Jace', 'Kodi', 'Loki', 'Mael', 'Nico', 'Orion', 'Pike', 'Rhys', 'Silas', 'Talon', 'Vero', 'Wade', 'Xavi', 'Yael', 'Zeke', 'Aric', 'Bane', 'Cael', 'Dagon', 'Einar', 'Falk', 'Garen', 'Hakon', 'Iago', 'Jarl', 'Kaelan', 'Levin', 'Marek', 'Nolan', 'Oren', 'Pax', 'Roric', 'Sven', 'Tibor', 'Ulf', 'Vidor', 'Wulfric', 'Xenon', 'Ymir', 'Zoran', 'Alden'
 ];
 const firstNamesFemale = [
-  'Bree','Cira','Daya','Enya','Fia','Gia','Harlow','Ione','Jora','Kaia','Lia','Mira','Nyx','Ona','Pandora','Quinn','Rae','Saga','Thora','Ula','Vida','Wren','Xana','Yvaine','Ziva','Astra','Bianca','Celeste','Dione','Elara','Flora','Gaia','Helia','Iliana','Jiana','Kiana','Lara','Maia','Nadia','Odessa','Priya','Raya','Selia','Talia','Una','Vania','Waverly','Xenia','Yana','Zara','Anais','Briseis','Calista','Dagny','Elara','Ffion','Ginevra','Hestia','Illyria','Jasmine','Kallisto','Luciana','Maeve','Nerissa','Oriana','Persephone','Raven','Saoirse','Thalia','Valkyrie','Wisteria','Xanthe','Yelena','Zephyra','Alva','Beryl','Cyra','Dove','Esme','Fern','Greer','Hollis','Indra','Jules','Kiva','Lark','Maren','Nix','Olive','Paz','Quill','Rue','Sage','Tess','Vale','Willow','Xyla','Yarrow','Zinnia',
-  'Lyra','Kira','Zoe','Anya','Nova','Skye','Jade','Ria','Zara','Cleo','Dara','Elara','Faye','Gwen','Iris','Juno','Kaelin','Lena','Mina','Nia','Orla','Pia','Rhea','Sora','Tia','Veda','Willow','Xena','Yara','Zia','Ayla','Bria','Cora','Dina','Eira','Freya','Gala','Hana','Ida','Jessa','Kaelie','Lila','Mara','Nola','Oona','Petra','Rina','Sasha','Tessa','Vesper','Willa','Xyla','Yumi','Zola','Aria','Blair','Cerys','Dael','Eris','Faelan','Gara','Hera','Iona','Jael','Kaelen','Liora','Maelie','Nyssa','Oria','Phaedra','Riona','Sydra','Tamsin','Una','Vala','Wynn','Xanthe','Yara','Zella','Aella'
+  'Bree', 'Cira', 'Daya', 'Enya', 'Fia', 'Gia', 'Harlow', 'Ione', 'Jora', 'Kaia', 'Lia', 'Mira', 'Nyx', 'Ona', 'Pandora', 'Quinn', 'Rae', 'Saga', 'Thora', 'Ula', 'Vida', 'Wren', 'Xana', 'Yvaine', 'Ziva', 'Astra', 'Bianca', 'Celeste', 'Dione', 'Elara', 'Flora', 'Gaia', 'Helia', 'Iliana', 'Jiana', 'Kiana', 'Lara', 'Maia', 'Nadia', 'Odessa', 'Priya', 'Raya', 'Selia', 'Talia', 'Una', 'Vania', 'Waverly', 'Xenia', 'Yana', 'Zara', 'Anais', 'Briseis', 'Calista', 'Dagny', 'Elara', 'Ffion', 'Ginevra', 'Hestia', 'Illyria', 'Jasmine', 'Kallisto', 'Luciana', 'Maeve', 'Nerissa', 'Oriana', 'Persephone', 'Raven', 'Saoirse', 'Thalia', 'Valkyrie', 'Wisteria', 'Xanthe', 'Yelena', 'Zephyra', 'Alva', 'Beryl', 'Cyra', 'Dove', 'Esme', 'Fern', 'Greer', 'Hollis', 'Indra', 'Jules', 'Kiva', 'Lark', 'Maren', 'Nix', 'Olive', 'Paz', 'Quill', 'Rue', 'Sage', 'Tess', 'Vale', 'Willow', 'Xyla', 'Yarrow', 'Zinnia',
+  'Lyra', 'Kira', 'Zoe', 'Anya', 'Nova', 'Skye', 'Jade', 'Ria', 'Zara', 'Cleo', 'Dara', 'Elara', 'Faye', 'Gwen', 'Iris', 'Juno', 'Kaelin', 'Lena', 'Mina', 'Nia', 'Orla', 'Pia', 'Rhea', 'Sora', 'Tia', 'Veda', 'Willow', 'Xena', 'Yara', 'Zia', 'Ayla', 'Bria', 'Cora', 'Dina', 'Eira', 'Freya', 'Gala', 'Hana', 'Ida', 'Jessa', 'Kaelie', 'Lila', 'Mara', 'Nola', 'Oona', 'Petra', 'Rina', 'Sasha', 'Tessa', 'Vesper', 'Willa', 'Xyla', 'Yumi', 'Zola', 'Aria', 'Blair', 'Cerys', 'Dael', 'Eris', 'Faelan', 'Gara', 'Hera', 'Iona', 'Jael', 'Kaelen', 'Liora', 'Maelie', 'Nyssa', 'Oria', 'Phaedra', 'Riona', 'Sydra', 'Tamsin', 'Una', 'Vala', 'Wynn', 'Xanthe', 'Yara', 'Zella', 'Aella'
 ];
 const lastNames = [
-  'Aegis','Bios','Cipher','Dynamo','Energetic','Fusion','Genetix','Helix','Ionic','Jupiter','Kinetic','Lumina','Momentum','Neural','Orbital','Photon','Quantum','Radian','Synthetic','Tachyon','Unison','Vector','Wavelength','Xenon','Yield','Zenith','Accel','Byte','Cyber','Digital','Electron','Fiber','Graphite','Hydro','Infinite','Junction','Kernel','Logic','Mega','Nucleus','Omega','Pulse','Resonance','Silicon','Techno','Ultron','Vertex','Wire','Xylo','Yottabyte','Zer0','Aerospace','Biosys','Coreware','Datagen','Ecotech','Futura','Genome','Hardline','Infinium','Jarvis','Kryotech','Luminar','Mechadyne','Nanite','Omnitech','Procyon','Quantex','Robotics','Syntex','Teradyne','Unigen','Videre','Webcore','Xanadu','Yantra','Zetacorp','Apex','Blade','Chrome','Dagger','Edge','Frost','Glitch','Havoc','Icicle','Jinx','Karma','Laser','Matrix','Neon','Onyx','Phantom','Razor','Shadow','Toxin','Umbra','Viper','Wraith','XRay','Yellowjacket','Zen','Archer','Bishop','Cruz','Drake','Eagle','Falcon','Griffin','Hawk','Ingram','Jester','Knight','Lionel','Maverick','Noble','Orion','Phoenix','Ranger','Sparrow','Tiger','Ulysses','Valor','Wolf','Xavier','York','Zodiac','Abbott','Bentley','Chandler','Daley','Ellington','Fairchild','Gallagher','Harrington','Ingalls','Jefferson','Kensington','Livingston','Monroe','Nelson','Oakley','Prescott','Quincy','Rutherford','Sheridan','Thornton','Upton','Vanderbilt','Wellington','Xerxes','Yale','Zimmerman','Ashford','Bradley','Clayton','Donovan','Ellis','Fletcher','Graham','Hamilton','Irving','Jackson','Keller','Langston','Milton','Newton','Owens','Porter','Quinn','Ramsey','Shelby','Trenton','Underwood','Valentine','Winston','Young','Zane','Axton','Bowie','Corbin','Dorian','Easton','Fulton','Gatlin','Hutton','Idris','Jagger','Killian','Landon','Maddox','Nixon','Orlando','Paxton','Quillon','Rocco','Stanton','Tristan','Urien','Vaughn','Weston','Xavian','Yates','Zayn',
-  'Sterling','Vanguard','Bio','Wave','Core','Nexus','Aether','Synth','Optic','Apex','Matrix','Quantum','Echo','Flux','Giga','Hyper','Infra','Kinet','Lumen','Meta','Nano','Omni','Penta','Quadra','Rift','Spectra','Terra','Ultra','Velo','Xenon','Yotta','Zetta','Blaze','Chrome','Cypher','Daemon','Digit','Enigma','Fusion','Grid','Helix','Ion','Joule','Kilo','Logic','Macro','Micro','Neo','Octa','Pixel','Rune','Saga','Tech','Vector','Volt','Watt','Xerox','Yocto','Zero','Axiom','Bionic','Cortex','Data','Eon','Fiber','Gamma','Halo','Inertia','Jettison','Krypton','Laser','Magnet','Neural','Orbit','Plasma','Quasar','Radiant','Sensor','Titan','Unity','Vortex','Warp','Xylo','Yield','Zenith','Alba','Brooks','Cain','Dixon','Ellis','Flynn','Grant','Hayes','Irwin','Jones','King','Lane','Marsh','Nash','Owen','Page','Reed','Shaw','Todd','Vance','Ward','Young','Zeller','Adams','Baker','Clark','Davis','Evans','Fisher','Green','Hall','Hill','Jackson','Kelly','Lewis','Miller','Moore','Nelson','Parker','Roberts','Scott','Smith','Taylor','White','Wright','Allen','Bell','Carter','Cook','Cooper','Edwards','Foster','Gray','Harris','James','Johnson','Lee','Martin','Mitchell','Morris','Murphy','Myers','Perez','Phillips','Ramirez','Ross','Sanchez','Sanders','Stewart','Stone','Thomas','Thompson','Turner','Walker','Watson','Webb','Williams','Wilson','Wood','Young','Anderson','Bailey','Bennett','Brown','Campbell','Coleman','Collins','Diaz','Edwards','Flores','Garcia','Gomez','Gonzalez','Hernandez','Hughes','Jenkins','Kim','Long','Martinez','Morgan','Ortiz','Patel','Peterson','Price','Rivera','Rogers','Russell','Schmidt','Simmons','Stevens','Sullivan','Torres','Washington','Barnes','Bryant','Burke','Chapman','Cruz','Dean','Elliott','Ford','Gibson','Graham','Griffin','Hamilton','Henderson','Howard','Hudson','Hunt','Jensen','Jordan','Kennedy','Knight','Larson','Little','Marshall','Mason','Matthews','McDonald','Medina','Mendoza','Meyer','Mills','Montgomery','Morales','Murray','Neal','Olson','Palmer','Pearson','Perry','Powell','Ray','Reynolds','Richards','Robinson','Ruiz','Ryan','Saunders','Sharp','Singleton','Spencer','Stephens','Stevenson','Stone'
+  'Aegis', 'Bios', 'Cipher', 'Dynamo', 'Energetic', 'Fusion', 'Genetix', 'Helix', 'Ionic', 'Jupiter', 'Kinetic', 'Lumina', 'Momentum', 'Neural', 'Orbital', 'Photon', 'Quantum', 'Radian', 'Synthetic', 'Tachyon', 'Unison', 'Vector', 'Wavelength', 'Xenon', 'Yield', 'Zenith', 'Accel', 'Byte', 'Cyber', 'Digital', 'Electron', 'Fiber', 'Graphite', 'Hydro', 'Infinite', 'Junction', 'Kernel', 'Logic', 'Mega', 'Nucleus', 'Omega', 'Pulse', 'Resonance', 'Silicon', 'Techno', 'Ultron', 'Vertex', 'Wire', 'Xylo', 'Yottabyte', 'Zer0', 'Aerospace', 'Biosys', 'Coreware', 'Datagen', 'Ecotech', 'Futura', 'Genome', 'Hardline', 'Infinium', 'Jarvis', 'Kryotech', 'Luminar', 'Mechadyne', 'Nanite', 'Omnitech', 'Procyon', 'Quantex', 'Robotics', 'Syntex', 'Teradyne', 'Unigen', 'Videre', 'Webcore', 'Xanadu', 'Yantra', 'Zetacorp', 'Apex', 'Blade', 'Chrome', 'Dagger', 'Edge', 'Frost', 'Glitch', 'Havoc', 'Icicle', 'Jinx', 'Karma', 'Laser', 'Matrix', 'Neon', 'Onyx', 'Phantom', 'Razor', 'Shadow', 'Toxin', 'Umbra', 'Viper', 'Wraith', 'XRay', 'Yellowjacket', 'Zen', 'Archer', 'Bishop', 'Cruz', 'Drake', 'Eagle', 'Falcon', 'Griffin', 'Hawk', 'Ingram', 'Jester', 'Knight', 'Lionel', 'Maverick', 'Noble', 'Orion', 'Phoenix', 'Ranger', 'Sparrow', 'Tiger', 'Ulysses', 'Valor', 'Wolf', 'Xavier', 'York', 'Zodiac', 'Abbott', 'Bentley', 'Chandler', 'Daley', 'Ellington', 'Fairchild', 'Gallagher', 'Harrington', 'Ingalls', 'Jefferson', 'Kensington', 'Livingston', 'Monroe', 'Nelson', 'Oakley', 'Prescott', 'Quincy', 'Rutherford', 'Sheridan', 'Thornton', 'Upton', 'Vanderbilt', 'Wellington', 'Xerxes', 'Yale', 'Zimmerman', 'Ashford', 'Bradley', 'Clayton', 'Donovan', 'Ellis', 'Fletcher', 'Graham', 'Hamilton', 'Irving', 'Jackson', 'Keller', 'Langston', 'Milton', 'Newton', 'Owens', 'Porter', 'Quinn', 'Ramsey', 'Shelby', 'Trenton', 'Underwood', 'Valentine', 'Winston', 'Young', 'Zane', 'Axton', 'Bowie', 'Corbin', 'Dorian', 'Easton', 'Fulton', 'Gatlin', 'Hutton', 'Idris', 'Jagger', 'Killian', 'Landon', 'Maddox', 'Nixon', 'Orlando', 'Paxton', 'Quillon', 'Rocco', 'Stanton', 'Tristan', 'Urien', 'Vaughn', 'Weston', 'Xavian', 'Yates', 'Zayn',
+  'Sterling', 'Vanguard', 'Bio', 'Wave', 'Core', 'Nexus', 'Aether', 'Synth', 'Optic', 'Apex', 'Matrix', 'Quantum', 'Echo', 'Flux', 'Giga', 'Hyper', 'Infra', 'Kinet', 'Lumen', 'Meta', 'Nano', 'Omni', 'Penta', 'Quadra', 'Rift', 'Spectra', 'Terra', 'Ultra', 'Velo', 'Xenon', 'Yotta', 'Zetta', 'Blaze', 'Chrome', 'Cypher', 'Daemon', 'Digit', 'Enigma', 'Fusion', 'Grid', 'Helix', 'Ion', 'Joule', 'Kilo', 'Logic', 'Macro', 'Micro', 'Neo', 'Octa', 'Pixel', 'Rune', 'Saga', 'Tech', 'Vector', 'Volt', 'Watt', 'Xerox', 'Yocto', 'Zero', 'Axiom', 'Bionic', 'Cortex', 'Data', 'Eon', 'Fiber', 'Gamma', 'Halo', 'Inertia', 'Jettison', 'Krypton', 'Laser', 'Magnet', 'Neural', 'Orbit', 'Plasma', 'Quasar', 'Radiant', 'Sensor', 'Titan', 'Unity', 'Vortex', 'Warp', 'Xylo', 'Yield', 'Zenith', 'Alba', 'Brooks', 'Cain', 'Dixon', 'Ellis', 'Flynn', 'Grant', 'Hayes', 'Irwin', 'Jones', 'King', 'Lane', 'Marsh', 'Nash', 'Owen', 'Page', 'Reed', 'Shaw', 'Todd', 'Vance', 'Ward', 'Young', 'Zeller', 'Adams', 'Baker', 'Clark', 'Davis', 'Evans', 'Fisher', 'Green', 'Hall', 'Hill', 'Jackson', 'Kelly', 'Lewis', 'Miller', 'Moore', 'Nelson', 'Parker', 'Roberts', 'Scott', 'Smith', 'Taylor', 'White', 'Wright', 'Allen', 'Bell', 'Carter', 'Cook', 'Cooper', 'Edwards', 'Foster', 'Gray', 'Harris', 'James', 'Johnson', 'Lee', 'Martin', 'Mitchell', 'Morris', 'Murphy', 'Myers', 'Perez', 'Phillips', 'Ramirez', 'Ross', 'Sanchez', 'Sanders', 'Stewart', 'Stone', 'Thomas', 'Thompson', 'Turner', 'Walker', 'Watson', 'Webb', 'Williams', 'Wilson', 'Wood', 'Young', 'Anderson', 'Bailey', 'Bennett', 'Brown', 'Campbell', 'Coleman', 'Collins', 'Diaz', 'Edwards', 'Flores', 'Garcia', 'Gomez', 'Gonzalez', 'Hernandez', 'Hughes', 'Jenkins', 'Kim', 'Long', 'Martinez', 'Morgan', 'Ortiz', 'Patel', 'Peterson', 'Price', 'Rivera', 'Rogers', 'Russell', 'Schmidt', 'Simmons', 'Stevens', 'Sullivan', 'Torres', 'Washington', 'Barnes', 'Bryant', 'Burke', 'Chapman', 'Cruz', 'Dean', 'Elliott', 'Ford', 'Gibson', 'Graham', 'Griffin', 'Hamilton', 'Henderson', 'Howard', 'Hudson', 'Hunt', 'Jensen', 'Jordan', 'Kennedy', 'Knight', 'Larson', 'Little', 'Marshall', 'Mason', 'Matthews', 'McDonald', 'Medina', 'Mendoza', 'Meyer', 'Mills', 'Montgomery', 'Morales', 'Murray', 'Neal', 'Olson', 'Palmer', 'Pearson', 'Perry', 'Powell', 'Ray', 'Reynolds', 'Richards', 'Robinson', 'Ruiz', 'Ryan', 'Saunders', 'Sharp', 'Singleton', 'Spencer', 'Stephens', 'Stevenson', 'Stone'
 ];
 const districts: District[] = ['NORTE', 'SUL', 'LESTE', 'OESTE'];
 
@@ -51,7 +52,7 @@ const generateName = () => {
   const firstList = gender === 'M' ? firstNamesMale : firstNamesFemale;
   const first = firstList[randomInt(0, firstList.length - 1)];
   const last = lastNames[randomInt(0, lastNames.length - 1)];
-  
+
   // Deterministic appearance based on name hash (so it stays the same)
   const seedStr = `${first}${last}`;
   let hash = 0;
@@ -61,8 +62,8 @@ const generateName = () => {
   }
   const absHash = Math.abs(hash);
 
-  return { 
-    name: `${first} ${last}`, 
+  return {
+    name: `${first} ${last}`,
     nickname: `${first[0]}. ${last}`,
     appearance: {
       gender: gender as 'M' | 'F',
@@ -130,7 +131,7 @@ const generateBadges = (totalRating: number): Badges => {
 
 export const generatePlayer = (id: string, district: District, ratingOverride?: number, forcedRole?: PlayerRole): Player => {
   const { name, nickname, appearance } = generateName();
-  
+
   let role: PlayerRole;
   if (forcedRole) {
     role = forcedRole;
@@ -138,10 +139,10 @@ export const generatePlayer = (id: string, district: District, ratingOverride?: 
     // 10% chance for Goleiro if random
     if (Math.random() < 0.1) role = 'GOL';
     else {
-       const r = Math.random();
-       if (r < 0.35) role = 'DEF';
-       else if (r < 0.7) role = 'MEI';
-       else role = 'ATA';
+      const r = Math.random();
+      if (r < 0.35) role = 'DEF';
+      else if (r < 0.7) role = 'MEI';
+      else role = 'ATA';
     }
   }
 
@@ -247,20 +248,20 @@ const getColorsForDistrict = (district: District) => {
 };
 
 const logoPatterns: LogoPattern[] = [
-  'none', 'stripes-v', 'stripes-h', 'diagonal', 'half-v', 'half-h', 'cross', 'circle', 
+  'none', 'stripes-v', 'stripes-h', 'diagonal', 'half-v', 'half-h', 'cross', 'circle',
   'checkered', 'waves', 'diamond', 'sunburst'
 ];
 const logoSymbols = [
-  'Shield', 'Star', 'Sword', 'Zap', 'Flame', 'Crown', 'Target', 'Anchor', 'Award', 
-  'Compass', 'Crosshair', 'Feather', 'Flag', 'Heart', 'Key', 'Leaf', 'Lightning', 
-  'Moon', 'Mountain', 'Rocket', 'Sun', 'Trophy', 'Wind', 'Gem', 'Skull', 'Ghost', 
+  'Shield', 'Star', 'Sword', 'Zap', 'Flame', 'Crown', 'Target', 'Anchor', 'Award',
+  'Compass', 'Crosshair', 'Feather', 'Flag', 'Heart', 'Key', 'Leaf', 'Lightning',
+  'Moon', 'Mountain', 'Rocket', 'Sun', 'Trophy', 'Wind', 'Gem', 'Skull', 'Ghost',
   'Fingerprint', 'Cpu', 'Activity', 'ShieldAlert', 'ShieldCheck', 'Radio', 'Telescope'
 ];
 
 const generateLogo = (primary: string, secondary: string): TeamLogoMetadata => {
   const patternId = logoPatterns[randomInt(0, logoPatterns.length - 1)];
   const symbolId = logoSymbols[randomInt(0, logoSymbols.length - 1)];
-  
+
   // 30% chance of having a secondary symbol
   const hasSecondary = Math.random() < 0.3;
   const secondarySymbolId = hasSecondary ? logoSymbols[randomInt(0, logoSymbols.length - 1)] : undefined;
@@ -368,7 +369,7 @@ export const generateInitialState = (): GameState => {
   // Generate 32 teams (8 per district/league)
   let teamIndex = 1;
   let globalTeamNameIndex = 0;
-  
+
   districts.forEach((district) => {
     for (let i = 0; i < 8; i++) {
       const id = `t_${teamIndex}`;
@@ -422,7 +423,7 @@ export const generateInitialState = (): GameState => {
 
   clubs.forEach((teamId, index) => {
     if (vacantClubIds.includes(teamId)) return;
-    
+
     const managerId = `m_${index + 1}`;
     teams[teamId].managerId = managerId;
     managers[managerId].career.currentTeamId = teamId;

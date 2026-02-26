@@ -22,8 +22,8 @@ export const saveGameState = async (state: GameState, worldId: string = 'default
 
   const { data, error } = await supabase
     .from('games')
-    .upsert({ 
-      user_id: user.id, 
+    .upsert({
+      user_id: user.id,
       world_id: worldId,
       world_state: state.world,
       teams_data: state.teams,
@@ -34,9 +34,9 @@ export const saveGameState = async (state: GameState, worldId: string = 'default
       notifications: state.notifications,
       last_headline: state.lastHeadline,
       training_data: state.training,
-      updated_at: new Date().toISOString() 
+      updated_at: new Date().toISOString()
     }, { onConflict: 'user_id,world_id' });
-    
+
   if (error) {
     console.error('Error saving game state:', error);
     return null;
@@ -59,11 +59,11 @@ export const loadGameState = async (worldId: string = 'default'): Promise<GameSt
     return null;
   }
 
-  return {
-    world: data.world_state,
+  const gameState: GameState = {
+    world: data.world_state as any, // Temporary until world state is fully typed
     worldId: data.world_id,
-    teams: data.teams_data,
-    players: data.players_data,
+    teams: data.teams_data as any,
+    players: data.players_data as any,
     managers: data.managers_data || {},
     userTeamId: data.user_team_id,
     userManagerId: data.user_manager_id,
@@ -74,7 +74,8 @@ export const loadGameState = async (worldId: string = 'default'): Promise<GameSt
       cardLaboratory: { slots: [] },
       individualFocus: { evolutionSlot: null, stabilizationSlot: null }
     }
-  } as GameState;
+  };
+  return gameState;
 };
 
 export const listUserWorlds = async () => {
@@ -101,7 +102,7 @@ export const listUserWorlds = async () => {
 
 export const listPublicWorlds = async () => {
   const { data: { user } } = await supabase.auth.getUser();
-  
+
   // Fetch all worlds except the user's own (to show as "Community" worlds)
   let query = supabase
     .from('games')

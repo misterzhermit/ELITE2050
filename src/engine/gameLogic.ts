@@ -1,18 +1,19 @@
-import { GameState, Team, Player, LeagueTeamStats, Notification, District, MatchResult, TeamStats, Match } from '../types';
-import { simulateMatch, Tactic, TeamStats as MatchTeamStats } from './MatchEngine';
+import { GameState, Team, Player, LeagueTeamStats, GameNotification, District, MatchResult, TeamStats, Match, TacticalCard } from '../types';
+import { simulateMatch, TeamStats as MatchTeamStats } from './MatchEngine';
 import { calculateEvolution } from './simulation';
 
-// Season Configuration
-const MAX_TEAM_POWER = 11000;
-const SEASON_ROUNDS = 14;
-const ELITE_CUP_ROUNDS = 4;
-const DISTRICT_CUP_ROUNDS = 4;
-const SEASON_DAYS = 45;
-const MATCH_INTERVAL_DAYS = 2;
-const TOTAL_ROUNDS = SEASON_ROUNDS + ELITE_CUP_ROUNDS + DISTRICT_CUP_ROUNDS; // 22 rounds
-const SAFETY_NET_TOTAL = 6000;
-const SAFETY_NET_MIN_PLAYERS = 15;
-const SAFETY_NET_FREE_AGENT_RATING = 400;
+import {
+  MAX_TEAM_POWER,
+  SEASON_ROUNDS,
+  ELITE_CUP_ROUNDS,
+  DISTRICT_CUP_ROUNDS,
+  SEASON_DAYS,
+  MATCH_INTERVAL_DAYS,
+  TOTAL_ROUNDS,
+  SAFETY_NET_TOTAL,
+  SAFETY_NET_MIN_PLAYERS,
+  SAFETY_NET_FREE_AGENT_RATING
+} from '../constants/gameConstants';
 
 // --- Helpers ---
 
@@ -100,7 +101,7 @@ export const applySafetyNet = (state: GameState, teamId: string) => {
 
   if (addedPlayers > 0 || credit > 0) {
     const message = `Piso de 6.000 ativado. Free Agents: ${addedPlayers}. Crédito de emergência: ${credit} pts.`;
-    const notification: Notification = {
+    const notification: GameNotification = {
       id: `n_${Date.now()}_safetynet_${team.id}`,
       date: state.world.currentDate,
       title: 'Liga dos Renegados',
@@ -143,11 +144,11 @@ export const updateStandings = (standings: LeagueTeamStats[], homeId: string, aw
 
 const updatePlayerEvolutions = (state: GameState, result: MatchResult, homePlayers: Player[], awayPlayers: Player[]) => {
   const allPlayers = [...homePlayers, ...awayPlayers];
-  
+
   allPlayers.forEach(player => {
     // 1. Basic Stats
     player.history.gamesPlayed++;
-    
+
     // 2. Goals & Assists
     const goals = result.scorers.filter(s => s.playerId === player.id).length;
     const assists = result.assists.filter(a => a.playerId === player.id).length;
@@ -156,10 +157,10 @@ const updatePlayerEvolutions = (state: GameState, result: MatchResult, homePlaye
 
     // 3. Rating Evolution
     let matchRating = result.ratings?.[player.id];
-    
+
     // If no rating (no events), give average 6.0 with variance
     if (matchRating === undefined) {
-       matchRating = 6.0 + (Math.random() - 0.5); // 5.5 - 6.5
+      matchRating = 6.0 + (Math.random() - 0.5); // 5.5 - 6.5
     }
 
     // Ensure rating is within bounds
@@ -169,17 +170,17 @@ const updatePlayerEvolutions = (state: GameState, result: MatchResult, homePlaye
     const isStabilizationFocus = state.training.individualFocus.stabilizationSlot === player.id;
 
     const evolution = calculateEvolution(
-      player, 
-      matchRating, 
+      player,
+      matchRating,
       player.history.lastMatchRatings || [],
       isEvolutionFocus,
       isStabilizationFocus
     );
-    
+
     player.totalRating = evolution.newRating;
     player.pentagon = evolution.newPentagon;
     player.history.lastMatchRatings = [matchRating, ...(player.history.lastMatchRatings || [])].slice(0, 5);
-    
+
     // Calculate average rating incrementally
     const oldGames = player.history.gamesPlayed - 1;
     player.history.averageRating = Number(((player.history.averageRating * oldGames + matchRating) / player.history.gamesPlayed).toFixed(2));
@@ -188,7 +189,7 @@ const updatePlayerEvolutions = (state: GameState, result: MatchResult, homePlaye
 
 export const calculateAttr = (sel: { gk: Player, def: Player[], mid: Player[], att: Player[] }, attr: string) => {
   if (attr === 'goalkeeper') {
-      return Math.round(sel.gk.totalRating * (sel.gk.role === 'GOL' ? 1.0 : 0.5));
+    return Math.round(sel.gk.totalRating * (sel.gk.role === 'GOL' ? 1.0 : 0.5));
   }
   let players: Player[] = [];
   let targetRole = '';
@@ -197,24 +198,24 @@ export const calculateAttr = (sel: { gk: Player, def: Player[], mid: Player[], a
   if (attr === 'attack') { players = sel.att; targetRole = 'ATA'; }
 
   if (players.length === 0) return 0;
-  
+
   const sum = players.reduce((acc, p) => {
-      const penalty = p.role === targetRole ? 1.0 : 0.6;
-      return acc + (p.totalRating * penalty);
+    const penalty = p.role === targetRole ? 1.0 : 0.6;
+    return acc + (p.totalRating * penalty);
   }, 0);
-  
+
   return Math.round(sum / players.length);
 };
 
 export const getMatchSquad = (team: Team, players: Record<string, Player>): { gk: Player, def: Player[], mid: Player[], att: Player[], all: Player[] } => {
   const squad = team.squad.map(id => players[id]).filter(p => !!p);
-  
+
   // 1. Find best GK
   let gk = squad.find(p => p.role === 'GOL');
   if (!gk) {
-     // Fallback: Best rated player becomes GK
-     const sorted = [...squad].sort((a, b) => b.totalRating - a.totalRating);
-     gk = sorted[0];
+    // Fallback: Best rated player becomes GK
+    const sorted = [...squad].sort((a, b) => b.totalRating - a.totalRating);
+    gk = sorted[0];
   }
 
   let pool = squad.filter(p => p.id !== gk!.id);
@@ -226,14 +227,14 @@ export const getMatchSquad = (team: Team, players: Record<string, Player>): { gk
 
   // Helper to fill slots
   const fill = (target: Player[], role: string, count: number) => {
-     for (let i = 0; i < count; i++) {
-        if (target.length >= count) break;
-        const idx = pool.findIndex(p => p.role === role);
-        if (idx !== -1) {
-           target.push(pool[idx]);
-           pool.splice(idx, 1);
-        }
-     }
+    for (let i = 0; i < count; i++) {
+      if (target.length >= count) break;
+      const idx = pool.findIndex(p => p.role === role);
+      if (idx !== -1) {
+        target.push(pool[idx]);
+        pool.splice(idx, 1);
+      }
+    }
   };
 
   fill(def, 'DEF', 4);
@@ -301,7 +302,7 @@ export const simulateAndRecordMatch = (state: GameState, match: Match, standings
   match.homeScore = result.homeScore;
   match.awayScore = result.awayScore;
   // Note: we don't set played = true here yet because it might be LOCKED status
-  
+
   updatePlayerEvolutions(state, result, homeSelection.all, awaySelection.all);
 
   if (standings) {
@@ -329,13 +330,13 @@ const getDistrictCupTeams = (state: GameState) => {
   districts.forEach(district => {
     const districtTeamId = `d_${district.toLowerCase()}`;
     const districtTeam = state.teams[districtTeamId];
-    
+
     if (districtTeam) {
       districtTeam.squad = [];
       const allPlayers = Object.values(state.players);
       const districtPlayers = allPlayers.filter(p => p.district === district);
       const topPlayers = districtPlayers.sort((a, b) => b.totalRating - a.totalRating).slice(0, 18);
-      
+
       districtTeam.squad = topPlayers.map(p => p.id);
       districtTeamIds.push(districtTeamId);
     }
@@ -346,7 +347,7 @@ const getDistrictCupTeams = (state: GameState) => {
 
 const buildTopMovers = (prevState: GameState, newState: GameState, count: number) => {
   const movers: { name: string, delta: number }[] = [];
-  
+
   Object.keys(newState.players).forEach(id => {
     const prev = prevState.players[id];
     const curr = newState.players[id];
@@ -357,33 +358,37 @@ const buildTopMovers = (prevState: GameState, newState: GameState, count: number
       }
     }
   });
-  
+
   movers.sort((a, b) => b.delta - a.delta);
-  
+
   const rises = movers.slice(0, count);
   const falls = movers.slice(movers.length - count).reverse();
-  
+
   return { rises, falls };
 };
 
 // --- Main Advance Function ---
 
-export const advanceGameDay = (prevState: GameState): GameState => {
+export const advanceGameDay = (prevState: GameState, skipDateIncrement = false): GameState => {
   const state = JSON.parse(JSON.stringify(prevState)) as GameState;
   const { world } = state;
-  
-  const date = new Date(world.currentDate);
-  date.setDate(date.getDate() + 1);
-  world.currentDate = date.toISOString();
+
+  if (!skipDateIncrement) {
+    const date = new Date(world.currentDate);
+    date.setDate(date.getDate() + 1);
+    // Reset to start of day for consistency when manually skipping
+    date.setHours(8, 0, 0, 0);
+    world.currentDate = date.toISOString();
+  }
 
   const dayNumber = getSeasonDayNumber(world.currentDate);
   const isMatchDay = isSeasonMatchDay(dayNumber);
-  
+
   // Transfer Window Logic
   world.transferWindowOpen = dayNumber <= 2 || dayNumber >= SEASON_DAYS;
 
   // --- Progress Card Laboratory ---
-  if (state.training.cardLaboratory.slots) {
+  if (state.training?.cardLaboratory?.slots) {
     state.training.cardLaboratory.slots.forEach(slot => {
       if (slot.cardId && slot.finishTime) {
         const finish = new Date(slot.finishTime);
@@ -425,7 +430,7 @@ export const advanceGameDay = (prevState: GameState): GameState => {
             };
 
             userTeam.inventory.push(newCard);
-            
+
             state.notifications.unshift({
               id: `n_${Date.now()}_card_lab`,
               date: state.world.currentDate,
@@ -471,14 +476,14 @@ export const advanceGameDay = (prevState: GameState): GameState => {
     } else if (round <= SEASON_ROUNDS + ELITE_CUP_ROUNDS) {
       // --- ELITE CUP ---
       const eliteRound = round - SEASON_ROUNDS; // 1..4
-      
+
       if (eliteRound === 1 && world.eliteCup.teams.length === 0) {
         world.eliteCup.teams = getEliteCupTeams(state);
       }
 
-      const stageName = eliteRound === 1 ? 'Oitavas de Final' : 
-                        eliteRound === 2 ? 'Quartas de Final' :
-                        eliteRound === 3 ? 'Semifinal' : 'Final';
+      const stageName = eliteRound === 1 ? 'Oitavas de Final' :
+        eliteRound === 2 ? 'Quartas de Final' :
+          eliteRound === 3 ? 'Semifinal' : 'Final';
 
       state.notifications.unshift({
         id: `n_${Date.now()}_elite_${eliteRound}`,
@@ -496,10 +501,10 @@ export const advanceGameDay = (prevState: GameState): GameState => {
         if (world.eliteCup.bracket.round1.length === 0) {
           const shuffled = shuffle(world.eliteCup.teams);
           for (let i = 0; i < shuffled.length; i += 2) {
-             world.eliteCup.bracket.round1.push({
-               id: `ec_r1_${i}`, round: eliteRound, homeTeamId: shuffled[i], awayTeamId: shuffled[i+1],
-               homeScore: 0, awayScore: 0, played: false, date: world.currentDate
-             });
+            world.eliteCup.bracket.round1.push({
+              id: `ec_r1_${i}`, round: eliteRound, homeTeamId: shuffled[i], awayTeamId: shuffled[i + 1],
+              homeScore: 0, awayScore: 0, played: false, date: world.currentDate
+            });
           }
         }
         matchesToPlay = world.eliteCup.bracket.round1;
@@ -508,10 +513,10 @@ export const advanceGameDay = (prevState: GameState): GameState => {
           const prev = world.eliteCup.bracket.round1;
           const winners = prev.map(m => m.homeScore >= m.awayScore ? m.homeTeamId : m.awayTeamId);
           for (let i = 0; i < winners.length; i += 2) {
-             world.eliteCup.bracket.quarters.push({
-               id: `ec_qf_${i}`, round: eliteRound, homeTeamId: winners[i], awayTeamId: winners[i+1],
-               homeScore: 0, awayScore: 0, played: false, date: world.currentDate
-             });
+            world.eliteCup.bracket.quarters.push({
+              id: `ec_qf_${i}`, round: eliteRound, homeTeamId: winners[i], awayTeamId: winners[i + 1],
+              homeScore: 0, awayScore: 0, played: false, date: world.currentDate
+            });
           }
         }
         matchesToPlay = world.eliteCup.bracket.quarters;
@@ -520,10 +525,10 @@ export const advanceGameDay = (prevState: GameState): GameState => {
           const prev = world.eliteCup.bracket.quarters;
           const winners = prev.map(m => m.homeScore >= m.awayScore ? m.homeTeamId : m.awayTeamId);
           for (let i = 0; i < winners.length; i += 2) {
-             world.eliteCup.bracket.semis.push({
-               id: `ec_sf_${i}`, round: eliteRound, homeTeamId: winners[i], awayTeamId: winners[i+1],
-               homeScore: 0, awayScore: 0, played: false, date: world.currentDate
-             });
+            world.eliteCup.bracket.semis.push({
+              id: `ec_sf_${i}`, round: eliteRound, homeTeamId: winners[i], awayTeamId: winners[i + 1],
+              homeScore: 0, awayScore: 0, played: false, date: world.currentDate
+            });
           }
         }
         matchesToPlay = world.eliteCup.bracket.semis;
@@ -532,8 +537,8 @@ export const advanceGameDay = (prevState: GameState): GameState => {
           const prev = world.eliteCup.bracket.semis;
           const winners = prev.map(m => m.homeScore >= m.awayScore ? m.homeTeamId : m.awayTeamId);
           world.eliteCup.bracket.final = {
-             id: `ec_final`, round: eliteRound, homeTeamId: winners[0], awayTeamId: winners[1],
-             homeScore: 0, awayScore: 0, played: false, date: world.currentDate
+            id: `ec_final`, round: eliteRound, homeTeamId: winners[0], awayTeamId: winners[1],
+            homeScore: 0, awayScore: 0, played: false, date: world.currentDate
           };
         }
         matchesToPlay = [world.eliteCup.bracket.final!];
@@ -554,11 +559,11 @@ export const advanceGameDay = (prevState: GameState): GameState => {
           if (penaltyWinner === 'home') final.homeScore += 1; // Representation of winning on penalties
           else final.awayScore += 1;
         }
-        
+
         const winnerId = final.homeScore > final.awayScore ? final.homeTeamId : final.awayTeamId;
         world.eliteCup.winnerId = winnerId;
         const winnerTeam = state.teams[winnerId];
-        
+
         state.notifications.unshift({
           id: `n_${Date.now()}_elite_winner`,
           date: world.currentDate,
@@ -572,7 +577,7 @@ export const advanceGameDay = (prevState: GameState): GameState => {
     } else if (round <= TOTAL_ROUNDS) {
       // --- DISTRICT CUP ---
       const districtRound = round - (SEASON_ROUNDS + ELITE_CUP_ROUNDS); // 1..4
-      
+
       if (districtRound === 1 && world.districtCup.teams.length === 0) {
         const teamIds = getDistrictCupTeams(state);
         world.districtCup.teams = teamIds;
@@ -591,38 +596,38 @@ export const advanceGameDay = (prevState: GameState): GameState => {
       });
 
       if (districtRound <= 3) {
-         // Group Phase (Round Robin for 4 teams: 3 rounds)
-         const pairings = [
-           [[0, 1], [2, 3]], 
-           [[0, 2], [1, 3]], 
-           [[0, 3], [1, 2]]
-         ];
-         const todaysPairings = pairings[districtRound - 1];
-         
-         todaysPairings.forEach(([idx1, idx2], i) => {
-           const home = world.districtCup.teams[idx1];
-           const away = world.districtCup.teams[idx2];
-           const match: Match = {
-             id: `dc_r${districtRound}_${i}`, round: districtRound, homeTeamId: home, awayTeamId: away,
-             homeScore: 0, awayScore: 0, played: false, date: world.currentDate, status: 'FINISHED'
-           };
-           world.districtCup.matches.push(match);
-           simulateAndRecordMatch(state, match, world.districtCup.standings);
-           match.played = true;
-         });
-         world.districtCup.round = districtRound;
+        // Group Phase (Round Robin for 4 teams: 3 rounds)
+        const pairings = [
+          [[0, 1], [2, 3]],
+          [[0, 2], [1, 3]],
+          [[0, 3], [1, 2]]
+        ];
+        const todaysPairings = pairings[districtRound - 1];
+
+        todaysPairings.forEach(([idx1, idx2], i) => {
+          const home = world.districtCup.teams[idx1];
+          const away = world.districtCup.teams[idx2];
+          const match: Match = {
+            id: `dc_r${districtRound}_${i}`, round: districtRound, homeTeamId: home, awayTeamId: away,
+            homeScore: 0, awayScore: 0, played: false, date: world.currentDate, status: 'FINISHED'
+          };
+          world.districtCup.matches.push(match);
+          simulateAndRecordMatch(state, match, world.districtCup.standings);
+          match.played = true;
+        });
+        world.districtCup.round = districtRound;
 
       } else {
         // Final (Top 2)
         const sorted = sortStandings(world.districtCup.standings);
         const finalists = sorted.slice(0, 2).map(s => s.teamId);
-        
+
         const match: Match = {
-           id: `dc_final`, round: districtRound, homeTeamId: finalists[0], awayTeamId: finalists[1],
-           homeScore: 0, awayScore: 0, played: false, date: world.currentDate, status: 'FINISHED'
+          id: `dc_final`, round: districtRound, homeTeamId: finalists[0], awayTeamId: finalists[1],
+          homeScore: 0, awayScore: 0, played: false, date: world.currentDate, status: 'FINISHED'
         };
         world.districtCup.final = match;
-        
+
         simulateAndRecordMatch(state, match, null);
         match.played = true;
 
@@ -632,11 +637,11 @@ export const advanceGameDay = (prevState: GameState): GameState => {
           if (penaltyWinner === 'home') match.homeScore! += 1;
           else match.awayScore! += 1;
         }
-        
+
         const winnerId = match.homeScore! > match.awayScore! ? match.homeTeamId : match.awayTeamId;
         world.districtCup.winnerId = winnerId;
         world.districtCup.round = districtRound;
-        
+
         const winnerTeam = state.teams[winnerId];
         state.notifications.unshift({
           id: `n_${Date.now()}_district_winner`,
@@ -651,7 +656,7 @@ export const advanceGameDay = (prevState: GameState): GameState => {
 
     // --- Generate Top 5 Movers Report ---
     const movers = buildTopMovers(prevState, state, 5);
-      
+
     if (movers.rises.length > 0) {
       state.notifications.unshift({
         id: `n_${Date.now()}_movers_up`,

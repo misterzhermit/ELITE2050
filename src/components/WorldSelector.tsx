@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useGame } from '../store/GameContext';
-import { Globe, Plus, Calendar, Clock, ChevronRight, LogOut } from 'lucide-react';
+import { Globe, Plus, Calendar, Clock, ChevronRight, LogOut, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateInitialState } from '../engine/generator';
 
@@ -16,16 +16,16 @@ export const WorldSelector: React.FC = () => {
 
   const handleCreateWorld = async () => {
     if (!newWorldName.trim()) return;
-    
+
     const id = Date.now().toString();
     const initialState = generateInitialState();
     // Set a name for the world in the state
     (initialState.world as any).name = newWorldName;
-    
+
     // Set local state first
     setState(initialState);
     setWorldId(id);
-    
+
     // Save to supabase
     await saveGame(initialState);
     await refreshWorlds();
@@ -58,23 +58,21 @@ export const WorldSelector: React.FC = () => {
 
         {/* Tab Switcher */}
         <div className="flex gap-2 mb-8 bg-black/40 p-1 rounded-2xl border border-white/5">
-          <button 
+          <button
             onClick={() => setActiveTab('my-worlds')}
-            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-              activeTab === 'my-worlds' 
-              ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20' 
-              : 'text-slate-500 hover:text-slate-300'
-            }`}
+            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'my-worlds'
+                ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20'
+                : 'text-slate-500 hover:text-slate-300'
+              }`}
           >
             Meus Mundos
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('community')}
-            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-              activeTab === 'community' 
-              ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20' 
-              : 'text-slate-500 hover:text-slate-300'
-            }`}
+            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'community'
+                ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20'
+                : 'text-slate-500 hover:text-slate-300'
+              }`}
           >
             Comunidade
           </button>
@@ -92,7 +90,7 @@ export const WorldSelector: React.FC = () => {
                   <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
                     <Globe size={64} className="text-cyan-400" />
                   </div>
-                  
+
                   <div className="relative z-10">
                     <h3 className="text-xl font-black text-white uppercase tracking-wider mb-2 group-hover:text-cyan-400 transition-colors">
                       {world.name}
@@ -104,7 +102,7 @@ export const WorldSelector: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="mt-6 flex items-center justify-between">
                     <span className="text-[10px] font-black text-cyan-500 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0">
                       Entrar no Mundo
@@ -165,7 +163,7 @@ export const WorldSelector: React.FC = () => {
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
                       <Globe size={64} className="text-purple-400" />
                     </div>
-                    
+
                     <div className="relative z-10">
                       <h3 className="text-xl font-black text-white uppercase tracking-wider mb-2 group-hover:text-purple-400 transition-colors">
                         {world.name}
@@ -181,7 +179,7 @@ export const WorldSelector: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="mt-6 flex items-center justify-between">
                       <span className="text-[10px] font-black text-purple-500 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0">
                         Explorar Mundo
