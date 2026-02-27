@@ -1,5 +1,5 @@
 export type PositionType = 'Linha' | 'Goleiro';
-export type PlayerRole = 'GOL' | 'DEF' | 'MEI' | 'ATA';
+export type PlayerRole = 'GOL' | 'ZAG' | 'MEI' | 'ATA';
 export type District = 'NORTE' | 'SUL' | 'LESTE' | 'OESTE' | 'EXILADO';
 
 export interface Pentagon {
@@ -29,8 +29,6 @@ export interface Badges {
 
 export interface Contract {
   teamId: string | null;
-  salary: number;
-  marketValue: number;
 }
 
 export interface PlayerHistory {
@@ -91,13 +89,6 @@ export interface TeamTactics {
   preferredFormation: string;
 }
 
-export interface TeamFinances {
-  transferBudget: number;
-  sponsorshipQuota: number;
-  stadiumLevel: number; // 1-5
-  emergencyCredit: number;
-}
-
 export interface TeamLogoMetadata {
   primary: string;
   secondary: string;
@@ -117,13 +108,13 @@ export interface Team {
     secondary: string;
   };
   logo?: TeamLogoMetadata;
-  finances: TeamFinances;
   tactics: TeamTactics;
   inventory?: TacticalCard[]; // Cards available to use in slots
   managerId: string | null;
   squad: string[]; // Player IDs
   lineup: Record<string, string>; // Position -> Player ID
   chemistry?: number; // 0-100
+  powerCap?: number; // Teto de score dinâmico
 }
 
 export interface Manager {
@@ -275,14 +266,16 @@ export interface LeagueState {
   scorers?: LeagueScorer[];
   rounds?: Round[];
   matches: Match[];
-  tvQuota?: string;
   difficulty?: string;
   teams?: string[];
 }
 
+export type WorldStatus = 'LOBBY' | 'ACTIVE' | 'FINISHED';
+
 export interface WorldState {
   id?: string;
   name?: string;
+  status: WorldStatus;
   currentDate: string;
   currentRound: number;
   currentSeason?: number;
@@ -297,6 +290,10 @@ export interface WorldState {
 
 export interface TrainingState {
   chemistryBoostLastUsed?: string; // ISO Date
+  playstyleTraining: {
+    currentStyle: PlayStyle | null;
+    understanding: Record<string, number>; // PlayStyle -> 0-100
+  };
   cardLaboratory: {
     slots: Array<{
       cardId: string | null;
@@ -313,6 +310,7 @@ export interface GameState {
   world: WorldState;
   worldId?: string;
   userId?: string;
+  isCreator?: boolean;
   teams: Record<string, Team>;
   players: Record<string, Player>;
   managers: Record<string, Manager>;

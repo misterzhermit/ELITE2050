@@ -1,31 +1,32 @@
 import { useState, useEffect } from 'react';
 import { useGame } from '../store/GameContext';
 import { Match, MatchEvent } from '../types';
+import { MATCH_REAL_TIME_SECONDS } from '../constants/gameConstants';
 
 export const useMatchSimulation = (userTeamId: string | null) => {
     const { state } = useGame();
 
-    const [isWatchingVod, setIsWatchingVod] = useState(false);
-    const [vodSecond, setVodSecond] = useState(0);
+    const [isWatchingReport, setIsWatchingReport] = useState(false);
+    const [reportSecond, setReportSecond] = useState(0);
     const [selectedMatchReport, setSelectedMatchReport] = useState<Match | null>(null);
 
     useEffect(() => {
         let interval: any;
-        if (isWatchingVod && vodSecond < 360) {
+        if (isWatchingReport && reportSecond < MATCH_REAL_TIME_SECONDS) {
             interval = setInterval(() => {
-                setVodSecond(prev => Math.min(360, prev + 1));
+                setReportSecond(prev => Math.min(MATCH_REAL_TIME_SECONDS, prev + 1));
             }, 1000);
         }
         return () => clearInterval(interval);
-    }, [isWatchingVod, vodSecond]);
+    }, [isWatchingReport, reportSecond]);
 
-    const handleStartVod = () => {
-        setVodSecond(0);
-        setIsWatchingVod(true);
+    const handleStartReport = () => {
+        setReportSecond(0);
+        setIsWatchingReport(true);
     };
 
-    const handleMockVod = (mode: 'live' | 'finished' = 'live', customHeadline?: string) => {
-        console.log(`GM: Simulando relatório de jogo (VOD mock) em modo ${mode}...`);
+    const handleMockReport = (mode: 'live' | 'finished' = 'live', customHeadline?: string) => {
+        console.log(`GM: Simulando relatório de jogo em modo ${mode}...`);
 
         const teams = Object.values(state.teams);
         if (teams.length < 2) {
@@ -64,8 +65,8 @@ export const useMatchSimulation = (userTeamId: string | null) => {
 
         const mockEvents: MatchEvent[] = [];
         for (let i = 0; i < 25; i++) {
-            const second = i * 15;
-            const minute = Math.floor((second / 360) * 90);
+            const second = i * (MATCH_REAL_TIME_SECONDS / 25);
+            const minute = Math.floor((second / MATCH_REAL_TIME_SECONDS) * 90);
             const template = commentaryTemplates[i % commentaryTemplates.length];
 
             mockEvents.push({
@@ -140,28 +141,28 @@ export const useMatchSimulation = (userTeamId: string | null) => {
         };
 
         if (mode === 'live') {
-            setVodSecond(0);
-            setIsWatchingVod(true);
+            setReportSecond(0);
+            setIsWatchingReport(true);
         } else {
-            setVodSecond(360);
-            setIsWatchingVod(false);
+            setReportSecond(MATCH_REAL_TIME_SECONDS);
+            setIsWatchingReport(false);
         }
         setSelectedMatchReport(mockMatch);
     };
 
     const handleSimulateGameReport = () => {
-        handleMockVod();
+        handleMockReport();
     };
 
     return {
-        isWatchingVod,
-        setIsWatchingVod,
-        vodSecond,
+        isWatchingReport,
+        setIsWatchingReport,
+        reportSecond,
         selectedMatchReport,
         setSelectedMatchReport,
-        handleStartVod,
-        handleMockVod,
+        handleStartReport,
+        handleMockReport,
         handleSimulateGameReport,
-        setVodSecond
+        setReportSecond
     };
 };

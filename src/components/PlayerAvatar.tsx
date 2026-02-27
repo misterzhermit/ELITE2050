@@ -57,7 +57,7 @@ export const PlayerAvatar: React.FC<PlayerAvatarProps> = ({
   } : {};
 
   return (
-    <div className={`relative overflow-hidden rounded-xl ${sizes[size]} ${className} bg-slate-900/20`}>
+    <div className={`relative overflow-hidden rounded-xl ${sizes[size]} ${className}`}>
       {/* Camada 1: Corpo */}
       <img 
         src={bodyPath} 

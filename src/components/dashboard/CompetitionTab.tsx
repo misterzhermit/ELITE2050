@@ -13,18 +13,97 @@ import { LineupBuilder } from '../LineupBuilder';
 import { LiveReport, PostGameReport } from '../MatchReports';
 import { getMatchStatus } from '../../utils/matchUtils';
 import * as LucideIcons from 'lucide-react';
-const { Home, Trophy, ShoppingCart, Database, User, Clock, Newspaper, Wallet, TrendingUp, AlertCircle, Award, Calendar, Users, Activity, Sliders, Flame, Target, Zap, FastForward, Globe, MessageSquare, AlertTriangle, TrendingDown, Briefcase, Star, Search, Crown, ChevronRight, Lock, ChevronDown, Eye, Shield, Brain, X, Save } = LucideIcons;
+const { Home, Trophy, ShoppingCart, Database, User, Clock, Newspaper, TrendingUp, AlertCircle, Award, Calendar, Users, Activity, Sliders, Flame, Target, Zap, FastForward, Globe, MessageSquare, AlertTriangle, TrendingDown, Briefcase, Star, Search, Crown, ChevronRight, Lock, ChevronDown, Eye, Shield, Brain, X, Save } = LucideIcons;
 
 
 export const CompetitionTab = (props: any) => {
   const { state, setState } = useGame();
   const dashData = useDashboardData();
-  const { userTeam, upcomingMatches } = dashData;
-  const { handleMockVod, setSelectedMatchReport } = useMatchSimulation(userTeam?.id || null);
+  const { userTeam, upcomingMatches, userTeamMatches } = dashData;
+  const { 
+    handleMockReport, 
+    selectedMatchReport, 
+    setSelectedMatchReport, 
+    setReportSecond 
+  } = useMatchSimulation(userTeam?.id || null);
   const { handleUpdateTactics } = useTactics(userTeam?.id || null);
   const { handleSetFocus, handleStartCardLab, handleChemistryBoost } = useTraining(userTeam?.id || null);
   const { handleAdvanceDay } = useGameDay();
-  const calendarEvents: any[] = []; // TODO: derive from match schedule
+  
+  const [timeLeft, setTimeLeft] = useState<string>('');
+
+  React.useEffect(() => {
+    const nextMatch = upcomingMatches[0];
+    if (!nextMatch) return;
+
+    const timer = setInterval(() => {
+      const matchDate = new Date(`${nextMatch.date}T${nextMatch.time}`);
+      const now = new Date(state.world.currentDate);
+      const diff = matchDate.getTime() - now.getTime();
+
+      if (diff <= 0) {
+        setTimeLeft('AGORA');
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+      if (days > 0) {
+        setTimeLeft(`${days}D • ${hours}H`);
+      } else {
+        setTimeLeft(`${hours}H • ${minutes}M`);
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [upcomingMatches, state.world.currentDate]);
+  
+  const calendarEvents = React.useMemo(() => {
+    const events: any[] = [];
+    
+    if (userTeamMatches) {
+      userTeamMatches.forEach(m => {
+        const matchDate = new Date(`${m.date}T${m.time}`);
+        
+        events.push({
+          id: `match_${m.id}`,
+          type: 'match',
+          date: matchDate,
+          status: m.played ? 'played' : 'scheduled',
+          data: m
+        });
+
+        // Generate news for played matches
+        if (m.played) {
+          const isWin = (m.homeId === userTeam?.id && m.homeScore > m.awayScore) || 
+                        (m.awayId === userTeam?.id && m.awayScore > m.homeScore);
+          const isDraw = m.homeScore === m.awayScore;
+          
+          if (isWin) {
+            events.push({
+              id: `news_win_${m.id}`,
+              type: 'news',
+              date: new Date(matchDate.getTime() + 7200000), // 2 hours after match
+              title: 'Vitória Convincente',
+              subtitle: `O ${userTeam?.name} superou o ${m.homeId === userTeam?.id ? m.away : m.home} e subiu na tabela.`
+            });
+          } else if (!isDraw) {
+             events.push({
+              id: `news_loss_${m.id}`,
+              type: 'news',
+              date: new Date(matchDate.getTime() + 7200000),
+              title: 'Derrota Dolorosa',
+              subtitle: `O técnico precisa rever a estratégia após o revés contra o ${m.homeId === userTeam?.id ? m.away : m.home}.`
+            });
+          }
+        }
+      });
+    }
+    
+    return events.sort((a, b) => b.date.getTime() - a.date.getTime());
+  }, [userTeamMatches, userTeam]);
 
   const nextMatch = upcomingMatches[0];
   if (!nextMatch) return (
@@ -37,108 +116,100 @@ export const CompetitionTab = (props: any) => {
   const homeTeam = state.teams[nextMatch.homeId];
   const awayTeam = state.teams[nextMatch.awayId];
 
-  return (
-    <div className="space-y-8 animate-in fade-in duration-700 max-w-6xl mx-auto pb-12">
-      {/* Main Highlight Match - Compact Redesign */}
-      <div className="relative overflow-hidden rounded-3xl bg-black/40 backdrop-blur-3xl border border-white/10 p-6 shadow-2xl group hover:border-cyan-500/30 transition-all">
-        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-purple-500/5 opacity-50" />
+  const matchDateTime = new Date(`${nextMatch.date}T${nextMatch.time}`);
+  const formattedDate = matchDateTime.toLocaleDateString('pt-BR', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short'
+  }).replace('.', '').toUpperCase();
 
-        <div className="relative z-10">
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
-                <Trophy size={16} className="text-cyan-400" />
+  return (
+    <div className="space-y-4 sm:space-y-8 animate-in fade-in duration-700 max-w-6xl mx-auto pb-12 px-2 sm:px-0">
+      {/* Main Highlight Match - Futuristic Redesign */}
+      <div className="relative overflow-hidden rounded-[1.5rem] sm:rounded-[2.5rem] bg-black/10 backdrop-blur-3xl border border-cyan-400/20 p-5 sm:p-12 shadow-[0_0_50px_rgba(34,211,238,0.1)] group transition-all duration-700 hover:border-cyan-400/40">
+        {/* Neon Glow Effects */}
+        <div className="absolute top-0 left-0 w-32 h-32 bg-cyan-500/10 blur-[80px] -translate-x-1/2 -translate-y-1/2" />
+        <div className="absolute bottom-0 right-0 w-32 h-32 bg-purple-500/10 blur-[80px] translate-x-1/2 translate-y-1/2" />
+        
+        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 sm:gap-12">
+          {/* Left Side: Info */}
+          <div className="flex-1 space-y-3 sm:space-y-6 text-center md:text-left">
+            <div className="space-y-0.5 sm:space-y-2">
+              <h3 className="text-[9px] sm:text-xs font-black text-cyan-400 uppercase tracking-[0.4em] sm:tracking-[0.5em] italic">
+                  PRÓXIMO JOGO
+                </h3>
+                <div className="text-3xl sm:text-7xl font-black text-white tracking-tighter italic leading-tight">
+                  {timeLeft}
+                </div>
               </div>
-              <div>
-                <h2 className="text-lg font-black text-white uppercase tracking-tight italic">
-                  {nextMatch.type} <span className="text-slate-500 text-sm not-italic font-bold">• Rodada {nextMatch.id.split('_')[1]}</span>
-                </h2>
+
+            <div className="space-y-1">
+              <div className="flex items-center justify-center md:justify-start gap-2 sm:gap-3 text-white/80 font-black text-xs sm:text-lg uppercase tracking-tight italic">
+                <span className={`truncate max-w-[100px] sm:max-w-none ${nextMatch.homeId === userTeam?.id ? 'text-cyan-400' : ''}`}>{nextMatch.home}</span>
+                <span className="text-white/20 shrink-0 text-[10px] sm:text-base">VS</span>
+                <span className={`truncate max-w-[100px] sm:max-w-none ${nextMatch.awayId === userTeam?.id ? 'text-cyan-400' : ''}`}>{nextMatch.away}</span>
               </div>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
-              <Clock size={12} className="text-cyan-400" />
-              <span className="text-xs font-bold text-white tabular-nums">{nextMatch.time}</span>
+              <p className="text-[8px] sm:text-xs text-slate-500 font-bold uppercase tracking-[0.2em] sm:tracking-[0.3em]">
+                {formattedDate} • {nextMatch.time} • RODADA {nextMatch.id.split('_')[1]}
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-4">
-            {/* Home Team */}
-            <div className="flex items-center gap-4 flex-1 justify-end group/home">
-              <span className={`text-lg font-black uppercase tracking-tight ${nextMatch.homeId === userTeam?.id ? 'text-cyan-400' : 'text-white'}`}>
-                {nextMatch.home}
-              </span>
-              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-lg relative overflow-hidden group-hover/home:border-cyan-500/50 transition-colors">
+          {/* Right Side: Logos */}
+          <div className="flex items-center gap-3 sm:gap-8 relative scale-90 sm:scale-100">
+            {/* Connection Line */}
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent hidden sm:block" />
+            
+            <div className="relative group/home">
+              <div className="absolute inset-0 bg-cyan-500/20 blur-2xl rounded-full opacity-0 group-hover/home:opacity-100 transition-opacity duration-500" />
+              <div className="w-14 h-14 sm:w-28 sm:h-28 rounded-xl sm:rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center shadow-2xl relative overflow-hidden backdrop-blur-md transition-transform duration-500 group-hover/home:scale-110 group-hover/home:border-cyan-500/50">
                 {homeTeam?.logo ? (
                   <TeamLogo
                     primaryColor={homeTeam.logo.primary}
                     secondaryColor={homeTeam.logo.secondary}
                     patternId={homeTeam.logo.patternId as any}
                     symbolId={homeTeam.logo.symbolId}
-                    size={40}
+                    size={window.innerWidth < 640 ? 28 : 64}
                   />
                 ) : (
-                  <TeamLogo
-                    primaryColor={homeTeam?.colors.primary || '#fff'}
-                    secondaryColor={homeTeam?.colors.secondary || '#333'}
-                    patternId="none"
-                    symbolId="Shield"
-                    size={32}
-                  />
+                  <Shield size={window.innerWidth < 640 ? 28 : 40} className="text-white/20 sm:size-[48px]" />
                 )}
               </div>
             </div>
 
-            {/* VS */}
-            <div className="flex flex-col items-center px-4">
-              <span className="text-2xl font-black text-white/10 italic">VS</span>
-            </div>
+            <div className="text-base sm:text-2xl font-black text-white/10 italic z-10">VS</div>
 
-            {/* Away Team */}
-            <div className="flex items-center gap-4 flex-1 group/away">
-              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-lg relative overflow-hidden group-hover/away:border-purple-500/50 transition-colors">
+            <div className="relative group/away">
+              <div className="absolute inset-0 bg-purple-500/20 blur-2xl rounded-full opacity-0 group-hover/away:opacity-100 transition-opacity duration-500" />
+              <div className="w-14 h-14 sm:w-28 sm:h-28 rounded-xl sm:rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center shadow-2xl relative overflow-hidden backdrop-blur-md transition-transform duration-500 group-hover/away:scale-110 group-hover/away:border-purple-500/50">
                 {awayTeam?.logo ? (
                   <TeamLogo
                     primaryColor={awayTeam.logo.primary}
                     secondaryColor={awayTeam.logo.secondary}
                     patternId={awayTeam.logo.patternId as any}
                     symbolId={awayTeam.logo.symbolId}
-                    size={40}
+                    size={window.innerWidth < 640 ? 28 : 64}
                   />
                 ) : (
-                  <TeamLogo
-                    primaryColor={awayTeam?.colors.primary || '#fff'}
-                    secondaryColor={awayTeam?.colors.secondary || '#333'}
-                    patternId="none"
-                    symbolId="Shield"
-                    size={32}
-                  />
+                  <Shield size={window.innerWidth < 640 ? 28 : 40} className="text-white/20 sm:size-[48px]" />
                 )}
               </div>
-              <span className={`text-lg font-black uppercase tracking-tight ${nextMatch.awayId === userTeam?.id ? 'text-purple-400' : 'text-white'}`}>
-                {nextMatch.away}
-              </span>
             </div>
-          </div>
-
-          <div className="mt-6 flex justify-center">
-            <button className="w-full max-w-xs py-2 bg-white/5 hover:bg-cyan-500 hover:text-black border border-white/10 text-xs font-black uppercase tracking-[0.2em] rounded-xl transition-all">
-              Gerenciar Escalação
-            </button>
           </div>
         </div>
       </div>
 
       {/* Timeline Events Redesign */}
-      <div className="space-y-6">
-        <div className="flex items-center justify-between px-2">
-          <h3 className="text-xs font-black text-white uppercase tracking-[0.3em] flex items-center gap-3">
-            <Calendar size={16} className="text-cyan-400" />
+      <div className="space-y-4 sm:space-y-6 px-1 sm:px-0">
+        <div className="flex items-center justify-between px-1 sm:px-2">
+          <h3 className="text-[10px] sm:text-xs font-black text-white uppercase tracking-[0.2em] sm:tracking-[0.3em] flex items-center gap-2 sm:gap-3">
+            <Calendar size={window.innerWidth < 640 ? 14 : 16} className="text-cyan-400" />
             Cronograma & Notícias
           </h3>
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Temporada 2050</span>
+          <span className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest">Temporada 2050</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
           {calendarEvents.map((event: any) => {
             if (event.type === 'match') {
               const homeTeam = state.teams[event.data.homeId];
@@ -150,74 +221,75 @@ export const CompetitionTab = (props: any) => {
               return (
                 <div
                   key={event.id}
-                  className={`group relative overflow-hidden rounded-lg border transition-all duration-300 ${isPlayed
-                    ? 'bg-slate-900/40 border-slate-500/10 opacity-60 hover:opacity-100'
+                  onClick={() => isPlayed && setSelectedMatchReport(event.data)}
+                  className={`group relative overflow-hidden rounded-lg sm:rounded-xl border transition-all duration-300 ${isPlayed
+                    ? 'cursor-pointer bg-slate-900/40 border-slate-500/10 opacity-60 hover:opacity-100 hover:border-cyan-500/30'
                     : 'bg-gradient-to-r from-cyan-950/20 to-black/40 border-cyan-500/20 hover:border-cyan-400/50 hover:shadow-[0_0_10px_rgba(34,211,238,0.1)]'
                     }`}
                 >
                   {/* Hover Effect */}
                   <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
 
-                  <div className="p-2 flex items-center justify-between gap-2 relative z-10 h-10">
+                  <div className="p-2 sm:p-3 flex items-center justify-between gap-2 relative z-10 h-12 sm:h-16">
                     {/* Date & Time */}
-                    <div className="flex flex-col items-center justify-center min-w-[2.5rem] pr-2 border-r border-white/5 h-full">
-                      <span className="text-[9px] font-black text-white/50 uppercase leading-none mb-0.5">
-                        {event.date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}
+                    <div className="flex flex-col items-center justify-center min-w-[2.5rem] sm:min-w-[4rem] pr-2 sm:pr-3 border-r border-white/5 h-full">
+                      <span className="text-[7px] sm:text-[10px] font-black text-white/50 uppercase leading-none mb-0.5">
+                        {event.date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '').toUpperCase()}
                       </span>
-                      <span className={`text-[9px] font-bold ${isPlayed ? 'text-slate-500' : 'text-cyan-400'} leading-none`}>
+                      <span className={`text-[8px] sm:text-[11px] font-bold ${isPlayed ? 'text-slate-500' : 'text-cyan-400'} leading-none`}>
                         {isPlayed ? 'FIM' : event.data.time}
                       </span>
                     </div>
 
                     {/* Teams & Score */}
-                    <div className="flex-1 flex items-center justify-between gap-1.5 min-w-0">
+                    <div className="flex-1 flex items-center justify-between gap-1.5 sm:gap-3 min-w-0">
                       {/* Home */}
-                      <div className="flex items-center gap-1.5 flex-1 justify-end min-w-0">
-                        <span className={`text-[9px] font-bold uppercase truncate text-right ${isHomeUser ? 'text-cyan-400' : 'text-slate-400'}`}>
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-1 justify-end min-w-0">
+                        <span className={`text-[8px] sm:text-[11px] font-bold uppercase truncate text-right ${isHomeUser ? 'text-cyan-400' : 'text-slate-400'}`}>
                           {homeTeam?.name || event.data.home}
                         </span>
-                        <div className="w-5 h-5 shrink-0 flex items-center justify-center">
+                        <div className="w-4 h-4 sm:w-7 sm:h-7 shrink-0 flex items-center justify-center">
                           {homeTeam?.logo ? (
                             <TeamLogo
                               primaryColor={homeTeam.logo.primary}
                               secondaryColor={homeTeam.logo.secondary}
                               patternId={homeTeam.logo.patternId as any}
                               symbolId={homeTeam.logo.symbolId}
-                              size={20}
+                              size={window.innerWidth < 640 ? 16 : 28}
                             />
                           ) : (
-                            <div className="w-4 h-4 rounded-full bg-slate-700" />
+                            <div className="w-3 h-3 sm:w-5 sm:h-5 rounded-full bg-slate-700" />
                           )}
                         </div>
                       </div>
 
                       {/* VS/Score */}
-                      <div className="flex items-center justify-center min-w-[1.5rem]">
+                      <div className="flex items-center justify-center min-w-[1.5rem] sm:min-w-[2rem]">
                         {isPlayed ? (
-                          <span className="text-[10px] font-black text-white tracking-widest bg-white/5 px-1 rounded border border-white/5">
+                          <span className="text-[9px] sm:text-[12px] font-black text-white tracking-wider bg-white/5 px-1 sm:px-1.5 py-0.5 rounded border border-white/5">
                             {event.data.homeScore}-{event.data.awayScore}
                           </span>
                         ) : (
-                          <span className="text-[8px] font-black text-white/10 italic">VS</span>
+                          <span className="text-[7px] sm:text-[10px] font-black text-white/10 italic">VS</span>
                         )}
                       </div>
 
                       {/* Away */}
-                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                        <div className="w-5 h-5 shrink-0 flex items-center justify-center">
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
+                        <div className="w-4 h-4 sm:w-7 sm:h-7 shrink-0 flex items-center justify-center">
                           {awayTeam?.logo ? (
                             <TeamLogo
                               primaryColor={awayTeam.logo.primary}
                               secondaryColor={awayTeam.logo.secondary}
                               patternId={awayTeam.logo.patternId as any}
                               symbolId={awayTeam.logo.symbolId}
-                              size={20}
+                              size={window.innerWidth < 640 ? 16 : 28}
                             />
                           ) : (
-                            <div className="w-4 h-4 rounded-full bg-slate-700" />
+                            <div className="w-3 h-3 sm:w-5 sm:h-5 rounded-full bg-slate-700" />
                           )}
                         </div>
-                        <span className={`text-[9px] font-bold uppercase truncate ${isAwayUser ? 'text-cyan-400' : 'text-slate-400'}`}>
+                        <span className={`text-[8px] sm:text-[11px] font-bold uppercase truncate ${isAwayUser ? 'text-cyan-400' : 'text-slate-400'}`}>
                           {awayTeam?.name || event.data.away}
                         </span>
                       </div>
@@ -231,27 +303,50 @@ export const CompetitionTab = (props: any) => {
             return (
               <div
                 key={event.id}
-                className="group relative overflow-hidden rounded-xl border border-purple-500/20 bg-purple-900/10 p-3 flex items-center gap-3 hover:border-purple-500/50 transition-all"
+                className="group relative overflow-hidden rounded-lg sm:rounded-xl border border-purple-500/20 bg-purple-900/10 p-2.5 sm:p-4 flex items-center gap-3 sm:gap-4 hover:border-purple-500/50 transition-all"
               >
-                <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400">
-                  <Newspaper size={16} />
+                <div className="p-2 sm:p-3 bg-purple-500/20 rounded-lg sm:rounded-xl text-purple-400">
+                  <Newspaper size={window.innerWidth < 640 ? 16 : 20} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-xs font-bold text-white truncate group-hover:text-purple-400 transition-colors">
+                  <h4 className="text-[10px] sm:text-[13px] font-bold text-white truncate group-hover:text-purple-400 transition-colors">
                     {event.title}
                   </h4>
-                  <p className="text-[10px] text-slate-400 truncate">
+                  <p className="text-[9px] sm:text-[11px] text-slate-400 truncate mt-0.5">
                     {event.subtitle}
                   </p>
                 </div>
-                <div className="text-[9px] font-bold text-slate-500 uppercase">
-                  {event.date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                <div className="text-[8px] sm:text-[10px] font-black text-slate-500 uppercase tracking-tighter">
+                  {event.date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '').toUpperCase()}
                 </div>
               </div>
             );
           })}
         </div>
       </div>
+
+      {/* Match Report Modal */}
+      {selectedMatchReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 sm:bg-black/80 backdrop-blur-md sm:backdrop-blur-sm p-2 sm:p-4 animate-in fade-in duration-300">
+          <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setSelectedMatchReport(null)}
+              className="fixed sm:absolute top-4 sm:-top-12 right-4 sm:right-0 z-[60] p-2 bg-black/50 sm:bg-white/10 hover:bg-red-500 rounded-full text-white transition-colors backdrop-blur-md border border-white/10"
+            >
+              <X size={window.innerWidth < 640 ? 20 : 24} />
+            </button>
+            <div className="pb-8">
+              <PostGameReport
+                match={selectedMatchReport}
+                homeTeam={state.teams[selectedMatchReport.homeTeamId || selectedMatchReport.homeId]}
+                awayTeam={state.teams[selectedMatchReport.awayTeamId || selectedMatchReport.awayId]}
+                players={state.players}
+                onClose={() => setSelectedMatchReport(null)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

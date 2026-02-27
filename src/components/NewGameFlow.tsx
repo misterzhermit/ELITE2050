@@ -17,8 +17,9 @@ import {
 } from 'lucide-react';
 import { useGame } from '../store/GameContext';
 import { TeamLogo } from './TeamLogo';
-import { Player, Team, PlayerRole, District, LeagueColor } from '../types';
+import { Player, Team, PlayerRole, District, LeagueColor, GameState } from '../types';
 import { PlayerCard } from './PlayerCard';
+import { refillTeamRoster } from '../engine/generator';
 
 type Step = 'path-selection' | 'heir-choice' | 'founder-identity' | 'founder-draft';
 
@@ -27,6 +28,7 @@ export const NewGameFlow: React.FC = () => {
   const [step, setStep] = useState<Step>('path-selection');
   const [selectedHeirTeamId, setSelectedHeirTeamId] = useState('');
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+  const [managerName, setManagerName] = useState('');
   
   // Founder Data
   const [founderData, setFounderData] = useState({
@@ -44,8 +46,8 @@ export const NewGameFlow: React.FC = () => {
   const [draftDistrictFilter, setDraftDistrictFilter] = useState<District | 'ALL'>('ALL');
 
   const players = useMemo(() => Object.values(state.players), [state.players]);
-   const teams = useMemo(() => Object.values(state.teams), [state.teams]);
- 
+  const teams = useMemo(() => Object.values(state.teams), [state.teams]);
+
   const availableHeirTeams = useMemo(() => {
     // Return teams that don't have a manager assigned
     return Object.values(state.teams).filter(t => !t.managerId && t.id.startsWith('t_'));
@@ -53,6 +55,11 @@ export const NewGameFlow: React.FC = () => {
 
   const filteredDraftPlayers = useMemo(() => {
     return players.filter(p => {
+      // Rule: Only allow players from NPC teams or free agents
+      const playerTeam = p.contract.teamId ? state.teams[p.contract.teamId] : null;
+      const fromNpcTeam = !playerTeam || !playerTeam.managerId;
+      if (!fromNpcTeam) return false;
+
       const matchesSearch = p.nickname.toLowerCase().includes(draftSearch.toLowerCase()) || 
                            p.name.toLowerCase().includes(draftSearch.toLowerCase());
       const matchesRole = draftRoleFilter === 'ALL' || p.role === draftRoleFilter;
@@ -60,7 +67,7 @@ export const NewGameFlow: React.FC = () => {
       const notSelected = !selectedPlayerIds.includes(p.id);
       return matchesSearch && matchesRole && matchesDistrict && notSelected;
     }).sort((a, b) => b.totalRating - a.totalRating);
-  }, [players, draftSearch, draftRoleFilter, draftDistrictFilter, selectedPlayerIds]);
+  }, [players, draftSearch, draftRoleFilter, draftDistrictFilter, selectedPlayerIds, state.teams]);
 
   const selectedPlayers = useMemo(() => {
     return selectedPlayerIds.map(id => state.players[id]).filter(Boolean);
@@ -76,32 +83,32 @@ export const NewGameFlow: React.FC = () => {
   };
 
   // Logic for Path B: Founder Draft
-  const draftBudget = 9000;
-  const currentBudget = useMemo(() => {
+  const draftScoreLimit = 10000; // Increased to allow more flexibility for 15 players
+  const currentScore = useMemo(() => {
     return selectedPlayerIds.reduce((sum, id) => sum + (state.players[id]?.totalRating || 0), 0);
   }, [selectedPlayerIds, state.players]);
 
   const selectedPlayersByRole = useMemo(() => {
-    const roles: Record<PlayerRole, number> = { GOL: 0, DEF: 0, MEI: 0, ATA: 0 };
+    const roles: Record<PlayerRole, number> = { GOL: 0, ZAG: 0, MEI: 0, ATA: 0 };
     selectedPlayerIds.forEach(id => {
       const role = state.players[id]?.role;
-      if (role) roles[role]++;
+      if (role) roles[role as PlayerRole]++;
     });
     return roles;
   }, [selectedPlayerIds, state.players]);
 
   const eliteCount = useMemo(() => {
-    return selectedPlayerIds.filter(id => (state.players[id]?.totalRating || 0) >= 850).length;
+    return selectedPlayerIds.filter(id => (state.players[id]?.totalRating || 0) >= 900).length;
   }, [selectedPlayerIds, state.players]);
 
   const isDraftValid = 
     selectedPlayerIds.length === 15 &&
-    currentBudget <= draftBudget &&
+    currentScore <= draftScoreLimit &&
     eliteCount <= 3 &&
-    selectedPlayersByRole.GOL === 2 &&
-    selectedPlayersByRole.DEF === 5 &&
-    selectedPlayersByRole.MEI === 5 &&
-    selectedPlayersByRole.ATA === 3;
+    selectedPlayersByRole.GOL >= 1 &&
+    selectedPlayersByRole.ZAG >= 4 &&
+    selectedPlayersByRole.MEI >= 3 &&
+    selectedPlayersByRole.ATA >= 2;
 
   const handleFinishHeir = () => {
     const team = state.teams[selectedHeirTeamId];
@@ -110,7 +117,7 @@ export const NewGameFlow: React.FC = () => {
     const managerId = userId || 'm_user';
     const userManager = {
       id: managerId,
-      name: 'Manager User',
+      name: managerName || 'Manager User',
       district: team.district,
       reputation: 50,
       attributes: {
@@ -129,10 +136,10 @@ export const NewGameFlow: React.FC = () => {
     const newLineup: Record<string, string> = {};
     const formationSlots = [
       { id: 'GOL', role: 'GOL' },
-      { id: 'DEF1', role: 'DEF' },
-      { id: 'DEF2', role: 'DEF' },
-      { id: 'DEF3', role: 'DEF' },
-      { id: 'DEF4', role: 'DEF' },
+      { id: 'ZAG1', role: 'ZAG' },
+      { id: 'ZAG2', role: 'ZAG' },
+      { id: 'ZAG3', role: 'ZAG' },
+      { id: 'ZAG4', role: 'ZAG' },
       { id: 'MEI1', role: 'MEI' },
       { id: 'MEI2', role: 'MEI' },
       { id: 'MEI3', role: 'MEI' },
@@ -163,6 +170,7 @@ export const NewGameFlow: React.FC = () => {
 
     const newState = {
       ...state,
+      isCreator: true,
       teams: {
         ...state.teams,
         [selectedHeirTeamId]: {
@@ -174,6 +182,10 @@ export const NewGameFlow: React.FC = () => {
       managers: {
         ...state.managers,
         [managerId]: userManager
+      },
+      world: {
+        ...state.world,
+        status: 'LOBBY'
       },
       userTeamId: selectedHeirTeamId,
       userManagerId: managerId
@@ -193,10 +205,10 @@ export const NewGameFlow: React.FC = () => {
     const newLineup: Record<string, string> = {};
     const formationSlots = [
       { id: 'GOL', role: 'GOL' },
-      { id: 'DEF1', role: 'DEF' },
-      { id: 'DEF2', role: 'DEF' },
-      { id: 'DEF3', role: 'DEF' },
-      { id: 'DEF4', role: 'DEF' },
+      { id: 'ZAG1', role: 'ZAG' },
+      { id: 'ZAG2', role: 'ZAG' },
+      { id: 'ZAG3', role: 'ZAG' },
+      { id: 'ZAG4', role: 'ZAG' },
       { id: 'MEI1', role: 'MEI' },
       { id: 'MEI2', role: 'MEI' },
       { id: 'MEI3', role: 'MEI' },
@@ -225,6 +237,9 @@ export const NewGameFlow: React.FC = () => {
       }
     });
 
+    // 5. Create or update user manager
+    const managerId = userId || 'm_user';
+    
     const newTeam: Team = {
       id: newTeamId,
       name: `${founderData.name} ${founderData.prefix}`,
@@ -235,31 +250,54 @@ export const NewGameFlow: React.FC = () => {
         primary: founderData.primaryColor,
         secondary: founderData.secondaryColor
       },
-      finances: {
-        transferBudget: 50000000,
-        sponsorshipQuota: 10000000,
-        stadiumLevel: 1,
-        emergencyCredit: 0
-      },
       tactics: {
         playStyle: 'Vertical',
         preferredFormation: '4-3-3'
       },
-      managerId: 'm_user', // Create a user manager
+      managerId: managerId,
       squad: selectedPlayerIds,
       lineup: newLineup
     };
 
-    // 2. Update players to point to new team and clear old team squad
+    // 2. Update players to point to new team and handle original teams
     const updatedPlayers = { ...state.players };
+    const updatedTeams = { ...state.teams };
+    
+    // Identify teams that lost players and remove them from their squads
     selectedPlayerIds.forEach(pid => {
+      const player = updatedPlayers[pid];
+      const oldTeamId = player.contract.teamId;
+      
+      if (oldTeamId && updatedTeams[oldTeamId]) {
+        updatedTeams[oldTeamId] = {
+          ...updatedTeams[oldTeamId],
+          squad: updatedTeams[oldTeamId].squad.filter(id => id !== pid)
+        };
+      }
+      
       updatedPlayers[pid] = {
-        ...updatedPlayers[pid],
-        contract: { ...updatedPlayers[pid].contract, teamId: newTeamId }
+        ...player,
+        contract: { ...player.contract, teamId: newTeamId }
       };
     });
 
-    // 3. Update world state to replace the team in leagues
+    // 3. Refill teams that lost players (NPC Coherent Recruitment)
+    // We target a power level around 9000-11000 for refilled teams
+    Object.keys(updatedTeams).forEach(tid => {
+      const team = updatedTeams[tid];
+      // Only refill club teams that are not the user team and have fewer than 18 players
+      if (tid.startsWith('t_') && tid !== newTeamId && team.squad.length < 18) {
+        const targetPower = team.powerCap || 10000;
+        const newSignings = refillTeamRoster(team, targetPower, updatedPlayers, team.district);
+        
+        newSignings.forEach(p => {
+          updatedPlayers[p.id] = p;
+          team.squad.push(p.id);
+        });
+      }
+    });
+
+    // 4. Update world state to replace the team in leagues
     const updatedLeagues = { ...state.world.leagues };
     Object.keys(updatedLeagues).forEach(key => {
       const league = updatedLeagues[key as keyof typeof updatedLeagues];
@@ -273,11 +311,12 @@ export const NewGameFlow: React.FC = () => {
       }));
     });
 
-    // 4. Create or update user manager
-    const managerId = userId || 'm_user';
+    // Remove the replaced team from teams record
+    delete updatedTeams[founderData.replacedTeamId];
+
     const userManager = {
       id: managerId,
-      name: 'Manager User',
+      name: managerName || 'Manager User',
       district: founderData.district,
       reputation: 50,
       attributes: {
@@ -292,12 +331,10 @@ export const NewGameFlow: React.FC = () => {
       }
     };
 
-    const newState = {
+    const newState: GameState = {
       ...state,
-      teams: {
-        ...state.teams,
-        [newTeamId]: newTeam
-      },
+      isCreator: true,
+      teams: updatedTeams,
       players: updatedPlayers,
       managers: {
         ...state.managers,
@@ -305,7 +342,8 @@ export const NewGameFlow: React.FC = () => {
       },
       world: {
         ...state.world,
-        leagues: updatedLeagues
+        leagues: updatedLeagues,
+        status: 'LOBBY' // Set to lobby on creation
       },
       userTeamId: newTeamId,
       userManagerId: managerId
@@ -340,42 +378,42 @@ export const NewGameFlow: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-5xl relative z-10 px-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 w-full max-w-5xl relative z-10 px-4">
         {/* Path A: Heir */}
         <button 
           onClick={() => setStep('heir-choice')}
-          className="group relative h-[380px] xl:h-[420px] bg-gradient-to-b from-white/[0.03] to-transparent backdrop-blur-2xl border border-white/5 rounded-[2.5rem] p-8 xl:p-10 text-left transition-all duration-500 hover:border-cyan-500/40 hover:bg-cyan-500/[0.02] overflow-hidden shadow-2xl"
+          className="group relative min-h-[280px] sm:min-h-[320px] md:h-[380px] xl:h-[420px] bg-gradient-to-b from-white/[0.03] to-transparent backdrop-blur-2xl border border-white/5 rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-8 xl:p-10 text-left transition-all duration-500 hover:border-cyan-500/40 hover:bg-cyan-500/[0.02] overflow-hidden shadow-2xl"
         >
           {/* Animated Background Icon */}
           <div className="absolute -bottom-10 -right-10 opacity-[0.03] group-hover:opacity-[0.08] transition-all duration-700 group-hover:scale-110 group-hover:-rotate-12">
-            <Briefcase size={280} className="text-cyan-400" />
+            <Briefcase size={200} className="text-cyan-400 sm:size-[280px]" />
           </div>
 
           {/* Glow Effect on Hover */}
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/0 via-transparent to-cyan-500/0 group-hover:from-cyan-500/[0.05] transition-all duration-700" />
           
           <div className="relative z-10 h-full flex flex-col">
-            <div className="w-14 h-14 xl:w-16 xl:h-16 bg-black/40 border border-cyan-500/30 rounded-2xl flex items-center justify-center mb-6 xl:mb-8 group-hover:scale-110 group-hover:border-cyan-400 transition-all duration-500 shadow-lg shadow-cyan-500/10">
-              <Briefcase size={28} className="text-cyan-400 xl:size-8" />
+            <div className="w-12 h-12 sm:w-14 sm:h-14 xl:w-16 xl:h-16 bg-black/40 border border-cyan-500/30 rounded-xl sm:rounded-2xl flex items-center justify-center mb-4 sm:mb-6 xl:mb-8 group-hover:scale-110 group-hover:border-cyan-400 transition-all duration-500 shadow-lg shadow-cyan-500/10">
+              <Briefcase size={24} className="text-cyan-400 sm:size-7 xl:size-8" />
             </div>
             
-            <div className="space-y-2 mb-4 xl:mb-6">
-              <h2 className="text-2xl xl:text-3xl font-black text-white uppercase tracking-tighter italic">O HERDEIRO</h2>
+            <div className="space-y-1 sm:space-y-2 mb-3 sm:mb-4 xl:mb-6">
+              <h2 className="text-xl sm:text-2xl xl:text-3xl font-black text-white uppercase tracking-tighter italic">O HERDEIRO</h2>
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
-                <p className="text-cyan-400 text-[9px] xl:text-[10px] font-black uppercase tracking-[0.25em]">GESTÃO DE LEGADO</p>
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+                <p className="text-cyan-400 text-[8px] sm:text-[9px] xl:text-[10px] font-black uppercase tracking-[0.25em]">GESTÃO DE LEGADO</p>
               </div>
             </div>
 
-            <p className="text-slate-400 text-xs xl:text-sm leading-relaxed font-medium mb-auto">
+            <p className="text-slate-400 text-[11px] sm:text-xs xl:text-sm leading-relaxed font-medium mb-auto">
               Assuma o comando de um clube estabelecido. Gerencie ídolos, lide com a pressão da torcida e mantenha a tradição viva ou revolucione a estrutura de dentro para fora.
             </p>
 
-            <div className="pt-6 xl:pt-8 border-t border-white/5">
+            <div className="pt-4 sm:pt-6 xl:pt-8 border-t border-white/5 mt-4">
               <div className="flex items-center justify-between">
-                <div className="inline-flex items-center gap-3 text-cyan-400 font-black text-[10px] xl:text-[11px] uppercase tracking-[0.2em] group-hover:gap-5 transition-all">
+                <div className="inline-flex items-center gap-2 sm:gap-3 text-cyan-400 font-black text-[9px] sm:text-[10px] xl:text-[11px] uppercase tracking-[0.2em] group-hover:gap-5 transition-all">
                   Explorar Vagas
-                  <ArrowRight size={16} />
+                  <ArrowRight size={14} className="sm:size-4" />
                 </div>
                 <div className="flex gap-1">
                   {[1,2,3].map(i => <div key={i} className="w-1 h-1 rounded-full bg-cyan-500/20" />)}
@@ -388,38 +426,38 @@ export const NewGameFlow: React.FC = () => {
         {/* Path B: Founder */}
         <button 
           onClick={() => setStep('founder-identity')}
-          className="group relative h-[380px] xl:h-[420px] bg-gradient-to-b from-white/[0.03] to-transparent backdrop-blur-2xl border border-white/5 rounded-[2.5rem] p-8 xl:p-10 text-left transition-all duration-500 hover:border-amber-500/40 hover:bg-amber-500/[0.02] overflow-hidden shadow-2xl"
+          className="group relative min-h-[280px] sm:min-h-[320px] md:h-[380px] xl:h-[420px] bg-gradient-to-b from-white/[0.03] to-transparent backdrop-blur-2xl border border-white/5 rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-8 xl:p-10 text-left transition-all duration-500 hover:border-amber-500/40 hover:bg-amber-500/[0.02] overflow-hidden shadow-2xl"
         >
           {/* Animated Background Icon */}
           <div className="absolute -bottom-10 -right-10 opacity-[0.03] group-hover:opacity-[0.08] transition-all duration-700 group-hover:scale-110 group-hover:rotate-12">
-            <Globe size={280} className="text-amber-400" />
+            <Globe size={200} className="text-amber-400 sm:size-[280px]" />
           </div>
 
           {/* Glow Effect on Hover */}
           <div className="absolute inset-0 bg-gradient-to-br from-amber-500/0 via-transparent to-amber-500/0 group-hover:from-amber-500/[0.05] transition-all duration-700" />
 
           <div className="relative z-10 h-full flex flex-col">
-            <div className="w-14 h-14 xl:w-16 xl:h-16 bg-black/40 border border-amber-500/30 rounded-2xl flex items-center justify-center mb-6 xl:mb-8 group-hover:scale-110 group-hover:border-amber-400 transition-all duration-500 shadow-lg shadow-amber-500/10">
-              <Globe size={28} className="text-amber-400 xl:size-8" />
+            <div className="w-12 h-12 sm:w-14 sm:h-14 xl:w-16 xl:h-16 bg-black/40 border border-amber-500/30 rounded-xl sm:rounded-2xl flex items-center justify-center mb-4 sm:mb-6 xl:mb-8 group-hover:scale-110 group-hover:border-amber-400 transition-all duration-500 shadow-lg shadow-amber-500/10">
+              <Globe size={24} className="text-amber-400 sm:size-7 xl:size-8" />
             </div>
 
-            <div className="space-y-2 mb-4 xl:mb-6">
-              <h2 className="text-2xl xl:text-3xl font-black text-white uppercase tracking-tighter italic">O FUNDADOR</h2>
+            <div className="space-y-1 sm:space-y-2 mb-3 sm:mb-4 xl:mb-6">
+              <h2 className="text-xl sm:text-2xl xl:text-3xl font-black text-white uppercase tracking-tighter italic">O FUNDADOR</h2>
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.8)]" />
-                <p className="text-amber-400 text-[9px] xl:text-[10px] font-black uppercase tracking-[0.25em]">CRIAÇÃO ABSOLUTA</p>
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.8)]" />
+                <p className="text-amber-400 text-[8px] sm:text-[9px] xl:text-[10px] font-black uppercase tracking-[0.25em]">CRIAÇÃO ABSOLUTA</p>
               </div>
             </div>
 
-            <p className="text-slate-400 text-xs xl:text-sm leading-relaxed font-medium mb-auto">
+            <p className="text-slate-400 text-[11px] sm:text-xs xl:text-sm leading-relaxed font-medium mb-auto">
               Crie uma nova potência do zero. Escolha seu nome, cores e monte seu elenco através de um Draft estratégico. O mercado é seu para conquistar.
             </p>
 
-            <div className="pt-6 xl:pt-8 border-t border-white/5">
+            <div className="pt-4 sm:pt-6 xl:pt-8 border-t border-white/5 mt-4">
               <div className="flex items-center justify-between">
-                <div className="inline-flex items-center gap-3 text-amber-400 font-black text-[10px] xl:text-[11px] uppercase tracking-[0.2em] group-hover:gap-5 transition-all">
+                <div className="inline-flex items-center gap-2 sm:gap-3 text-amber-400 font-black text-[9px] sm:text-[10px] xl:text-[11px] uppercase tracking-[0.2em] group-hover:gap-5 transition-all">
                   Iniciar Registro
-                  <ArrowRight size={16} />
+                  <ArrowRight size={14} className="sm:size-4" />
                 </div>
                 <div className="flex gap-1">
                   {[1,2,3].map(i => <div key={i} className="w-1 h-1 rounded-full bg-amber-500/20" />)}
@@ -444,6 +482,15 @@ export const NewGameFlow: React.FC = () => {
       </div>
     </div>
   );
+
+  const [selectedLeagueFilter, setSelectedLeagueFilter] = useState<string>('all');
+
+  const filteredTeams = useMemo(() => {
+    return availableHeirTeams.filter(t => {
+      if (selectedLeagueFilter !== 'all' && t.league !== selectedLeagueFilter) return false;
+      return true;
+    });
+  }, [availableHeirTeams, selectedLeagueFilter]);
 
   const renderHeirChoice = () => (
     <div className="min-h-screen bg-[#02040a] p-4 xl:p-8 flex flex-col h-screen overflow-hidden relative">
@@ -479,24 +526,30 @@ export const NewGameFlow: React.FC = () => {
             </div>
           </div>
 
-          <div className="hidden md:flex items-center gap-6 text-right">
-            <div className="space-y-1">
-              <p className="text-slate-500 text-[8px] font-black uppercase tracking-widest">Database Sync</p>
-              <p className="text-cyan-400 font-mono text-[10px]">LIVE_FEED_v2.4</p>
-            </div>
-            <div className="w-[1px] h-10 bg-white/10" />
-            <div className="space-y-1">
-              <p className="text-slate-500 text-[8px] font-black uppercase tracking-widest">Vagas Livres</p>
-              <p className="text-white font-mono text-xl xl:text-2xl font-black">{availableHeirTeams.length}</p>
+          <div className="hidden md:flex flex-col items-end gap-4">
+            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl p-1">
+              {['all', 'norte', 'sul', 'leste', 'oeste'].map((league) => (
+                <button
+                  key={league}
+                  onClick={() => setSelectedLeagueFilter(league)}
+                  className={`px-4 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${
+                    selectedLeagueFilter === league 
+                      ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20' 
+                      : 'text-slate-500 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  {league === 'all' ? 'Todas' : league}
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
         {/* Teams Grid */}
         <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-10">
-          {availableHeirTeams.length > 0 ? (
+          {filteredTeams.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 xl:gap-8">
-              {availableHeirTeams.map(team => {
+              {filteredTeams.map(team => {
                 const teamRating = team.squad.reduce((sum, pid) => sum + (state.players[pid]?.totalRating || 0), 0);
                 const isSelected = selectedHeirTeamId === team.id;
                 
@@ -504,7 +557,7 @@ export const NewGameFlow: React.FC = () => {
                   <button 
                     key={team.id}
                     onClick={() => setSelectedHeirTeamId(team.id)}
-                    className={`group relative p-6 xl:p-8 rounded-[2rem] xl:rounded-[2.5rem] border transition-all duration-500 text-left overflow-hidden min-h-[280px] xl:min-h-[320px] flex flex-col justify-between ${
+                    className={`group relative p-4 sm:p-6 xl:p-8 rounded-[1.25rem] sm:rounded-[2rem] xl:rounded-[2.5rem] border transition-all duration-500 text-left overflow-hidden min-h-[160px] sm:min-h-[280px] xl:min-h-[320px] flex flex-col justify-between ${
                       isSelected 
                         ? 'bg-cyan-500/[0.07] border-cyan-500/50 shadow-[0_0_40px_rgba(34,211,238,0.15)] scale-[1.02]' 
                         : 'bg-white/[0.02] border-white/5 hover:border-cyan-500/30 hover:bg-white/[0.04]'
@@ -517,9 +570,9 @@ export const NewGameFlow: React.FC = () => {
                     <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/0 via-transparent to-cyan-500/0 group-hover:from-cyan-500/[0.02] transition-all duration-700" />
 
                     <div className="relative z-10">
-                      <div className="flex items-start justify-between mb-4 xl:mb-6">
+                      <div className="flex items-start justify-between mb-2 sm:mb-4 xl:mb-6">
                         <div className="relative">
-                          <div className={`w-12 h-12 xl:w-16 xl:h-16 rounded-2xl flex items-center justify-center border transition-all duration-500 ${
+                          <div className={`w-9 h-9 sm:w-12 sm:h-12 xl:w-16 xl:h-16 rounded-lg sm:rounded-2xl flex items-center justify-center border transition-all duration-500 ${
                             isSelected ? 'border-cyan-400 bg-black/40 shadow-lg shadow-cyan-500/20' : 'border-white/10 bg-black/20 group-hover:border-white/30'
                           }`} style={{ backgroundColor: isSelected ? undefined : team.colors.primary + '15' }}>
                           <div className="flex items-center justify-center transition-transform duration-500 group-hover:scale-110">
@@ -529,7 +582,7 @@ export const NewGameFlow: React.FC = () => {
                                 secondaryColor={team.logo.secondary}
                                 patternId={team.logo.patternId as any}
                                 symbolId={team.logo.symbolId}
-                                size={isSelected ? 44 : 40}
+                                size={isSelected ? (window.innerWidth < 640 ? 24 : 32) : (window.innerWidth < 640 ? 20 : 28)}
                               />
                             ) : (
                               <TeamLogo 
@@ -537,20 +590,20 @@ export const NewGameFlow: React.FC = () => {
                                 secondaryColor={team.colors.secondary}
                                 patternId="none"
                                 symbolId="Shield"
-                                size={isSelected ? 32 : 28}
+                                size={isSelected ? (window.innerWidth < 640 ? 18 : 24) : (window.innerWidth < 640 ? 16 : 20)}
                               />
                             )}
                           </div>
                           </div>
                           {isSelected && (
-                            <div className="absolute -top-2 -right-2 w-6 h-6 bg-cyan-500 rounded-full flex items-center justify-center border-2 border-[#02040a] shadow-lg animate-bounce">
-                              <CheckCircle2 size={12} className="text-black" />
+                            <div className="absolute -top-1.5 -right-1.5 w-5 h-5 sm:w-6 sm:h-6 bg-cyan-500 rounded-full flex items-center justify-center border-2 border-[#02040a] shadow-lg animate-bounce">
+                              <CheckCircle2 size={10} className="text-black sm:size-[12px]" />
                             </div>
                           )}
                         </div>
                         <div className="text-right">
-                          <p className="text-[7px] xl:text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Status</p>
-                          <span className={`text-[8px] xl:text-[9px] font-black uppercase px-2.5 py-1 rounded-full border ${
+                          <p className="text-[6px] sm:text-[8px] font-black text-slate-500 uppercase tracking-widest mb-0.5 sm:mb-1">Status</p>
+                          <span className={`text-[7px] sm:text-[9px] font-black uppercase px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full border ${
                             isSelected ? 'bg-cyan-500 text-black border-cyan-500 shadow-[0_0_15px_rgba(34,211,238,0.3)]' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'
                           }`}>
                             Disponível
@@ -558,49 +611,49 @@ export const NewGameFlow: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="space-y-1 xl:space-y-2 mb-6 xl:mb-8">
-                        <h3 className="text-xl xl:text-2xl font-black text-white uppercase tracking-tighter italic group-hover:text-cyan-400 transition-colors">{team.name}</h3>
-                        <div className="flex items-center gap-2">
+                      <div className="space-y-0.5 sm:space-y-2 mb-4 sm:mb-8">
+                        <h3 className="text-lg sm:text-2xl font-black text-white uppercase tracking-tighter italic group-hover:text-cyan-400 transition-colors truncate">{team.name}</h3>
+                        <div className="flex items-center gap-1.5 sm:gap-2">
                           <div className="w-1 h-1 rounded-full bg-cyan-500/50" />
-                          <p className="text-[8px] xl:text-[9px] text-slate-400 font-black uppercase tracking-[0.2em]">{team.city} • {team.district}</p>
+                          <p className="text-[7px] sm:text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] truncate">{team.city} • {team.district}</p>
                         </div>
                       </div>
                     </div>
 
-                    <div className="relative z-10 grid grid-cols-2 gap-3 xl:gap-4 mb-6 xl:mb-8">
-                      <div className="bg-black/40 rounded-xl xl:rounded-2xl p-3 xl:p-4 border border-white/5 group-hover:border-cyan-500/20 transition-all">
-                        <p className="text-[6px] xl:text-[7px] text-slate-500 font-black uppercase tracking-widest mb-1.5">Rating Geral</p>
+                    <div className="relative z-10 grid grid-cols-2 gap-2 sm:gap-4 mb-4 sm:mb-8">
+                      <div className="bg-black/40 rounded-lg sm:rounded-2xl p-2 sm:p-4 border border-white/5 group-hover:border-cyan-500/20 transition-all">
+                        <p className="text-[5px] sm:text-[7px] text-slate-500 font-black uppercase tracking-widest mb-1 sm:mb-1.5">Rating Geral</p>
                         <div className="flex items-baseline gap-1">
-                          <p className="text-lg xl:text-xl font-black text-white tabular-nums tracking-tighter">{teamRating.toLocaleString('pt-BR')}</p>
-                          <span className="text-[7px] xl:text-[8px] font-black text-cyan-500/50 uppercase">PTS</span>
+                          <p className="text-sm sm:text-xl font-black text-white tabular-nums tracking-tighter">{teamRating.toLocaleString('pt-BR')}</p>
+                          <span className="text-[6px] sm:text-[8px] font-black text-cyan-500/50 uppercase">PTS</span>
                         </div>
-                        <div className="mt-2 w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                        <div className="mt-1.5 sm:mt-2 w-full h-0.5 sm:h-1 bg-white/5 rounded-full overflow-hidden">
                           <div className="h-full bg-cyan-500 shadow-[0_0_5px_rgba(34,211,238,0.5)] transition-all duration-1000" style={{ width: `${Math.min(100, (teamRating / 11000) * 100)}%` }} />
                         </div>
                       </div>
-                      <div className="bg-black/40 rounded-xl xl:rounded-2xl p-3 xl:p-4 border border-white/5 group-hover:border-cyan-500/20 transition-all">
-                        <p className="text-[6px] xl:text-[7px] text-slate-500 font-black uppercase tracking-widest mb-1.5">Divisão</p>
-                        <p className="text-[9px] xl:text-[10px] font-black text-cyan-400 uppercase tracking-tight truncate">{team.league}</p>
-                        <div className="mt-2 flex gap-0.5">
-                          {[1,2,3,4,5].map(i => <div key={i} className={`w-1 h-1 rounded-full ${i <= 3 ? 'bg-cyan-500/50' : 'bg-white/5'}`} />)}
+                      <div className="bg-black/40 rounded-lg sm:rounded-2xl p-2 sm:p-4 border border-white/5 group-hover:border-cyan-500/20 transition-all">
+                        <p className="text-[5px] sm:text-[7px] text-slate-500 font-black uppercase tracking-widest mb-1 sm:mb-1.5">Divisão</p>
+                        <p className="text-[8px] sm:text-[10px] font-black text-cyan-400 uppercase tracking-tight truncate">{team.league}</p>
+                        <div className="mt-1.5 sm:mt-2 flex gap-0.5">
+                          {[1,2,3,4,5].map(i => <div key={i} className={`w-0.5 sm:w-1 h-0.5 sm:h-1 rounded-full ${i <= 3 ? 'bg-cyan-500/50' : 'bg-white/5'}`} />)}
                         </div>
                       </div>
                     </div>
 
-                    <div className="relative z-10 pt-4 xl:pt-6 border-t border-white/5 flex items-center justify-between group-hover:border-cyan-500/20 transition-colors">
+                    <div className="relative z-10 pt-3 sm:pt-6 border-t border-white/5 flex items-center justify-between group-hover:border-cyan-500/20 transition-colors">
                       <div className="flex items-center gap-2 xl:gap-3">
-                        <div className="flex -space-x-2">
+                        <div className="flex -space-x-1.5 sm:-space-x-2">
                           {[1,2,3].map(i => (
-                            <div key={i} className="w-5 h-5 xl:w-6 xl:h-6 rounded-full border-2 border-[#02040a] bg-slate-800 flex items-center justify-center overflow-hidden">
-                              <Users size={10} className="text-slate-500" />
+                            <div key={i} className="w-4 h-4 sm:w-6 sm:h-6 rounded-full border border-[#02040a] bg-slate-800 flex items-center justify-center overflow-hidden">
+                              <Users size={8} className="text-slate-500 sm:size-[10px]" />
                             </div>
                           ))}
                         </div>
-                        <span className="text-[7px] xl:text-[8px] font-black text-slate-500 uppercase tracking-widest">{team.squad.length} Atletas</span>
+                        <span className="text-[6px] sm:text-[8px] font-black text-slate-500 uppercase tracking-widest">{team.squad.length} Atletas</span>
                       </div>
-                      <div className={`flex items-center gap-2 transition-all duration-500 ${isSelected ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 group-hover:opacity-100 group-hover:translate-x-0'}`}>
-                        <span className="text-[8px] xl:text-[9px] font-black text-cyan-400 uppercase tracking-widest">Selecionar</span>
-                        <ArrowRight size={14} className="text-cyan-400" />
+                      <div className={`flex items-center gap-1.5 sm:gap-2 transition-all duration-500 ${isSelected ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 group-hover:opacity-100 group-hover:translate-x-0'}`}>
+                        <span className="text-[7px] sm:text-[9px] font-black text-cyan-400 uppercase tracking-widest">Selecionar</span>
+                        <ArrowRight size={12} className="text-cyan-400 sm:size-[14px]" />
                       </div>
                     </div>
                   </button>
@@ -628,23 +681,40 @@ export const NewGameFlow: React.FC = () => {
         </div>
 
         {/* Action Footer */}
-        <div className="mt-auto pt-4 xl:pt-8 border-t border-white/5 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-4">
-            <div className={`w-2 h-2 rounded-full animate-pulse transition-colors duration-500 ${selectedHeirTeamId ? 'bg-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.5)]' : 'bg-slate-700'}`} />
-            <div className="space-y-0.5">
-              <p className="text-slate-500 text-[8px] xl:text-[9px] font-black uppercase tracking-[0.2em]">
-                {selectedHeirTeamId ? 'Unidade de Destino Confirmada' : 'Aguardando Seleção de Destino'}
-              </p>
-              {selectedHeirTeamId && (
-                <p className="text-cyan-400 text-[7px] xl:text-[8px] font-mono uppercase tracking-widest">
-                  READY_FOR_DEPLOYMENT: {state.teams[selectedHeirTeamId]?.name}
+        <div className="mt-auto pt-4 xl:pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-6 shrink-0">
+          <div className="flex flex-col sm:flex-row items-center gap-6 w-full sm:w-auto">
+            {/* Manager Name Input */}
+            <div className="w-full sm:w-64 space-y-2">
+              <label className="flex items-center justify-between px-1">
+                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Seu Nome de Treinador</span>
+                <span className="text-[7px] font-mono text-cyan-500/30">ID_MANAGER</span>
+              </label>
+              <input 
+                type="text"
+                placeholder="NOME DO MANAGER..."
+                value={managerName}
+                onChange={e => setManagerName(e.target.value)}
+                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-[10px] text-white font-bold focus:border-cyan-500/50 focus:bg-cyan-500/5 outline-none transition-all placeholder:text-slate-700 uppercase"
+              />
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className={`w-2 h-2 rounded-full animate-pulse transition-colors duration-500 ${selectedHeirTeamId ? 'bg-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.5)]' : 'bg-slate-700'}`} />
+              <div className="space-y-0.5">
+                <p className="text-slate-500 text-[8px] xl:text-[9px] font-black uppercase tracking-[0.2em]">
+                  {selectedHeirTeamId ? 'Unidade de Destino Confirmada' : 'Aguardando Seleção de Destino'}
                 </p>
-              )}
+                {selectedHeirTeamId && (
+                  <p className="text-cyan-400 text-[7px] xl:text-[8px] font-mono uppercase tracking-widest">
+                    READY_FOR_DEPLOYMENT: {state.teams[selectedHeirTeamId]?.name}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
           
           <button 
-            disabled={!selectedHeirTeamId}
+            disabled={!selectedHeirTeamId || !managerName}
             onClick={handleFinishHeir}
             className={`relative group px-10 xl:px-14 py-3 xl:py-4 rounded-xl xl:rounded-2xl font-black text-[10px] xl:text-[11px] uppercase tracking-[0.3em] transition-all duration-500 ${
               selectedHeirTeamId 
@@ -714,54 +784,68 @@ export const NewGameFlow: React.FC = () => {
 
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 xl:gap-12 min-h-0">
           {/* Form Side */}
-          <div className="space-y-6 overflow-y-auto pr-4 custom-scrollbar pb-10">
+          <div className="space-y-4 sm:space-y-6 overflow-y-auto pr-2 sm:pr-4 custom-scrollbar pb-10">
             {/* Identity Section */}
-            <div className="bg-white/[0.02] border border-white/5 rounded-[2.5rem] p-6 xl:p-8 space-y-6 relative overflow-hidden group">
+            <div className="bg-white/[0.02] border border-white/5 rounded-[1.5rem] sm:rounded-[2.5rem] p-5 sm:p-8 space-y-4 sm:space-y-6 relative overflow-hidden group">
               <div className="absolute inset-0 bg-gradient-to-br from-amber-500/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
               
               <div className="flex items-center gap-3 relative z-10">
-                <div className="w-1.5 h-6 bg-amber-500 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.5)]" />
-                <h3 className="text-[10px] xl:text-[11px] font-black text-white uppercase tracking-[0.3em]">Identidade Corporativa</h3>
+                <div className="w-1 h-5 sm:w-1.5 sm:h-6 bg-amber-500 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.5)]" />
+                <h3 className="text-[9px] sm:text-[11px] font-black text-white uppercase tracking-[0.3em]">Identidade Corporativa</h3>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 xl:gap-6 relative z-10">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6 relative z-10">
+                <div className="space-y-2 sm:col-span-2">
+                  <label className="flex items-center justify-between px-1">
+                    <span className="text-[7px] sm:text-[8px] font-black text-slate-500 uppercase tracking-widest">Seu Nome de Treinador</span>
+                    <span className="text-[6px] sm:text-[7px] font-mono text-amber-500/30">ID_MANAGER</span>
+                  </label>
+                  <input 
+                    type="text"
+                    placeholder="EX: ALEX FERGUSON"
+                    value={managerName}
+                    onChange={e => setManagerName(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-lg sm:rounded-xl px-3 sm:px-4 py-2.5 sm:py-3.5 text-[10px] sm:text-[11px] text-white font-bold focus:border-amber-500/50 focus:bg-amber-500/5 outline-none transition-all placeholder:text-slate-700 uppercase"
+                  />
+                </div>
+
                 <div className="space-y-2">
                   <label className="flex items-center justify-between px-1">
-                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Nome do Clube</span>
-                    <span className="text-[7px] font-mono text-amber-500/30">ID_PRIMARY</span>
+                    <span className="text-[7px] sm:text-[8px] font-black text-slate-500 uppercase tracking-widest">Nome do Clube</span>
+                    <span className="text-[6px] sm:text-[7px] font-mono text-amber-500/30">ID_PRIMARY</span>
                   </label>
                   <input 
                     type="text"
                     placeholder="EX: NOVA"
                     value={founderData.name}
                     onChange={e => setFounderData(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3.5 text-[10px] xl:text-[11px] text-white font-bold focus:border-amber-500/50 focus:bg-amber-500/5 outline-none transition-all placeholder:text-slate-700 uppercase"
+                    className="w-full bg-black/40 border border-white/10 rounded-lg sm:rounded-xl px-3 sm:px-4 py-2.5 sm:py-3.5 text-[10px] sm:text-[11px] text-white font-bold focus:border-amber-500/50 focus:bg-amber-500/5 outline-none transition-all placeholder:text-slate-700 uppercase"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <label className="flex items-center justify-between px-1">
-                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Sufixo / Sigla</span>
-                    <span className="text-[7px] font-mono text-amber-500/30">TAG_SUFFIX</span>
+                    <span className="text-[7px] sm:text-[8px] font-black text-slate-500 uppercase tracking-widest">Sufixo / Sigla</span>
+                    <span className="text-[6px] sm:text-[7px] font-mono text-amber-500/30">TAG_SUFFIX</span>
                   </label>
                   <input 
                     type="text"
                     placeholder="EX: UNITED, FC"
                     value={founderData.prefix}
                     onChange={e => setFounderData(prev => ({ ...prev, prefix: e.target.value }))}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3.5 text-[10px] xl:text-[11px] text-white font-bold focus:border-amber-500/50 focus:bg-amber-500/5 outline-none transition-all placeholder:text-slate-700 uppercase"
+                    className="w-full bg-black/40 border border-white/10 rounded-lg sm:rounded-xl px-3 sm:px-4 py-2.5 sm:py-3.5 text-[10px] sm:text-[11px] text-white font-bold focus:border-amber-500/50 focus:bg-amber-500/5 outline-none transition-all placeholder:text-slate-700 uppercase"
                   />
                 </div>
               </div>
 
-              <div className="space-y-4 relative z-10">
+              <div className="space-y-3 sm:space-y-4 relative z-10">
                 <label className="flex items-center justify-between px-1">
-                  <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Cromatismo Técnico</span>
-                  <span className="text-[7px] font-mono text-amber-500/30">HEX_SYNERGY</span>
+                  <span className="text-[7px] sm:text-[8px] font-black text-slate-500 uppercase tracking-widest">Cromatismo Técnico</span>
+                  <span className="text-[6px] sm:text-[7px] font-mono text-amber-500/30">HEX_SYNERGY</span>
                 </label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-black/40 border border-white/10 rounded-xl p-3 xl:p-4 flex items-center gap-4 transition-all hover:border-amber-500/30">
-                    <div className="relative w-10 h-10 xl:w-12 xl:h-12 rounded-lg overflow-hidden border border-white/10 shrink-0 shadow-lg">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                  <div className="bg-black/40 border border-white/10 rounded-lg sm:rounded-xl p-2.5 sm:p-4 flex items-center gap-3 sm:gap-4 transition-all hover:border-amber-500/30">
+                    <div className="relative w-8 h-8 sm:w-12 sm:h-12 rounded-lg overflow-hidden border border-white/10 shrink-0 shadow-lg">
                       <input 
                         type="color"
                         value={founderData.primaryColor}
@@ -770,13 +854,13 @@ export const NewGameFlow: React.FC = () => {
                       />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-1">Primária</p>
-                      <p className="text-[9px] xl:text-[10px] font-mono text-white uppercase">{founderData.primaryColor}</p>
+                      <p className="text-[6px] sm:text-[7px] font-black text-slate-500 uppercase tracking-widest mb-0.5 sm:mb-1">Primária</p>
+                      <p className="text-[8px] sm:text-[10px] font-mono text-white uppercase truncate">{founderData.primaryColor}</p>
                     </div>
                   </div>
 
-                  <div className="bg-black/40 border border-white/10 rounded-xl p-3 xl:p-4 flex items-center gap-4 transition-all hover:border-amber-500/30">
-                    <div className="relative w-10 h-10 xl:w-12 xl:h-12 rounded-lg overflow-hidden border border-white/10 shrink-0 shadow-lg">
+                  <div className="bg-black/40 border border-white/10 rounded-lg sm:rounded-xl p-2.5 sm:p-4 flex items-center gap-3 sm:gap-4 transition-all hover:border-amber-500/30">
+                    <div className="relative w-8 h-8 sm:w-12 sm:h-12 rounded-lg overflow-hidden border border-white/10 shrink-0 shadow-lg">
                       <input 
                         type="color"
                         value={founderData.secondaryColor}
@@ -785,8 +869,8 @@ export const NewGameFlow: React.FC = () => {
                       />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-1">Secundária</p>
-                      <p className="text-[9px] xl:text-[10px] font-mono text-white uppercase">{founderData.secondaryColor}</p>
+                      <p className="text-[6px] sm:text-[7px] font-black text-slate-500 uppercase tracking-widest mb-0.5 sm:mb-1">Secundária</p>
+                      <p className="text-[8px] sm:text-[10px] font-mono text-white uppercase truncate">{founderData.secondaryColor}</p>
                     </div>
                   </div>
                 </div>
@@ -794,16 +878,16 @@ export const NewGameFlow: React.FC = () => {
             </div>
 
             {/* Substitution Section */}
-            <div className="bg-white/[0.02] border border-white/5 rounded-[2.5rem] p-6 xl:p-8 space-y-6 relative overflow-hidden group">
+            <div className="bg-white/[0.02] border border-white/5 rounded-[1.5rem] sm:rounded-[2.5rem] p-5 sm:p-8 space-y-4 sm:space-y-6 relative overflow-hidden group">
               <div className="absolute inset-0 bg-gradient-to-br from-red-500/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
               
               <div className="flex items-center gap-3 relative z-10">
-                <div className="w-1.5 h-6 bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
-                <h3 className="text-[10px] xl:text-[11px] font-black text-white uppercase tracking-[0.3em]">Alvo de Desativação</h3>
+                <div className="w-1 h-5 sm:w-1.5 sm:h-6 bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
+                <h3 className="text-[9px] sm:text-[11px] font-black text-white uppercase tracking-[0.3em]">Alvo de Desativação</h3>
               </div>
 
-              <div className="space-y-4 relative z-10">
-                <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest leading-relaxed italic opacity-60">
+              <div className="space-y-3 sm:space-y-4 relative z-10">
+                <p className="text-[8px] sm:text-[9px] text-slate-500 font-black uppercase tracking-widest leading-relaxed italic opacity-60">
                   Toda nova franquia deve ocupar a vaga de uma instituição obsoleta.
                 </p>
                 
@@ -820,24 +904,24 @@ export const NewGameFlow: React.FC = () => {
                         }));
                       }
                     }}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-[10px] xl:text-[11px] text-white font-bold focus:border-red-500/50 outline-none transition-all appearance-none cursor-pointer uppercase tracking-tight"
+                    className="w-full bg-black/40 border border-white/10 rounded-lg sm:rounded-xl px-4 sm:px-5 py-3 sm:py-4 text-[9px] sm:text-[11px] text-white font-bold focus:border-red-500/50 outline-none transition-all appearance-none cursor-pointer uppercase tracking-tight"
                   >
                     <option value="" className="bg-[#02040a]">SELECIONE UNIDADE OBSOLETA...</option>
-                    {teams.filter(t => t.id.startsWith('t_')).map(t => (
+                    {teams.filter(t => t.id.startsWith('t_') && !t.managerId).map(t => (
                       <option key={t.id} value={t.id} className="bg-[#02040a]">
                         {t.name} • {t.league} • {t.district}
                       </option>
                     ))}
                   </select>
-                  <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500 group-hover:text-red-400 transition-colors">
-                    <Layout size={16} />
+                  <div className="absolute right-4 sm:right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500 group-hover:text-red-400 transition-colors">
+                    <Layout size={14} className="sm:size-4" />
                   </div>
                 </div>
 
                 {founderData.replacedTeamId && (
-                  <div className="flex items-center gap-3 p-4 bg-red-500/5 border border-red-500/10 rounded-xl animate-in fade-in slide-in-from-top-2 duration-500">
-                    <AlertCircle size={16} className="text-red-500 shrink-0" />
-                    <p className="text-[8px] text-red-400 font-black uppercase tracking-widest leading-tight">
+                  <div className="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 bg-red-500/5 border border-red-500/10 rounded-lg sm:rounded-xl animate-in fade-in slide-in-from-top-2 duration-500">
+                    <AlertCircle size={14} className="text-red-500 shrink-0 sm:size-4" />
+                    <p className="text-[7px] sm:text-[8px] text-red-400 font-black uppercase tracking-widest leading-tight">
                       AVISO: {state.teams[founderData.replacedTeamId]?.name} será permanentemente removido do sistema.
                     </p>
                   </div>
@@ -948,10 +1032,10 @@ export const NewGameFlow: React.FC = () => {
           </div>
           
           <button 
-            disabled={!founderData.name || !founderData.prefix || !founderData.replacedTeamId}
+            disabled={!founderData.name || !founderData.prefix || !founderData.replacedTeamId || !managerName}
             onClick={() => setStep('founder-draft')}
             className={`relative group px-12 xl:px-16 py-4 xl:py-5 rounded-2xl font-black text-[10px] xl:text-[11px] uppercase tracking-[0.4em] transition-all duration-500 ${
-              founderData.name && founderData.replacedTeamId
+              founderData.name && founderData.replacedTeamId && managerName
                 ? 'bg-amber-500 text-black shadow-[0_0_40px_rgba(245,158,11,0.3)] hover:scale-105 hover:shadow-amber-500/60' 
                 : 'bg-white/5 text-slate-600 cursor-not-allowed border border-white/5'
             }`}
@@ -978,7 +1062,7 @@ export const NewGameFlow: React.FC = () => {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.01)_0%,transparent_70%)]" />
         </div>
 
-        {/* Header Superior - Budget & Stats */}
+        {/* Header Superior - Score & Estatísticas */}
         <div className="bg-black/60 backdrop-blur-2xl border-b border-white/5 p-4 z-20 shrink-0 shadow-2xl">
           <div className="max-w-[1600px] mx-auto flex items-center justify-between gap-8">
             <div className="flex items-center gap-6">
@@ -993,7 +1077,7 @@ export const NewGameFlow: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                   <h2 className="text-xl font-black text-white uppercase tracking-tighter italic flex items-center gap-2">
-                    Expansion <span className="text-amber-400">Draft</span>
+                    Mercado de <span className="text-amber-400">Expansão</span>
                   </h2>
                 </div>
                 <p className="text-[8px] text-slate-500 font-black uppercase tracking-[0.4em]">Protocolo de Recrutamento Ativo • 2050</p>
@@ -1001,30 +1085,42 @@ export const NewGameFlow: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-6">
-              {/* Budget Monitor */}
+              {/* Draft Status Summary */}
+              <div className="hidden xl:flex items-center gap-4 px-6 border-r border-white/10">
+                <div className="flex flex-col items-end">
+                  <span className="text-[7px] font-black text-slate-500 uppercase tracking-[0.3em]">Status do Draft</span>
+                  <div className="flex gap-1.5 mt-1">
+                    <div className={`w-1.5 h-1.5 rounded-full ${selectedPlayerIds.length === 15 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-700'}`} />
+                    <div className={`w-1.5 h-1.5 rounded-full ${currentScore <= draftScoreLimit ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'}`} />
+                    <div className={`w-1.5 h-1.5 rounded-full ${eliteCount <= 3 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'}`} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Score Monitor */}
               <div className="bg-black/40 border border-white/10 rounded-2xl px-5 py-3 flex items-center gap-5 min-w-[240px] relative overflow-hidden group">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-all duration-500 ${
-                  currentBudget > draftBudget 
+                  currentScore > draftScoreLimit 
                     ? 'bg-red-500/10 border-red-500/50 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)]' 
                     : 'bg-emerald-500/10 border-emerald-500/50 text-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
                 }`}>
-                  <Zap size={18} className={currentBudget > draftBudget ? 'animate-bounce' : ''} />
+                  <Zap size={18} className={currentScore > draftScoreLimit ? 'animate-bounce' : ''} />
                 </div>
                 <div className="flex-1">
                   <div className="flex justify-between items-baseline mb-1.5">
-                    <span className="text-[8px] text-slate-500 font-black uppercase tracking-widest">Power Budget</span>
-                    <span className={`text-[12px] font-mono font-black tabular-nums ${currentBudget > draftBudget ? 'text-red-500' : 'text-emerald-400'}`}>
-                      {currentBudget.toLocaleString('pt-BR')} <span className="text-[9px] text-slate-600">/ 9.000</span>
+                    <span className="text-[8px] text-slate-500 font-black uppercase tracking-widest">Score do Time</span>
+                    <span className={`text-[12px] font-mono font-black tabular-nums ${currentScore > draftScoreLimit ? 'text-red-500' : 'text-emerald-400'}`}>
+                      {currentScore.toLocaleString('pt-BR')} <span className="text-[9px] text-slate-600">/ {draftScoreLimit.toLocaleString('pt-BR')}</span>
                     </span>
                   </div>
                   <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
                     <div 
                       className={`h-full transition-all duration-700 ease-out ${
-                        currentBudget > draftBudget 
+                        currentScore > draftScoreLimit 
                           ? 'bg-red-500' 
                           : 'bg-gradient-to-r from-emerald-600 to-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.5)]'
                       }`}
-                      style={{ width: `${Math.min(100, (currentBudget / draftBudget) * 100)}%` }}
+                      style={{ width: `${Math.min(100, (currentScore / draftScoreLimit) * 100)}%` }}
                     />
                   </div>
                 </div>
@@ -1044,6 +1140,32 @@ export const NewGameFlow: React.FC = () => {
                       }`}
                     >
                       <Trophy size={10} fill={i <= eliteCount ? 'currentColor' : 'none'} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Role Tracker */}
+              <div className="bg-black/40 border border-white/10 rounded-2xl px-5 py-3 flex flex-col items-center justify-center min-w-[180px]">
+                <span className="text-[8px] text-slate-500 font-black uppercase tracking-widest mb-2.5">Composição Mínima</span>
+                <div className="flex gap-3">
+                  {[
+                    { role: 'GOL', min: 1, current: selectedPlayersByRole.GOL },
+                    { role: 'ZAG', min: 4, current: selectedPlayersByRole.ZAG },
+                    { role: 'MEI', min: 3, current: selectedPlayersByRole.MEI },
+                    { role: 'ATA', min: 2, current: selectedPlayersByRole.ATA }
+                  ].map(item => (
+                    <div key={item.role} className="flex flex-col items-center gap-1">
+                      <div className={`w-7 h-5 rounded-lg flex items-center justify-center border transition-all duration-500 ${
+                        item.current >= item.min 
+                          ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' 
+                          : 'bg-red-500/10 border-red-500/30 text-red-400 opacity-60'
+                      }`}>
+                        <span className="text-[8px] font-black">{item.role}</span>
+                      </div>
+                      <span className={`text-[7px] font-mono ${item.current >= item.min ? 'text-emerald-400' : 'text-slate-600'}`}>
+                        {item.current}/{item.min}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -1080,7 +1202,7 @@ export const NewGameFlow: React.FC = () => {
                 <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-amber-400 transition-colors" />
                 <input 
                   type="text"
-                  placeholder="FILTRAR DATABASE..."
+                  placeholder="PROCURAR NO MERCADO..."
                   value={draftSearch}
                   onChange={e => setDraftSearch(e.target.value)}
                   className="w-full bg-black/40 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-[10px] xl:text-[11px] text-white font-bold focus:border-amber-500/50 focus:bg-amber-500/5 outline-none transition-all placeholder:text-slate-700 uppercase"
@@ -1096,7 +1218,7 @@ export const NewGameFlow: React.FC = () => {
                   >
                     <option value="ALL">POSIÇÃO</option>
                     <option value="GOL">GOL</option>
-                    <option value="DEF">DEF</option>
+                    <option value="ZAG">ZAG</option>
                     <option value="MEI">MEI</option>
                     <option value="ATA">ATA</option>
                   </select>
@@ -1115,6 +1237,35 @@ export const NewGameFlow: React.FC = () => {
                     <option value="OESTE">OESTE</option>
                   </select>
                   <ChevronRight size={12} className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-slate-500 pointer-events-none group-hover:text-amber-400 transition-colors" />
+                </div>
+              </div>
+            </div>
+
+            {/* Requirements Checklist */}
+            <div className="p-4 xl:p-6 bg-amber-500/[0.02] border-b border-white/5 space-y-3">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertCircle size={12} className="text-amber-500" />
+                <span className="text-[9px] text-amber-500/80 font-black uppercase tracking-widest">Requisitos de Registro</span>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[8px] font-bold text-slate-500 uppercase">Total de Atletas</span>
+                  <span className={`text-[9px] font-mono font-bold ${selectedPlayerIds.length === 15 ? 'text-emerald-500' : 'text-slate-400'}`}>
+                    {selectedPlayerIds.length}/15
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[8px] font-bold text-slate-500 uppercase">Teto de Score</span>
+                  <span className={`text-[9px] font-mono font-bold ${currentScore <= draftScoreLimit ? 'text-emerald-500' : 'text-red-500'}`}>
+                    {currentScore.toLocaleString()} / {draftScoreLimit.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[8px] font-bold text-slate-500 uppercase">Vagas Elite (900+)</span>
+                  <span className={`text-[9px] font-mono font-bold ${eliteCount <= 3 ? 'text-emerald-500' : 'text-red-500'}`}>
+                    {eliteCount}/3
+                  </span>
                 </div>
               </div>
             </div>
@@ -1138,22 +1289,25 @@ export const NewGameFlow: React.FC = () => {
               </div>
               
               <div className="flex-1 overflow-y-auto px-4 py-4 xl:py-6 space-y-4 xl:space-y-6 custom-scrollbar">
-                {['GOL', 'DEF', 'MEI', 'ATA'].map(role => {
+                {[
+                  { role: 'GOL', min: 1 },
+                  { role: 'ZAG', min: 4 },
+                  { role: 'MEI', min: 3 },
+                  { role: 'ATA', min: 2 }
+                ].map(({ role, min }) => {
                   const rolePlayers = selectedPlayers.filter(p => p.role === role);
-                  const required = role === 'GOL' ? 2 : role === 'DEF' ? 5 : role === 'MEI' ? 5 : 3;
-                  const isComplete = rolePlayers.length === required;
-                  const isOver = rolePlayers.length > required;
+                  const isComplete = rolePlayers.length >= min;
                   
                   return (
                     <div key={role} className="space-y-2 xl:space-y-3">
                       <div className="flex items-center justify-between px-2">
                         <div className="flex items-center gap-2">
-                          <div className={`w-1.5 h-1.5 rounded-full ${isComplete ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : isOver ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-slate-700'}`} />
+                          <div className={`w-1.5 h-1.5 rounded-full ${isComplete ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-700'}`} />
                           <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">{role}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-mono font-black ${isComplete ? 'text-emerald-500' : isOver ? 'text-red-500' : 'text-slate-600'}`}>
-                            {rolePlayers.length}/{required}
+                          <span className={`text-[10px] font-mono font-black ${isComplete ? 'text-emerald-500' : 'text-slate-600'}`}>
+                            {rolePlayers.length}/{min}
                           </span>
                         </div>
                       </div>

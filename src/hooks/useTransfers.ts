@@ -19,15 +19,15 @@ export const useTransfers = (userTeamId: string | null, totalPoints: number, pow
             return;
         }
 
-        const value = player.contract.marketValue;
+        const value = player.totalRating;
         const nextTotalPoints = totalPoints + player.totalRating;
 
         if (nextTotalPoints > powerCap) {
-            addToast(`Contratação excede o Power Cap de ${powerCap / 100}k!`, 'error');
+            addToast(`Contratação excede o Score Máximo de ${powerCap} pts!`, 'error');
             return;
         }
 
-        if (window.confirm(`Deseja contratar ${player.nickname} por $${(value / 1000000).toFixed(1)}M?`)) {
+        if (window.confirm(`Deseja contratar ${player.nickname} por ${player.totalRating} pts de score?`)) {
             try {
                 const newNotification: GameNotification = {
                     id: `transf_${Date.now()}`,
@@ -79,5 +79,78 @@ export const useTransfers = (userTeamId: string | null, totalPoints: number, pow
         }
     };
 
-    return { handleMakeProposal };
+    const handleSellPlayer = async (playerId: string) => {
+        const userTeam = userTeamId ? state.teams[userTeamId] : null;
+
+        if (!userTeam) {
+            addToast('Você precisa estar em um time para vender um jogador!', 'error');
+            return;
+        }
+
+        const player = state.players[playerId];
+        if (!player) return;
+
+        if (window.confirm(`Deseja dispensar ${player.nickname}? O teto de ${powerCap} pts será mantido.`)) {
+            try {
+                const newNotification: GameNotification = {
+                    id: `sell_${Date.now()}`,
+                    date: new Date().toISOString(),
+                    title: 'Atleta Dispensado',
+                    message: `${player.nickname} deixou o ${userTeam.name}.`,
+                    type: 'transfer',
+                    read: false
+                };
+
+                setState(prev => {
+                    const newState = { ...prev };
+                    
+                    // Update player: set teamId to null (exiled)
+                    newState.players[playerId] = {
+                        ...player,
+                        contract: {
+                            ...player.contract,
+                            teamId: '' // Clear team reference
+                        }
+                    };
+
+                    // Update team: remove from squad and lineup, and PERSIST powerCap
+                    const updatedSquad = newState.teams[userTeam.id].squad.filter(id => id !== playerId);
+                    const updatedLineup = { ...newState.teams[userTeam.id].lineup };
+                    Object.keys(updatedLineup).forEach(pos => {
+                        if (updatedLineup[pos] === playerId) {
+                            delete updatedLineup[pos];
+                        }
+                    });
+
+                    newState.teams[userTeam.id] = {
+                        ...newState.teams[userTeam.id],
+                        squad: updatedSquad,
+                        lineup: updatedLineup,
+                        powerCap: powerCap // Ensure current cap is saved in team state
+                    };
+
+                    newState.notifications = [newNotification, ...(newState.notifications || [])];
+                    return newState;
+                });
+
+                if (isOnline) {
+                    const { data } = await supabase.auth.getUser();
+                    // Optional: update transfer history or player status in DB
+                    await supabase.from('notifications').insert({
+                        user_id: data.user?.id,
+                        title: newNotification.title,
+                        message: newNotification.message,
+                        type: newNotification.type
+                    });
+                }
+                
+                addToast(`${player.nickname} foi dispensado do elenco.`, 'success');
+            } catch (error) {
+                console.error('Erro ao dispensar jogador:', error);
+                addToast('Erro ao dispensar jogador. Tente novamente.', 'error');
+            }
+        }
+    };
+
+    return { handleMakeProposal, handleSellPlayer };
 };

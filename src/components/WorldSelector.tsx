@@ -1,17 +1,21 @@
 import React, { useState } from 'react';
 import { useGame } from '../store/GameContext';
-import { Globe, Plus, Calendar, Clock, ChevronRight, LogOut, Users } from 'lucide-react';
+import { Globe, Plus, Calendar, Clock, ChevronRight, LogOut, Users, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateInitialState } from '../engine/generator';
 
 export const WorldSelector: React.FC = () => {
-  const { worlds, publicWorlds, setWorldId, loadGame, setState, saveGame, refreshWorlds } = useGame();
+  const { worlds, publicWorlds, setWorldId, loadGame, joinGame, setState, saveGame, refreshWorlds, deleteWorld, logout } = useGame();
   const [isCreating, setIsCreating] = useState(false);
   const [newWorldName, setNewWorldName] = useState('');
   const [activeTab, setActiveTab] = useState<'my-worlds' | 'community'>('my-worlds');
 
-  const handleSelectWorld = async (id: string) => {
-    await loadGame(id);
+  const handleSelectWorld = async (id: string, isPublic: boolean = false) => {
+    if (isPublic) {
+      await joinGame(id);
+    } else {
+      await loadGame(id);
+    }
   };
 
   const handleCreateWorld = async () => {
@@ -34,7 +38,7 @@ export const WorldSelector: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await logout();
   };
 
   return (
@@ -61,8 +65,8 @@ export const WorldSelector: React.FC = () => {
           <button
             onClick={() => setActiveTab('my-worlds')}
             className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'my-worlds'
-                ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20'
-                : 'text-slate-500 hover:text-slate-300'
+              ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20'
+              : 'text-slate-500 hover:text-slate-300'
               }`}
           >
             Meus Mundos
@@ -70,8 +74,8 @@ export const WorldSelector: React.FC = () => {
           <button
             onClick={() => setActiveTab('community')}
             className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'community'
-                ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20'
-                : 'text-slate-500 hover:text-slate-300'
+              ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20'
+              : 'text-slate-500 hover:text-slate-300'
               }`}
           >
             Comunidade
@@ -82,9 +86,8 @@ export const WorldSelector: React.FC = () => {
           {activeTab === 'my-worlds' ? (
             <>
               {worlds.map((world) => (
-                <button
+                <div
                   key={world.id}
-                  onClick={() => handleSelectWorld(world.id)}
                   className="group relative bg-black/40 backdrop-blur-xl border border-white/5 hover:border-cyan-500/50 rounded-2xl p-6 text-left transition-all duration-300 hover:shadow-[0_0_30px_rgba(34,211,238,0.1)] overflow-hidden"
                 >
                   <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
@@ -92,9 +95,23 @@ export const WorldSelector: React.FC = () => {
                   </div>
 
                   <div className="relative z-10">
-                    <h3 className="text-xl font-black text-white uppercase tracking-wider mb-2 group-hover:text-cyan-400 transition-colors">
-                      {world.name}
-                    </h3>
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="text-xl font-black text-white uppercase tracking-wider group-hover:text-cyan-400 transition-colors">
+                        {world.name}
+                      </h3>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Deseja deletar o mundo "${world.name}"? Esta ação não pode ser desfeita.`)) {
+                            deleteWorld(world.id);
+                          }
+                        }}
+                        className="p-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-red-400 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                        title="Deletar Mundo"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest">
                         <Clock size={12} />
@@ -103,13 +120,16 @@ export const WorldSelector: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="mt-6 flex items-center justify-between">
+                  <button
+                    onClick={() => handleSelectWorld(world.id)}
+                    className="mt-6 w-full flex items-center justify-between group/enter"
+                  >
                     <span className="text-[10px] font-black text-cyan-500 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0">
                       Entrar no Mundo
                     </span>
                     <ChevronRight size={16} className="text-cyan-500 transform group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </button>
+                  </button>
+                </div>
               ))}
 
               {isCreating ? (
@@ -157,7 +177,7 @@ export const WorldSelector: React.FC = () => {
                 publicWorlds.map((world) => (
                   <button
                     key={world.id}
-                    onClick={() => handleSelectWorld(world.id)}
+                    onClick={() => handleSelectWorld(world.id, true)}
                     className="group relative bg-black/40 backdrop-blur-xl border border-white/5 hover:border-purple-500/50 rounded-2xl p-6 text-left transition-all duration-300 hover:shadow-[0_0_30px_rgba(168,85,247,0.1)] overflow-hidden"
                   >
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">

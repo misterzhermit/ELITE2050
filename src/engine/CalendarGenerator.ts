@@ -4,21 +4,35 @@ import { Match, Team } from '../types';
  * Generates a double round-robin calendar for the given teams.
  * Teams play each other twice (home and away).
  * Total rounds = (N-1) * 2
+ * 
+ * @param teams - Array of teams in the league
+ * @param leagueId - Unique identifier for the league
+ * @param seasonStartDate - ISO date string for when the season starts (e.g. '2050-02-28T00:00:00.000Z')
  */
-export const generateCalendar = (teams: Team[], leagueId: string): Match[] => {
+export const generateCalendar = (teams: Team[], leagueId: string, seasonStartDate?: string): Match[] => {
   const matches: Match[] = [];
   const teamIds = teams.map(t => t.id);
   const n = teamIds.length;
   const matchesPerRound = n / 2;
   const roundsPerHalf = n - 1;
 
+  // Use provided season start or default to tomorrow in 2050
+  const baseDate = seasonStartDate
+    ? new Date(seasonStartDate)
+    : (() => {
+      const now = new Date();
+      const d = new Date(2050, now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+      return d;
+    })();
+
   // Rotation teams for next round
   let rotation = [...teamIds];
 
   for (let roundNum = 1; roundNum <= roundsPerHalf * 2; roundNum++) {
-    // Each round happens every 2 days
-    const roundDate = new Date('2050-01-01T08:00:00Z');
-    roundDate.setDate(roundDate.getDate() + (roundNum * 2));
+    // Each round happens 1 day after the previous
+    // Round 1 = seasonStart + 1 day (Day 2 of season)
+    const roundDate = new Date(baseDate);
+    roundDate.setDate(roundDate.getDate() + roundNum);
     const dateStr = roundDate.toISOString().split('T')[0];
 
     for (let i = 0; i < matchesPerRound; i++) {
@@ -52,6 +66,6 @@ export const generateCalendar = (teams: Team[], leagueId: string): Match[] => {
   // Sort matches by date and time
   return matches.sort((a, b) => {
     if (a.date !== b.date) return a.date.localeCompare(b.date);
-    return a.time.localeCompare(b.time);
+    return a.time!.localeCompare(b.time!);
   });
 };

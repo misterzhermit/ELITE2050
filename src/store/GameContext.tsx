@@ -1,10 +1,9 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode, useMemo, useCallback, useState } from 'react';
 import { GameState } from '../types';
-import { generateInitialState } from '../engine/generator';
-import { saveGameState, loadGameState, listUserWorlds, listPublicWorlds, supabase } from '../lib/supabase';
+import { generateInitialState, getGameDate2050 } from '../engine/generator';
+import { saveGameState, loadGameState, listUserWorlds, listPublicWorlds, supabase, deleteWorld as deleteWorldFromSupabase, joinSharedWorld } from '../lib/supabase';
 import { DEFAULT_TIME_SPEED } from '../constants/gameConstants';
-import { advanceGameDay, simulateAndRecordMatch } from '../engine/gameLogic';
-import { getMatchStatus } from '../utils/matchUtils';
+import { advanceGameDay } from '../engine/gameLogic';
 
 interface GameStateValue {
   state: GameState;
@@ -24,8 +23,12 @@ interface GameDispatchValue {
   setState: React.Dispatch<React.SetStateAction<GameState>>;
   saveGame: (newState?: GameState) => Promise<void>;
   loadGame: (worldId?: string) => Promise<void>;
+  joinGame: (worldId: string) => Promise<void>;
   setIsAuthenticated: (val: boolean) => void;
   setWorldId: (id: string | null) => void;
+  logout: () => Promise<void>;
+  leaveWorld: () => void;
+  deleteWorld: (worldId: string) => Promise<void>;
   refreshWorlds: () => Promise<void>;
   addToast: (message: string, type: 'success' | 'error' | 'info') => void;
   removeToast: (id: string) => void;
@@ -130,7 +133,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!worldId) return;
     setIsSyncing(true);
     try {
-      await saveGameState(newState || state, worldId);
+      const stateToSave = newState || state;
+      console.log('GM: Persistindo estado no Supabase...', {
+        world_id: worldId,
+        currentDate: stateToSave.world.currentDate,
+        matchesCount: Object.values(stateToSave.world.leagues).reduce((acc, l: any) => acc + (l.matches?.length || 0), 0)
+      });
+      await saveGameState(stateToSave, worldId);
       console.log('Game saved successfully');
       setIsOnline(true);
       // Only show toast if it's a manual save or a major event
@@ -144,6 +153,25 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [worldId, state, addToast]);
 
+  const joinGame = useCallback(async (targetWorldId: string) => {
+    setIsSyncing(true);
+    try {
+      const joinedState = await joinSharedWorld(targetWorldId);
+      if (joinedState) {
+        setIsInitialLoad(true);
+        setState(joinedState);
+        setWorldId(targetWorldId);
+        addToast('Você entrou em um mundo compartilhado!', 'success');
+      }
+    } catch (error) {
+      console.error('Failed to join game', error);
+      addToast('Erro ao entrar no mundo', 'error');
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setIsInitialLoad(false), 1000);
+    }
+  }, [setState, addToast]);
+
   const loadGame = useCallback(async (targetWorldId?: string) => {
     const idToLoad = targetWorldId || worldId;
     if (!idToLoad) return;
@@ -152,10 +180,38 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const loadedState = await loadGameState(idToLoad);
       if (loadedState) {
+        // Deep comparison to avoid unnecessary state updates and potential world regeneration
+        // We compare critical parts of the state: world clock/status and key counts
+        const hasSubstantialChanges = (
+          loadedState.world.currentDate !== state.world.currentDate ||
+          loadedState.world.status !== state.world.status ||
+          Object.keys(loadedState.teams).length !== Object.keys(state.teams).length ||
+          Object.keys(loadedState.players).length !== Object.keys(state.players).length
+        );
+
+        if (!hasSubstantialChanges && !targetWorldId) {
+          console.log('GameContext: Loaded state matches local state, skipping update.');
+          return;
+        }
+
         // Migration for legacy saves missing training state
         if (!loadedState.training) {
+          console.log('GameContext: Legacy save missing training state, patching...');
           loadedState.training = {
             chemistryBoostLastUsed: undefined,
+            playstyleTraining: {
+              currentStyle: null,
+              understanding: {
+                'Blitzkrieg': 0,
+                'Tiki-Taka': 0,
+                'Retranca Armada': 0,
+                'Motor Lento': 0,
+                'Equilibrado': 20,
+                'Gegenpressing': 0,
+                'Catenaccio': 0,
+                'Vertical': 0
+              }
+            },
             cardLaboratory: {
               slots: [
                 { cardId: null, finishTime: null },
@@ -168,6 +224,42 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
           };
         }
+
+        // Ensure playstyleTraining exists
+        if (!loadedState.training.playstyleTraining) {
+          loadedState.training.playstyleTraining = {
+            currentStyle: null,
+            understanding: {
+              'Blitzkrieg': 0,
+              'Tiki-Taka': 0,
+              'Retranca Armada': 0,
+              'Motor Lento': 0,
+              'Equilibrado': 20,
+              'Gegenpressing': 0,
+              'Catenaccio': 0,
+              'Vertical': 0
+            }
+          };
+        }
+
+        // Ensure cardLaboratory exists
+        if (!loadedState.training.cardLaboratory) {
+          loadedState.training.cardLaboratory = {
+            slots: [
+              { cardId: null, finishTime: null },
+              { cardId: null, finishTime: null }
+            ]
+          };
+        }
+
+        // Ensure individualFocus exists
+        if (!loadedState.training.individualFocus) {
+          loadedState.training.individualFocus = {
+            evolutionSlot: null,
+            stabilizationSlot: null
+          };
+        }
+
         setIsInitialLoad(true);
         setState(loadedState);
         setWorldId(idToLoad);
@@ -190,58 +282,106 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     if (isInitialLoad || !worldId) return;
 
+    // We only want to auto-save when "static" state changes (lineup, tactics, etc.)
+    // OR periodically if the clock is running.
+    // To avoid resetting the timer on every clock tick (every second), 
+    // we use a deep comparison or just a separate periodic timer.
+
     const timer = setTimeout(() => {
+      console.log('GameContext: Auto-save triggered by state change...');
       saveGame();
-    }, 5000); // 5s debounce
+    }, 5000); // Reduced to 5s for better responsiveness during testing
 
     return () => clearTimeout(timer);
-  }, [state, worldId, isInitialLoad, saveGame]);
+  }, [
+    state.teams,
+    state.players,
+    state.managers,
+    state.userTeamId,
+    state.notifications,
+    state.lastHeadline,
+    state.training,
+    worldId,
+    isInitialLoad,
+    saveGame
+  ]);
+
+  // Separate periodic save for world state (currentDate, leagues/matches)
+  useEffect(() => {
+    if (isInitialLoad || !worldId || isPaused) return;
+
+    const periodicTimer = setInterval(() => {
+      saveGame();
+    }, 60000); // Save every minute while playing
+
+    return () => clearInterval(periodicTimer);
+  }, [worldId, isInitialLoad, isPaused, saveGame]);
 
   // Real-time Clock Logic
   useEffect(() => {
     if (isPaused || isInitialLoad || !worldId) return;
 
+    // --- REALTIME SYNC (POLLING) ---
+    // If we are NOT the creator, periodically check for world state changes
+    const syncTimer = setInterval(async () => {
+      if (!state.isCreator) {
+        try {
+          const loaded = await loadGameState(worldId);
+          if (loaded && (
+            loaded.world.currentDate !== state.world.currentDate ||
+            loaded.world.status !== state.world.status ||
+            Object.keys(loaded.teams).length !== Object.keys(state.teams).length
+          )) {
+            console.log('GameContext: World state updated by creator, refreshing local state.');
+            setState(loaded);
+          }
+        } catch (e) {
+          console.error('Polling error:', e);
+        }
+      }
+    }, 15000);
+
+    // --- Main Clock (1s interval) ---
     const interval = setInterval(() => {
       setState(prev => {
-        const currentDate = new Date(prev.world.currentDate);
-        const oldDay = currentDate.getDate();
+        // LOBBY LOCK: Don't advance time while in LOBBY
+        if (prev.world.status === 'LOBBY') return prev;
 
-        // Add time based on speed
-        currentDate.setMinutes(currentDate.getMinutes() + timeSpeed);
+        // Only the world creator drives the clock
+        if (!prev.isCreator) return prev;
 
-        const newDay = currentDate.getDate();
+        // --- Map real time to 2050 game world ---
+        const gameNow = getGameDate2050();
+        const oldDate = new Date(prev.world.currentDate);
+        const oldDay = oldDate.getDate();
+        const newDay = gameNow.getDate();
+
+        // Ensure seasonStartReal exists
+        let seasonStartReal = prev.world.seasonStartReal;
+        if (!seasonStartReal) {
+          const nextDay = new Date(gameNow);
+          nextDay.setDate(nextDay.getDate() + 1);
+          nextDay.setHours(0, 0, 0, 0);
+          seasonStartReal = nextDay.toISOString();
+        }
+
+        // Update currentDate to 2050 game-world time
         let newState = {
           ...prev,
           world: {
             ...prev.world,
-            currentDate: currentDate.toISOString()
+            currentDate: gameNow.toISOString(),
+            seasonStartReal: seasonStartReal
           }
         };
 
-        // --- Auto-Simulation of Finished matches ---
-        // Check all active leagues for matches that just finished but weren't simulated
-        let matchSimulated = false;
-        Object.keys(newState.world.leagues).forEach(leagueKey => {
-          const league = newState.world.leagues[leagueKey];
-          league.matches.forEach(match => {
-            if (match.status !== 'FINISHED' && !match.played) {
-              const status = getMatchStatus(match, newState.world.currentDate);
-              if (status === 'FINISHED') {
-                console.log(`Clock: Match ${match.id} finished logically, simulating...`);
-                simulateAndRecordMatch(newState, match, league.standings);
-                match.status = 'FINISHED';
-                match.played = true;
-                matchSimulated = true;
-              }
-            }
-          });
-        });
-
-        if (matchSimulated) {
-          console.log('Clock: Some matches were simulated automatically.');
-        }
-
         // --- Day Change Logic ---
+        // When the real day changes, run advanceGameDay which handles:
+        // - Match simulation for the current round
+        // - Player evolution
+        // - Training progress
+        // - Safety net checks
+        // - Cup progression
         if (oldDay !== newDay) {
           console.log('Clock: Day changed, running daily advance...');
           return advanceGameDay(newState, true);
@@ -251,18 +391,60 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
     }, 1000);
 
-    return () => clearInterval(interval);
-  }, [isPaused, isInitialLoad, worldId, timeSpeed, setState]);
+    return () => {
+      clearInterval(syncTimer);
+      clearInterval(interval);
+    };
+  }, [isPaused, isInitialLoad, worldId, setState, state.isCreator, state.world.currentDate, state.world.status, state.teams]);
 
   const togglePause = useCallback(() => setIsPaused(prev => !prev), []);
+
+  const logout = useCallback(async () => {
+    try {
+      await supabase.auth.signOut();
+      setIsAuthenticated(false);
+      setUserId(null);
+      setWorldId(null);
+      setWorlds([]);
+      dispatch({ type: 'RESET_STATE' });
+      addToast('Sistema desconectado', 'info');
+    } catch (error) {
+      console.error('Logout error:', error);
+      addToast('Erro ao sair do sistema', 'error');
+    }
+  }, [addToast]);
+
+  const leaveWorld = useCallback(() => {
+    setWorldId(null);
+    dispatch({ type: 'RESET_STATE' });
+    addToast('Saindo do mundo...', 'info');
+  }, [addToast]);
+
+  const deleteWorld = useCallback(async (id: string) => {
+    try {
+      const success = await deleteWorldFromSupabase(id);
+      if (success) {
+        addToast('Mundo deletado com sucesso', 'success');
+        await refreshWorlds();
+      } else {
+        addToast('Erro ao deletar mundo', 'error');
+      }
+    } catch (error) {
+      console.error('Delete world error:', error);
+      addToast('Erro ao deletar mundo', 'error');
+    }
+  }, [addToast]);
 
   const stateValue = useMemo(() => ({
     state, isSyncing, isOnline, isAuthenticated, userId, worldId, worlds, publicWorlds, toasts, isPaused, timeSpeed
   }), [state, isSyncing, isOnline, isAuthenticated, userId, worldId, worlds, publicWorlds, toasts, isPaused, timeSpeed]);
 
   const dispatchValue = useMemo(() => ({
-    setState, saveGame, loadGame, setIsAuthenticated, setWorldId, refreshWorlds, addToast, removeToast, togglePause, setTimeSpeed
-  }), [setState, saveGame, loadGame, setIsAuthenticated, setWorldId, refreshWorlds, addToast, removeToast, togglePause, setTimeSpeed]);
+    setState, saveGame,
+    loadGame,
+    joinGame,
+    setIsAuthenticated, setWorldId, logout, leaveWorld, deleteWorld, refreshWorlds, addToast, removeToast, togglePause, setTimeSpeed
+  }), [setState, saveGame, loadGame, setIsAuthenticated, setWorldId, logout, leaveWorld, deleteWorld, refreshWorlds, addToast, removeToast, togglePause, setTimeSpeed]);
 
   return (
     <GameDispatchContext.Provider value={dispatchValue}>

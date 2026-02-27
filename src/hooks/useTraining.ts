@@ -42,36 +42,22 @@ export const useTraining = (userTeamId: string | null) => {
     };
 
     const handleChemistryBoost = () => {
-        if (!userTeamId) return;
+        // ... (removed or kept for compatibility, but user wants to replace it)
+        // I will keep the function signature but maybe the UI won't use it anymore
+    };
 
-        const lastUsed = state.training.chemistryBoostLastUsed;
-        const now = new Date(state.world.currentDate);
-
-        if (lastUsed) {
-            const last = new Date(lastUsed);
-            const diffDays = Math.floor((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
-            if (diffDays < 7) {
-                alert('O Treinamento Coletivo está em cooldown (7 dias).');
-                return;
-            }
-        }
-
+    const handleSetPlaystyleTraining = (style: string | null) => {
         setState(prev => ({
             ...prev,
             training: {
                 ...prev.training,
-                chemistryBoostLastUsed: now.toISOString()
-            },
-            teams: {
-                ...prev.teams,
-                [userTeamId]: {
-                    ...prev.teams[userTeamId],
-                    chemistry: Math.min(100, (prev.teams[userTeamId].chemistry || 50) + 10)
+                playstyleTraining: {
+                    ...prev.training.playstyleTraining,
+                    currentStyle: style as any
                 }
             }
         }));
-        alert('Treinamento Coletivo realizado! Entrosamento aumentado em +10.');
     };
 
-    return { handleSetFocus, handleStartCardLab, handleChemistryBoost };
+    return { handleSetFocus, handleStartCardLab, handleChemistryBoost, handleSetPlaystyleTraining };
 };

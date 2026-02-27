@@ -21,6 +21,15 @@ import { generateCalendar } from './CalendarGenerator';
 // Utility to generate random numbers in a range
 const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 
+/**
+ * Maps the current real date to the game world year (2050).
+ * e.g. Feb 27, 2026 → Feb 27, 2050
+ */
+export const getGameDate2050 = (realDate?: Date): Date => {
+  const now = realDate || new Date();
+  return new Date(2050, now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+};
+
 const generateRatingPool = () => {
   const ratings: number[] = [];
   for (let i = 0; i < 750; i++) ratings.push(randomInt(400, 1000));
@@ -72,6 +81,47 @@ const generateName = () => {
       bootId: (absHash % 15) + 1 // 1..15
     }
   };
+};
+
+export const refillTeamRoster = (
+  team: Team,
+  targetPower: number,
+  allPlayers: Record<string, Player>,
+  district: District
+): Player[] => {
+  const currentSquad = team.squad.map(id => allPlayers[id]).filter(Boolean);
+  const currentPower = currentSquad.reduce((sum, p) => sum + p.totalRating, 0);
+  const neededPower = targetPower - currentPower;
+  const neededPlayersCount = Math.max(0, 18 - currentSquad.length);
+
+  if (neededPlayersCount <= 0) return [];
+
+  const newPlayers: Player[] = [];
+  // Distribute power among new players, ensuring a minimum rating of 250
+  const powerPerPlayer = Math.max(250, Math.min(1000, Math.round(neededPower / neededPlayersCount)));
+
+  for (let i = 0; i < neededPlayersCount; i++) {
+    const id = `p_refill_${team.id}_${Date.now()}_${i}`;
+
+    // Check if team already has a goalkeeper
+    const hasGk = currentSquad.some(p => p.role === 'GOL') || newPlayers.some(p => p.role === 'GOL');
+    let role: PlayerRole;
+
+    if (!hasGk) {
+      role = 'GOL';
+    } else {
+      const r = Math.random();
+      if (r < 0.35) role = 'ZAG';
+      else if (r < 0.7) role = 'MEI';
+      else role = 'ATA';
+    }
+
+    const player = generatePlayer(id, district, powerPerPlayer, role);
+    player.contract.teamId = team.id;
+    newPlayers.push(player);
+  }
+
+  return newPlayers;
 };
 
 const generatePentagon = (): Pentagon => {
@@ -140,7 +190,7 @@ export const generatePlayer = (id: string, district: District, ratingOverride?: 
     if (Math.random() < 0.1) role = 'GOL';
     else {
       const r = Math.random();
-      if (r < 0.35) role = 'DEF';
+      if (r < 0.35) role = 'ZAG';
       else if (r < 0.7) role = 'MEI';
       else role = 'ATA';
     }
@@ -178,8 +228,6 @@ export const generatePlayer = (id: string, district: District, ratingOverride?: 
     badges,
     contract: {
       teamId: null,
-      salary: Math.floor((total * total) / 100) * 10,
-      marketValue: Math.floor((total * total * total) / 10000) * 1000,
     },
     history: {
       goals: 0,
@@ -295,12 +343,6 @@ export const generateTeam = (id: string, index: number, district: District): Tea
     league: getLeagueForDistrict(district),
     colors,
     logo: generateLogo(colors.primary, colors.secondary),
-    finances: {
-      transferBudget: randomInt(10, 100) * 1000000,
-      sponsorshipQuota: randomInt(5, 20) * 1000000,
-      stadiumLevel: randomInt(1, 5),
-      emergencyCredit: 0,
-    },
     tactics: {
       playStyle: 'Equilibrado',
       mentality: 'Calculista',
@@ -318,6 +360,7 @@ export const generateTeam = (id: string, index: number, district: District): Tea
       { id: 'card_2', name: 'Muralha', type: 'BUFF', rarity: 'RARE', effect: 'Aumenta a defesa em 15%' },
       { id: 'card_3', name: 'Meio-Campo Criativo', type: 'BUFF', rarity: 'COMMON', effect: 'Aumenta o meio-campo em 10%' }
     ],
+    powerCap: getLeagueForDistrict(district) === 'Cyan' ? 12000 : (getLeagueForDistrict(district) === 'Orange' || getLeagueForDistrict(district) === 'Purple') ? 10000 : 8000,
   };
 };
 
@@ -399,11 +442,11 @@ export const generateInitialState = (): GameState => {
       league: getLeagueForDistrict(district),
       colors,
       logo: generateLogo(colors.primary, colors.secondary),
-      finances: { transferBudget: 0, sponsorshipQuota: 0, stadiumLevel: 5, emergencyCredit: 0 },
       tactics: { playStyle: 'Vertical', preferredFormation: '4-3-3' },
       managerId: null,
       squad: [],
-      lineup: {}
+      lineup: {},
+      powerCap: 13000 // Selection teams have max cap
     };
   });
 
@@ -435,7 +478,7 @@ export const generateInitialState = (): GameState => {
 
   const initialRoles: PlayerRole[] = [
     'GOL', 'GOL', 'GOL',
-    'DEF', 'DEF', 'DEF', 'DEF', 'DEF', 'DEF', 'DEF', 'DEF',
+    'ZAG', 'ZAG', 'ZAG', 'ZAG', 'ZAG', 'ZAG', 'ZAG', 'ZAG',
     'MEI', 'MEI', 'MEI', 'MEI', 'MEI', 'MEI', 'MEI',
     'ATA', 'ATA', 'ATA', 'ATA', 'ATA'
   ];
@@ -491,42 +534,46 @@ export const generateInitialState = (): GameState => {
     }));
   };
 
+  // Season starts tomorrow in the 2050 game world
+  const gameNow = getGameDate2050();
+  const nextDay = new Date(gameNow);
+  nextDay.setDate(nextDay.getDate() + 1);
+  nextDay.setHours(0, 0, 0, 0);
+  const seasonStartReal = nextDay.toISOString();
+
   return {
     players,
     teams,
     managers,
     world: {
+      status: 'LOBBY',
       leagues: {
         norte: {
           id: 'l_cyan',
-          name: 'IGA Norte (NFC)',
+          name: 'Liga Norte (NFC)',
           standings: createStandings(norteTeams),
-          matches: generateCalendar(norteTeamObjs, 'l_cyan'),
-          tvQuota: 'Alta',
+          matches: generateCalendar(norteTeamObjs, 'l_cyan', seasonStartReal),
           difficulty: 'Normal',
         },
         sul: {
           id: 'l_orange',
           name: 'Liga Sul (SFC)',
           standings: createStandings(sulTeams),
-          matches: generateCalendar(sulTeamObjs, 'l_orange'),
-          tvQuota: 'Alta',
+          matches: generateCalendar(sulTeamObjs, 'l_orange', seasonStartReal),
           difficulty: 'Normal',
         },
         leste: {
           id: 'l_green',
           name: 'Liga Leste (EFC)',
           standings: createStandings(lesteTeams),
-          matches: generateCalendar(lesteTeamObjs, 'l_green'),
-          tvQuota: 'Alta',
+          matches: generateCalendar(lesteTeamObjs, 'l_green', seasonStartReal),
           difficulty: 'Normal',
         },
         oeste: {
           id: 'l_purple',
           name: 'Liga Oeste (WFC)',
           standings: createStandings(oesteTeams),
-          matches: generateCalendar(oesteTeamObjs, 'l_purple'),
-          tvQuota: 'Alta',
+          matches: generateCalendar(oesteTeamObjs, 'l_purple', seasonStartReal),
           difficulty: 'Normal',
         },
       },
@@ -553,8 +600,8 @@ export const generateInitialState = (): GameState => {
       rank1000PlayerId: null,
       currentSeason: 2050,
       currentRound: 1,
-      currentDate: new Date('2050-01-01T08:00:00Z').toISOString(),
-      seasonStartReal: null,
+      currentDate: gameNow.toISOString(),
+      seasonStartReal: seasonStartReal,
     },
     worldId: 'default',
     userTeamId: null,
@@ -566,6 +613,19 @@ export const generateInitialState = (): GameState => {
     notifications: [],
     training: {
       chemistryBoostLastUsed: undefined,
+      playstyleTraining: {
+        currentStyle: null,
+        understanding: {
+          'Blitzkrieg': 0,
+          'Tiki-Taka': 0,
+          'Retranca Armada': 0,
+          'Motor Lento': 0,
+          'Equilibrado': 20,
+          'Gegenpressing': 0,
+          'Catenaccio': 0,
+          'Vertical': 0
+        }
+      },
       cardLaboratory: {
         slots: [
           { cardId: null, finishTime: null },

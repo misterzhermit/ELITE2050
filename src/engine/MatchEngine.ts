@@ -123,25 +123,27 @@ export function simulateMatch(
 
   // Sectors initialized below with full tactical calculation
 
-  const homeEffect = PLAYSTYLE_EFFECTS[home.playStyle];
-  const awayEffect = PLAYSTYLE_EFFECTS[away.playStyle];
+  const homeEffect = PLAYSTYLE_EFFECTS[home.playStyle] || PLAYSTYLE_EFFECTS['Equilibrado'];
+  const awayEffect = PLAYSTYLE_EFFECTS[away.playStyle] || PLAYSTYLE_EFFECTS['Equilibrado'];
 
-  const homeMentality = MENTALITY_EFFECTS[home.mentality];
-  const awayMentality = MENTALITY_EFFECTS[away.mentality];
+  const homeMentality = MENTALITY_EFFECTS[home.mentality] || MENTALITY_EFFECTS['Calculista'];
+  const awayMentality = MENTALITY_EFFECTS[away.mentality] || MENTALITY_EFFECTS['Calculista'];
 
   // Tactical Card Effects
   const getCardEffects = (slots: (TacticalCard | null)[]) => {
     let att = 1.0, mid = 1.0, def = 1.0, gk = 1.0;
-    slots.forEach(card => {
-      if (!card) return;
-      // Simple logic for card effects based on their name/description
-      if (card.name.includes('Ataque')) att += 0.1;
-      if (card.name.includes('Defesa')) def += 0.1;
-      if (card.name.includes('Meio')) mid += 0.1;
-      if (card.name.includes('Goleiro')) gk += 0.1;
-      if (card.name === 'Super Chute') att += 0.15;
-      if (card.name === 'Muralha') def += 0.15;
-    });
+    if (slots && Array.isArray(slots)) {
+      slots.forEach(card => {
+        if (!card) return;
+        // Simple logic for card effects based on their name/description
+        if (card.name && card.name.includes('Ataque')) att += 0.1;
+        if (card.name && card.name.includes('Defesa')) def += 0.1;
+        if (card.name && card.name.includes('Meio')) mid += 0.1;
+        if (card.name && card.name.includes('Goleiro')) gk += 0.1;
+        if (card.name === 'Super Chute') att += 0.15;
+        if (card.name === 'Muralha') def += 0.15;
+      });
+    }
     return { att, mid, def, gk };
   };
 
@@ -152,26 +154,26 @@ export function simulateMatch(
     ...defaultSector,
     averageAttribute: home.attack,
     chemistry: home.chemistry,
-    tacticalBonus: homeEffect.att * homeCards.att * (1 + (home.linePosition - 50) / 200) + homeMentality.attBonus
+    tacticalBonus: (homeEffect.att || 1.0) * (homeCards.att || 1.0) * (1 + ((home.linePosition || 50) - 50) / 200) + (homeMentality.attBonus || 0)
   };
   const homeDefenseSector: SectorInput = {
     ...defaultSector,
     averageAttribute: home.defense,
     chemistry: home.chemistry,
-    tacticalBonus: homeEffect.def * homeCards.def * (1 + (50 - home.linePosition) / 200) - homeMentality.defPenalty
+    tacticalBonus: (homeEffect.def || 1.0) * (homeCards.def || 1.0) * (1 + (50 - (home.linePosition || 50)) / 200) - (homeMentality.defPenalty || 0)
   };
 
   const awayAttackSector: SectorInput = {
     ...defaultSector,
     averageAttribute: away.attack,
     chemistry: away.chemistry,
-    tacticalBonus: awayEffect.att * awayCards.att * (1 + (away.linePosition - 50) / 200) + awayMentality.attBonus
+    tacticalBonus: (awayEffect.att || 1.0) * (awayCards.att || 1.0) * (1 + ((away.linePosition || 50) - 50) / 200) + (awayMentality.attBonus || 0)
   };
   const awayDefenseSector: SectorInput = {
     ...defaultSector,
     averageAttribute: away.defense,
     chemistry: away.chemistry,
-    tacticalBonus: awayEffect.def * awayCards.def * (1 + (50 - away.linePosition) / 200) - awayMentality.defPenalty
+    tacticalBonus: (awayEffect.def || 1.0) * (awayCards.def || 1.0) * (1 + (50 - (away.linePosition || 50)) / 200) - (awayMentality.defPenalty || 0)
   };
 
   // --- INJECT 25 COMMENTARY CARDS (Every 15s in 360s window) ---
@@ -210,8 +212,9 @@ export function simulateMatch(
     const baseSecond = Math.floor((minute / MATCH_DURATION_MINUTES) * MATCH_REAL_TIME_SECONDS);
     const currentEventSecond = Math.max(0, Math.min(MATCH_REAL_TIME_SECONDS - 1, baseSecond + Math.floor(Math.random() * 7) - 3));
 
-    // Event chance: Tiki-Taka reduces opponent ticks
-    let intensity = 0.3 + (minute / 180);
+    // Event chance: Lowered for more realistic match flow
+    // Base intensity 0.1, peaks at 0.3 at minute 90
+    let intensity = 0.1 + (minute / 450);
     if (hasPossession === 'home' && awayEffect.tickReduction) intensity *= (1 - awayEffect.tickReduction);
     if (hasPossession === 'away' && homeEffect.tickReduction) intensity *= (1 - homeEffect.tickReduction);
 
@@ -415,6 +418,7 @@ export function simulateMatch(
     awayTeamId: away.id,
     homeScore,
     awayScore,
+    headline,
     scorers,
     assists,
     events,

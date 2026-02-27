@@ -39,8 +39,11 @@ export const calculateMatchEvent = (
   const defensePower = applyChaos(baseDefense, defense.chaosMax);
 
   const ratio = attackPower / Math.max(1, defensePower);
-  const goalProbability = clamp(0.08 + (ratio - 1) * 0.45, 0.02, 0.6);
-  const defenseProbability = clamp(0.18 + (1 / ratio - 1) * 0.35, 0.05, 0.6);
+  
+  // Adjusted probabilities for more realistic football scores
+  // Base goal probability is lower (0.04 instead of 0.08)
+  const goalProbability = clamp(0.04 + (ratio - 1) * 0.15, 0.01, 0.12);
+  const defenseProbability = clamp(0.25 + (1 / ratio - 1) * 0.2, 0.1, 0.5);
 
   let outcome: 'goal' | 'defense' | 'turnover' = 'turnover';
   const roll = Math.random();
@@ -87,7 +90,8 @@ export const calculateEvolution = (
   matchRating: number | null,
   lastPhases: number[],
   isEvolutionFocus: boolean = false,
-  isStabilizationFocus: boolean = false
+  isStabilizationFocus: boolean = false,
+  matchDifficulty: number = 1.0 // > 1 means opponent was stronger
 ): EvolutionResult => {
   const currentRating = player.totalRating;
   const potential = Math.min(1000, player.potential);
@@ -97,21 +101,29 @@ export const calculateEvolution = (
   const phaseHistory = [effectiveRating, ...lastPhases].slice(0, 3);
   const newPhase = phaseHistory.reduce((sum, v) => sum + v, 0) / Math.max(1, phaseHistory.length);
 
-  let inertia = 1;
-  if (currentRating > 850) inertia = 0.15;
-  else if (currentRating < 600) inertia = 1.5;
+  // Breakeven logic: higher rated players need better match ratings
+  // A 1000 player needs ~7.5, a 500 player needs ~6.0, a 250 player needs ~5.0
+  const breakeven = 6.0 + (currentRating - 500) / 333;
+  
+  // Difficulty adjustment: if playing against a stronger team, the breakeven is lower
+  // Using sqrt to make difficulty impact significant but not overwhelming
+  const adjustedBreakeven = breakeven / Math.sqrt(matchDifficulty);
 
-  let delta = played ? (effectiveRating - 6) * 5 * inertia : -1.2 * inertia;
+  // Multiplier adjusted: (Match Rating - Breakeven) * 6
+  // A 1000 player with 6.0 rating (average) against equal team: (6.0 - 7.5) * 6 = -9
+  // A 500 player with 8.0 rating (excellent) against equal team: (8.0 - 6.0) * 6 = +12
+  let delta = played ? (effectiveRating - adjustedBreakeven) * 6 : -1;
   
   // Apply individual focus modifiers
   if (isEvolutionFocus && delta > 0) {
-    delta *= 1.5; // 50% more gains
+    delta *= 2.0; // Double gains if focus
   }
   if (isStabilizationFocus && delta < 0) {
-    delta *= 0.5; // 50% less losses
+    delta *= 0.3; // Much less losses if stabilization
   }
 
-  delta = Math.round(delta);
+  // Cap delta at +/- 20
+  delta = clamp(Math.round(delta), -20, 20);
 
   const newPentagon = { ...player.pentagon };
   const keys: Array<keyof Pentagon> = ['FOR', 'AGI', 'INT', 'TAT', 'TEC'];

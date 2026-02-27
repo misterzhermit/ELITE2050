@@ -8,12 +8,14 @@ import {
 } from 'lucide-react';
 import { TeamLogo } from './TeamLogo';
 
+import { MATCH_REAL_TIME_SECONDS } from '../constants/gameConstants';
+
 interface LiveReportProps {
   match: Match;
   homeTeam: Team;
   awayTeam: Team;
   players: Record<string, Player>;
-  currentSecond: number; // 0-360
+  currentSecond: number; // 0-MATCH_REAL_TIME_SECONDS
 }
 
 export const LiveReport: React.FC<LiveReportProps> = ({
@@ -39,11 +41,11 @@ export const LiveReport: React.FC<LiveReportProps> = ({
     .filter(e => e.type === 'GOAL' && e.teamId === awayTeam.id && e.realTimeSecond <= currentSecond)
     .length;
 
-  const progress = (currentSecond / 360) * 100;
-  const matchMinute = Math.floor((currentSecond / 360) * 90);
+  const progress = (currentSecond / MATCH_REAL_TIME_SECONDS) * 100;
+  const matchMinute = Math.floor((currentSecond / MATCH_REAL_TIME_SECONDS) * 90);
 
   // Stats interpolation based on time
-  const interpolateStat = (finalValue: number) => Math.round(finalValue * (currentSecond / 360));
+  const interpolateStat = (finalValue: number) => Math.round(finalValue * (currentSecond / MATCH_REAL_TIME_SECONDS));
 
   return (
     <div className="flex flex-col h-full bg-slate-950 rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl">

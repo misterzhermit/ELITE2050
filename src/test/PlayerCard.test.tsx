@@ -34,7 +34,7 @@ const mockPlayer: Player = {
     currentPhase: 7.5,
     phaseHistory: [7.5, 7.5, 7.5],
     badges: { slot1: null, slot2: null, slot3: null },
-    contract: { teamId: null, salary: 1000, marketValue: 50000 },
+    contract: { teamId: null },
     history: {
         goals: 10,
         assists: 5,

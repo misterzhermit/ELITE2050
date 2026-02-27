@@ -1,4 +1,4 @@
-import { GameState, Team, Player, LeagueTeamStats, GameNotification, District, MatchResult, TeamStats, Match, TacticalCard } from '../types';
+import { GameState, Team, Player, PlayerRole, LeagueTeamStats, GameNotification, District, MatchResult, TeamStats, Match, TacticalCard } from '../types';
 import { simulateMatch, TeamStats as MatchTeamStats } from './MatchEngine';
 import { calculateEvolution } from './simulation';
 
@@ -17,23 +17,27 @@ import {
 
 // --- Helpers ---
 
-const getSeasonDayNumber = (dateStr: string) => {
-  const seasonStart = new Date('2050-01-01T08:00:00Z');
+export const getSeasonDayNumber = (dateStr: string, seasonStartRealStr?: string | null) => {
+  if (!seasonStartRealStr) return 0;
+  const seasonStart = new Date(seasonStartRealStr);
   const current = new Date(dateStr);
+
+  if (current < seasonStart) return 0;
+
   const diffDays = Math.floor((current.getTime() - seasonStart.getTime()) / (1000 * 60 * 60 * 24));
   return (diffDays % SEASON_DAYS) + 1;
 };
 
 const isSeasonMatchDay = (dayNumber: number) => {
-  // Matches start on Day 3
-  if (dayNumber < 3) return false;
-  // Matches happen every 2 days: 3, 5, 7, ...
-  return (dayNumber - 3) % MATCH_INTERVAL_DAYS === 0;
+  // Matches start on Day 2 (Day 1 is Lobby/Pre-season)
+  if (dayNumber < 2) return false;
+  // Matches happen every day: 2, 3, 4, ...
+  return (dayNumber - 2) % MATCH_INTERVAL_DAYS === 0;
 };
 
 const getRoundFromDay = (dayNumber: number) => {
-  if (dayNumber < 3) return 0;
-  return Math.floor((dayNumber - 3) / MATCH_INTERVAL_DAYS) + 1;
+  if (dayNumber < 2) return 0;
+  return Math.floor((dayNumber - 2) / MATCH_INTERVAL_DAYS) + 1;
 };
 
 const sortStandings = (standings: LeagueTeamStats[]) =>
@@ -57,8 +61,10 @@ const calculateTeamAttribute = (team: Team, players: Record<string, Player>, att
   const squadPlayers = team.squad.map(id => players[id]).filter(p => !!p).sort((a, b) => b.totalRating - a.totalRating);
   if (squadPlayers.length === 0) return 50;
   const top11 = squadPlayers.slice(0, 11);
-  const avg = top11.reduce((sum, p) => sum + p.totalRating, 0) / top11.length;
-  return Math.round(avg / 10);
+  const sum = top11.reduce((sum, p) => sum + p.totalRating, 0);
+  // We keep a scaled value for match engine logic, but it's based on the sum
+  // Since 11 players * 1000 max = 11000, we scale to 0-100 for the engine
+  return Math.round(sum / 110);
 };
 
 export const calculateTeamPower = (team: Team, players: Record<string, Player>): number => {
@@ -70,7 +76,18 @@ export const calculateTeamPower = (team: Team, players: Record<string, Player>):
 };
 
 export const checkPowerCap = (team: Team, players: Record<string, Player>): boolean => {
-  return calculateTeamPower(team, players) <= MAX_TEAM_POWER;
+  const total = calculateTeamPower(team, players);
+
+  // Use the persistent powerCap if it exists, otherwise use base values
+  if (team.powerCap !== undefined) {
+    return total <= team.powerCap;
+  }
+
+  // Cyan (Elite) = 12k, Orange/Purple (Mid) = 10k, Green (Low) = 8k
+  let cap = 12000;
+  if (team.league === 'Orange' || team.league === 'Purple') cap = 10000;
+  else if (team.league === 'Green') cap = 8000;
+  return total <= cap;
 };
 
 export const applySafetyNet = (state: GameState, teamId: string) => {
@@ -95,12 +112,8 @@ export const applySafetyNet = (state: GameState, teamId: string) => {
     }
   }
 
-  const totalAfter = calculateTeamPower(team, state.players);
-  const credit = Math.max(0, SAFETY_NET_TOTAL - totalAfter);
-  team.finances.emergencyCredit = credit;
-
-  if (addedPlayers > 0 || credit > 0) {
-    const message = `Piso de 6.000 ativado. Free Agents: ${addedPlayers}. Crédito de emergência: ${credit} pts.`;
+  if (addedPlayers > 0) {
+    const message = `Piso de segurança ativado. ${addedPlayers} jogadores recrutados para o elenco.`;
     const notification: GameNotification = {
       id: `n_${Date.now()}_safetynet_${team.id}`,
       date: state.world.currentDate,
@@ -142,69 +155,116 @@ export const updateStandings = (standings: LeagueTeamStats[], homeId: string, aw
   }
 };
 
-const updatePlayerEvolutions = (state: GameState, result: MatchResult, homePlayers: Player[], awayPlayers: Player[]) => {
-  const allPlayers = [...homePlayers, ...awayPlayers];
+const updatePlayerEvolutions = (
+  state: GameState,
+  result: MatchResult,
+  homePlayers: Player[],
+  awayPlayers: Player[],
+  homePower: number,
+  awayPower: number
+) => {
+  const homeDifficulty = awayPower / Math.max(1, homePower);
+  const awayDifficulty = homePower / Math.max(1, awayPower);
 
-  allPlayers.forEach(player => {
-    // 1. Basic Stats
-    player.history.gamesPlayed++;
-
-    // 2. Goals & Assists
-    const goals = result.scorers.filter(s => s.playerId === player.id).length;
-    const assists = result.assists.filter(a => a.playerId === player.id).length;
-    player.history.goals += goals;
-    player.history.assists += assists;
-
-    // 3. Rating Evolution
-    let matchRating = result.ratings?.[player.id];
-
-    // If no rating (no events), give average 6.0 with variance
-    if (matchRating === undefined) {
-      matchRating = 6.0 + (Math.random() - 0.5); // 5.5 - 6.5
-    }
-
-    // Ensure rating is within bounds
-    matchRating = Math.max(3, Math.min(10, matchRating));
-
-    const isEvolutionFocus = state.training.individualFocus.evolutionSlot === player.id;
-    const isStabilizationFocus = state.training.individualFocus.stabilizationSlot === player.id;
-
-    const evolution = calculateEvolution(
-      player,
-      matchRating,
-      player.history.lastMatchRatings || [],
-      isEvolutionFocus,
-      isStabilizationFocus
-    );
-
-    player.totalRating = evolution.newRating;
-    player.pentagon = evolution.newPentagon;
-    player.history.lastMatchRatings = [matchRating, ...(player.history.lastMatchRatings || [])].slice(0, 5);
-
-    // Calculate average rating incrementally
-    const oldGames = player.history.gamesPlayed - 1;
-    player.history.averageRating = Number(((player.history.averageRating * oldGames + matchRating) / player.history.gamesPlayed).toFixed(2));
+  homePlayers.forEach(player => {
+    updateSinglePlayerEvolution(state, player, result, homeDifficulty);
   });
+
+  awayPlayers.forEach(player => {
+    updateSinglePlayerEvolution(state, player, result, awayDifficulty);
+  });
+};
+
+const updateSinglePlayerEvolution = (state: GameState, player: Player, result: MatchResult, difficulty: number) => {
+  // 1. Basic Stats
+  player.history.gamesPlayed++;
+
+  // 2. Goals & Assists
+  const goals = result.scorers.filter(s => s.playerId === player.id).length;
+  const assists = result.assists.filter(a => a.playerId === player.id).length;
+  player.history.goals += goals;
+  player.history.assists += assists;
+
+  // 3. Rating Evolution
+  let matchRating = result.ratings?.[player.id];
+
+  // If no rating (no events), give average 6.0 with variance
+  if (matchRating === undefined) {
+    matchRating = 6.0 + (Math.random() - 0.5); // 5.5 - 6.5
+
+    // Team performance bonus (participation in the win)
+    const teamId = player.contract.teamId;
+    if (teamId) {
+      const isHome = result.homeTeamId === teamId;
+      const teamWon = isHome ? result.homeScore > result.awayScore : result.awayScore > result.homeScore;
+      const teamDraw = result.homeScore === result.awayScore;
+
+      if (teamWon) matchRating += 0.8;
+      else if (teamDraw) matchRating += 0.3;
+      else matchRating -= 0.5; // Penalty for losing even if not involved in events
+    }
+  }
+
+  // Ensure rating is within bounds
+  matchRating = Math.max(3, Math.min(10, matchRating));
+
+  const isEvolutionFocus = state.training?.individualFocus?.evolutionSlot === player.id;
+  const isStabilizationFocus = state.training?.individualFocus?.stabilizationSlot === player.id;
+
+  const evolution = calculateEvolution(
+    player,
+    matchRating,
+    player.history.lastMatchRatings || [],
+    isEvolutionFocus,
+    isStabilizationFocus,
+    difficulty
+  );
+
+  // Dynamic Power Cap Logic:
+  if (player.contract.teamId) {
+    const team = state.teams[player.contract.teamId];
+    if (team) {
+      if (team.powerCap === undefined) {
+        if (team.league === 'Cyan') team.powerCap = 12000;
+        else if (team.league === 'Orange' || team.league === 'Purple') team.powerCap = 10000;
+        else team.powerCap = 8000;
+      }
+
+      const delta = evolution.newRating - player.totalRating;
+      team.powerCap += delta;
+      // Clamp powerCap to prevent runaway values
+      team.powerCap = Math.max(5000, Math.min(20000, team.powerCap));
+    }
+  }
+
+  player.totalRating = evolution.newRating;
+  player.pentagon = evolution.newPentagon;
+  player.history.lastMatchRatings = [matchRating, ...(player.history.lastMatchRatings || [])].slice(0, 5);
+
+  const oldGames = player.history.gamesPlayed - 1;
+  player.history.averageRating = Number(((player.history.averageRating * oldGames + matchRating) / player.history.gamesPlayed).toFixed(2));
 };
 
 export const calculateAttr = (sel: { gk: Player, def: Player[], mid: Player[], att: Player[] }, attr: string) => {
   if (attr === 'goalkeeper') {
-    return Math.round(sel.gk.totalRating * (sel.gk.role === 'GOL' ? 1.0 : 0.5));
+    return Math.round(sel.gk.totalRating * (sel.gk.role === 'GOL' ? 1.0 : 0.5) / 10);
   }
   let players: Player[] = [];
-  let targetRole = '';
-  if (attr === 'defense') { players = sel.def; targetRole = 'DEF'; }
+  let targetRole: PlayerRole = 'ZAG';
+  if (attr === 'defense') { players = sel.def; targetRole = 'ZAG'; }
   if (attr === 'midfield') { players = sel.mid; targetRole = 'MEI'; }
   if (attr === 'attack') { players = sel.att; targetRole = 'ATA'; }
 
   if (players.length === 0) return 0;
 
   const sum = players.reduce((acc, p) => {
-    const penalty = p.role === targetRole ? 1.0 : 0.6;
+    const isTarget = p.role === targetRole;
+    const penalty = isTarget ? 1.0 : 0.6;
     return acc + (p.totalRating * penalty);
   }, 0);
 
-  return Math.round(sum / players.length);
+  // Scaling to 0-100 range for MatchEngine
+  return Math.round(sum / (players.length || 1) / 10);
 };
 
 export const getMatchSquad = (team: Team, players: Record<string, Player>): { gk: Player, def: Player[], mid: Player[], att: Player[], all: Player[] } => {
@@ -226,10 +286,10 @@ export const getMatchSquad = (team: Team, players: Record<string, Player>): { gk
   const att: Player[] = [];
 
   // Helper to fill slots
-  const fill = (target: Player[], role: string, count: number) => {
+  const fill = (target: Player[], roles: string[], count: number) => {
     for (let i = 0; i < count; i++) {
       if (target.length >= count) break;
-      const idx = pool.findIndex(p => p.role === role);
+      const idx = pool.findIndex(p => roles.includes(p.role));
       if (idx !== -1) {
         target.push(pool[idx]);
         pool.splice(idx, 1);
@@ -237,9 +297,9 @@ export const getMatchSquad = (team: Team, players: Record<string, Player>): { gk
     }
   };
 
-  fill(def, 'DEF', 4);
-  fill(mid, 'MEI', 3);
-  fill(att, 'ATA', 3);
+  fill(def, ['ZAG'], 4);
+  fill(mid, ['MEI'], 3);
+  fill(att, ['ATA'], 3);
 
   while (def.length < 4 && pool.length > 0) def.push(pool.shift()!);
   while (mid.length < 3 && pool.length > 0) mid.push(pool.shift()!);
@@ -303,7 +363,10 @@ export const simulateAndRecordMatch = (state: GameState, match: Match, standings
   match.awayScore = result.awayScore;
   // Note: we don't set played = true here yet because it might be LOCKED status
 
-  updatePlayerEvolutions(state, result, homeSelection.all, awaySelection.all);
+  const homePower = calculateTeamPower(homeTeam, state.players);
+  const awayPower = calculateTeamPower(awayTeam, state.players);
+
+  updatePlayerEvolutions(state, result, homeSelection.all, awaySelection.all, homePower, awayPower);
 
   if (standings) {
     updateStandings(standings, match.homeTeamId, match.awayTeamId, result.homeScore, result.awayScore);
@@ -370,6 +433,13 @@ const buildTopMovers = (prevState: GameState, newState: GameState, count: number
 // --- Main Advance Function ---
 
 export const advanceGameDay = (prevState: GameState, skipDateIncrement = false): GameState => {
+  // --- LOBBY LOCK ---
+  // If the world is in LOBBY status, we don't advance the game state
+  // until the creator/manager explicitly activates the world.
+  if (prevState.world.status === 'LOBBY') {
+    return prevState;
+  }
+
   const state = JSON.parse(JSON.stringify(prevState)) as GameState;
   const { world } = state;
 
@@ -379,9 +449,17 @@ export const advanceGameDay = (prevState: GameState, skipDateIncrement = false):
     // Reset to start of day for consistency when manually skipping
     date.setHours(8, 0, 0, 0);
     world.currentDate = date.toISOString();
+
+    // Sync seasonStartReal if it's Day 0/1 to ensure matches align
+    if (!world.seasonStartReal || new Date(world.currentDate) < new Date(world.seasonStartReal)) {
+      const nextDay = new Date(world.currentDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      nextDay.setHours(0, 0, 0, 0);
+      world.seasonStartReal = nextDay.toISOString();
+    }
   }
 
-  const dayNumber = getSeasonDayNumber(world.currentDate);
+  const dayNumber = getSeasonDayNumber(world.currentDate, world.seasonStartReal);
   const isMatchDay = isSeasonMatchDay(dayNumber);
 
   // Transfer Window Logic
@@ -447,6 +525,18 @@ export const advanceGameDay = (prevState: GameState, skipDateIncrement = false):
     });
   }
 
+  // --- Progress Playstyle Training ---
+  if (state.training?.playstyleTraining?.currentStyle) {
+    const currentStyle = state.training.playstyleTraining.currentStyle;
+    const currentUnderstanding = state.training.playstyleTraining.understanding[currentStyle] || 0;
+
+    // Increment understanding by 1-3% per day
+    const increment = Math.floor(Math.random() * 3) + 1;
+    const newUnderstanding = Math.min(100, currentUnderstanding + increment);
+
+    state.training.playstyleTraining.understanding[currentStyle] = newUnderstanding;
+  }
+
   if (isMatchDay) {
     const round = getRoundFromDay(dayNumber);
     world.currentRound = round;
@@ -465,12 +555,38 @@ export const advanceGameDay = (prevState: GameState, skipDateIncrement = false):
       const leagues = ['norte', 'sul', 'leste', 'oeste'] as const;
       leagues.forEach(leagueKey => {
         const league = world.leagues[leagueKey];
-        const roundMatches = league.matches.filter(m => m.round === round);
-        roundMatches.forEach(match => {
-          simulateAndRecordMatch(state, match, league.standings);
-          match.played = true;
-          match.status = 'FINISHED';
-        });
+        if (league && league.matches) {
+          const roundMatches = league.matches.filter(m => m.round === round);
+          roundMatches.forEach(match => {
+            if (!match.played) {
+              const result = simulateAndRecordMatch(state, match, league.standings);
+              match.played = true;
+              match.status = 'FINISHED';
+
+              // Update Headline if it's user's team
+              if (state.userTeamId && (match.homeTeamId === state.userTeamId || match.awayTeamId === state.userTeamId)) {
+                const isHome = match.homeTeamId === state.userTeamId;
+                const opponentId = isHome ? match.awayTeamId : match.homeTeamId;
+                const opponent = state.teams[opponentId];
+
+                state.lastHeadline = {
+                  title: result.headline || "Fim de Jogo",
+                  message: `O ${state.teams[state.userTeamId]?.name} ${result.homeScore > result.awayScore ? (isHome ? 'venceu' : 'perdeu para') : result.homeScore < result.awayScore ? (isHome ? 'perdeu para' : 'venceu') : 'empatou com'} o ${opponent?.name} por ${result.homeScore}-${result.awayScore}.`
+                };
+
+                // Add notification
+                state.notifications.unshift({
+                  id: `n_${Date.now()}_match_${match.id}`,
+                  date: state.world.currentDate,
+                  title: result.headline || "Resultado da Partida",
+                  message: `Sua equipe jogou contra ${opponent?.name}. Placar: ${match.homeScore}-${match.awayScore}.`,
+                  type: 'match',
+                  read: false
+                });
+              }
+            }
+          });
+        }
       });
 
     } else if (round <= SEASON_ROUNDS + ELITE_CUP_ROUNDS) {
@@ -544,11 +660,37 @@ export const advanceGameDay = (prevState: GameState, skipDateIncrement = false):
         matchesToPlay = [world.eliteCup.bracket.final!];
       }
 
-      matchesToPlay.forEach(match => {
-        simulateAndRecordMatch(state, match, null);
-        match.played = true;
-        match.status = 'FINISHED';
-      });
+      if (matchesToPlay && matchesToPlay.length > 0) {
+        matchesToPlay.forEach(match => {
+          if (!match.played) {
+            const result = simulateAndRecordMatch(state, match, null);
+            match.played = true;
+            match.status = 'FINISHED';
+
+            // Update Headline if it's user's team
+            if (state.userTeamId && (match.homeTeamId === state.userTeamId || match.awayTeamId === state.userTeamId)) {
+              const isHome = match.homeTeamId === state.userTeamId;
+              const opponentId = isHome ? match.awayTeamId : match.homeTeamId;
+              const opponent = state.teams[opponentId];
+
+              state.lastHeadline = {
+                title: result.headline || "Copa Elite",
+                message: `O ${state.teams[state.userTeamId]?.name} ${result.homeScore > result.awayScore ? (isHome ? 'venceu' : 'perdeu para') : result.homeScore < result.awayScore ? (isHome ? 'perdeu para' : 'venceu') : 'empatou com'} o ${opponent?.name} por ${result.homeScore}-${result.awayScore}.`
+              };
+
+              // Add notification
+              state.notifications.unshift({
+                id: `n_${Date.now()}_match_${match.id}`,
+                date: state.world.currentDate,
+                title: result.headline || "Resultado Copa Elite",
+                message: `Sua equipe jogou contra ${opponent?.name}. Placar: ${match.homeScore}-${match.awayScore}.`,
+                type: 'match',
+                read: false
+              });
+            }
+          }
+        });
+      }
       world.eliteCup.round = eliteRound;
 
       if (eliteRound === 4 && world.eliteCup.bracket.final) {

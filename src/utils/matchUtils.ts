@@ -1,12 +1,13 @@
-import { Match, WorldState, MatchStatus } from '../types';
+import { Match, MatchStatus } from '../types';
+import { MATCH_REAL_TIME_SECONDS } from '../constants/gameConstants';
 
 /**
  * Checks if a match should be in 'LOCKED' status based on current game time.
  * A match is locked 1 hour (60 minutes) before its scheduled time.
  */
 export const getMatchStatus = (match: Match, currentDate: string): MatchStatus => {
-  if (match.status === 'FINISHED' || match.status === 'PLAYING') {
-    return match.status;
+  if (match.status === 'FINISHED') {
+    return 'FINISHED';
   }
 
   // Ensure match has date and time properties before processing
@@ -21,9 +22,15 @@ export const getMatchStatus = (match: Match, currentDate: string): MatchStatus =
   const diffInMs = matchDateTime.getTime() - currentGameDateTime.getTime();
   const diffInMinutes = diffInMs / (1000 * 60);
 
+  // Match duration in game minutes
+  // With 1:1 time scale (1 real sec = 1 game sec), the match lasts 6 real minutes.
+  // So it lasts 6 game minutes.
+  // MATCH_REAL_TIME_SECONDS = 360.
+  const matchDurationMinutes = MATCH_REAL_TIME_SECONDS / 60;
+
   if (diffInMinutes <= 0) {
-    // If it's past the time + 6 minutes, it's finished
-    if (diffInMinutes <= -6) {
+    // If it's past the time + duration, it's finished
+    if (diffInMinutes <= -matchDurationMinutes) {
       return 'FINISHED';
     }
     return 'PLAYING';
@@ -37,7 +44,7 @@ export const getMatchStatus = (match: Match, currentDate: string): MatchStatus =
 };
 
 /**
- * Checks if a match is currently in the 6-minute "LIVE" window.
+ * Checks if a match is currently in the "LIVE" window.
  */
 export const isMatchLive = (match: Match, currentDate: string): boolean => {
   if (!match || !match.date || !match.time) return false;
@@ -47,12 +54,12 @@ export const isMatchLive = (match: Match, currentDate: string): boolean => {
   const diffInMs = currentGameDateTime.getTime() - matchDateTime.getTime();
   const diffInMinutes = diffInMs / (1000 * 60);
 
-  // Match lasts 6 minutes real-time for the user
-  return diffInMinutes >= 0 && diffInMinutes < 6;
+  return diffInMinutes >= 0 && diffInMinutes < MATCH_REAL_TIME_SECONDS;
 };
 
 /**
- * Calculates the current real-time second (0-360) for a live match.
+ * Calculates the current progress (0-360) for a live match.
+ * Maps 1:1 from game minutes to VOD seconds.
  */
 export const getLiveMatchSecond = (match: Match, currentDate: string): number => {
   if (!match || !match.date || !match.time) return 0;
@@ -60,5 +67,7 @@ export const getLiveMatchSecond = (match: Match, currentDate: string): number =>
   const currentGameDateTime = new Date(currentDate);
   
   const diffInMs = currentGameDateTime.getTime() - matchDateTime.getTime();
-  return Math.max(0, Math.min(360, Math.floor(diffInMs / 1000)));
+  const diffInSeconds = diffInMs / 1000;
+
+  return Math.max(0, Math.min(MATCH_REAL_TIME_SECONDS, Math.floor(diffInSeconds)));
 };
