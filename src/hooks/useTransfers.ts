@@ -92,6 +92,8 @@ export const useTransfers = (userTeamId: string | null, totalPoints: number, pow
 
         if (window.confirm(`Deseja dispensar ${player.nickname}? O teto de ${powerCap} pts será mantido.`)) {
             try {
+                // If the player is contracted to another team, we must do a TRADE OFFER instead of selling directly
+                // Actually handleSellPlayer is for RELEASING a player from your OWN team.
                 const newNotification: GameNotification = {
                     id: `sell_${Date.now()}`,
                     date: new Date().toISOString(),
@@ -103,7 +105,7 @@ export const useTransfers = (userTeamId: string | null, totalPoints: number, pow
 
                 setState(prev => {
                     const newState = { ...prev };
-                    
+
                     // Update player: set teamId to null (exiled)
                     newState.players[playerId] = {
                         ...player,
@@ -143,7 +145,7 @@ export const useTransfers = (userTeamId: string | null, totalPoints: number, pow
                         type: newNotification.type
                     });
                 }
-                
+
                 addToast(`${player.nickname} foi dispensado do elenco.`, 'success');
             } catch (error) {
                 console.error('Erro ao dispensar jogador:', error);
@@ -152,5 +154,88 @@ export const useTransfers = (userTeamId: string | null, totalPoints: number, pow
         }
     };
 
-    return { handleMakeProposal, handleSellPlayer };
+    const handleSendTradeOffer = async (requestedPlayerId: string, offeredPlayerId: string) => {
+        const userTeam = userTeamId ? state.teams[userTeamId] : null;
+
+        if (!state.world.transferWindowOpen) {
+            addToast('A janela de transferências está fechada em dias de jogo!', 'error');
+            return;
+        }
+
+        if (!userTeam) {
+            addToast('Você precisa estar em um time para propor trocas!', 'error');
+            return;
+        }
+
+        const requestedPlayer = state.players[requestedPlayerId];
+        const targetTeamId = requestedPlayer?.contract?.teamId;
+
+        if (!targetTeamId) {
+            addToast('O jogador solicitado não pertence a nenhum time!', 'error');
+            return;
+        }
+
+        if (window.confirm(`Propor troca: seu jogador por ${requestedPlayer.nickname}?`)) {
+            const newOffer: import('../types').TradeOffer = {
+                id: `trade_${Date.now()}`,
+                fromTeamId: userTeam.id,
+                toTeamId: targetTeamId,
+                offeredPlayerId,
+                requestedPlayerId,
+                status: 'PENDING',
+                date: state.world.currentDate
+            };
+
+            setState(prev => ({
+                ...prev,
+                tradeOffers: [newOffer, ...(prev.tradeOffers || [])]
+            }));
+
+            // Auto-accept/decline for AI teams right now (simplification)
+            if (targetTeamId !== state.userTeamId) {
+                // Determine AI choice (AI accepts if offered player has higher or equal rating)
+                const offeredPlayer = state.players[offeredPlayerId];
+                if (offeredPlayer.totalRating >= requestedPlayer.totalRating - 15) {
+                    addToast(`O ${state.teams[targetTeamId].name} aceitou a proposta! A troca foi efetuada.`, 'success');
+
+                    // Execute Trade
+                    setState(prev => {
+                        const newState = { ...prev };
+                        const myTeam = newState.teams[userTeam.id];
+                        const aiTeam = newState.teams[targetTeamId];
+
+                        // Swap IDs in squads
+                        myTeam.squad = myTeam.squad.filter(id => id !== offeredPlayerId);
+                        myTeam.squad.push(requestedPlayerId);
+
+                        aiTeam.squad = aiTeam.squad.filter(id => id !== requestedPlayerId);
+                        aiTeam.squad.push(offeredPlayerId);
+
+                        // Remove from both lineups to prevent ghost references
+                        Object.keys(myTeam.lineup).forEach(pos => { if (myTeam.lineup[pos as any] === offeredPlayerId) delete myTeam.lineup[pos as any]; });
+                        Object.keys(aiTeam.lineup).forEach(pos => { if (aiTeam.lineup[pos as any] === requestedPlayerId) delete aiTeam.lineup[pos as any]; });
+
+                        // Update Players
+                        newState.players[requestedPlayerId].contract.teamId = userTeam.id;
+                        newState.players[offeredPlayerId].contract.teamId = targetTeamId;
+
+                        newState.tradeOffers[0].status = 'ACCEPTED';
+
+                        return newState;
+                    });
+                } else {
+                    addToast(`O ${state.teams[targetTeamId].name} recusou a troca por ${requestedPlayer.nickname}.`, 'error');
+                    setState(prev => {
+                        const newState = { ...prev };
+                        newState.tradeOffers[0].status = 'DECLINED';
+                        return newState;
+                    });
+                }
+            } else {
+                addToast('Proposta enviada com sucesso!', 'success');
+            }
+        }
+    };
+
+    return { handleMakeProposal, handleSellPlayer, handleSendTradeOffer };
 };

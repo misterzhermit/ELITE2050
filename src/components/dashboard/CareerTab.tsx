@@ -22,15 +22,15 @@ export const CareerTab = (props: any) => {
   const { state, isPaused, timeSpeed } = useGameState();
   const dashData = useDashboardData();
   const { userTeam, upcomingMatches } = dashData;
-  const { 
-    handleStartReport, 
-    handleMockReport, 
-    selectedMatchReport, 
-    setSelectedMatchReport, 
-    isWatchingReport, 
-    setIsWatchingReport, 
-    reportSecond, 
-    setReportSecond 
+  const {
+    handleStartReport,
+    handleMockReport,
+    selectedMatchReport,
+    setSelectedMatchReport,
+    isWatchingReport,
+    setIsWatchingReport,
+    reportSecond,
+    setReportSecond
   } = useMatchSimulation(userTeam?.id || null);
   const { handleUpdateTactics } = useTactics(userTeam?.id || null);
   const { handleSetFocus, handleStartCardLab, handleChemistryBoost } = useTraining(userTeam?.id || null);
@@ -119,16 +119,16 @@ export const CareerTab = (props: any) => {
         {/* Left Column - Team Context */}
         <div className="lg:col-span-8 space-y-4 sm:space-y-6">
           {/* User Team Card */}
-          <div className="glass-card-neon border-cyan-500/30 p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] relative overflow-hidden group">
+          <div className="glass-card-neon white-gradient-sheen border-cyan-500/30 p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] shadow-[0_0_30px_rgba(34,211,238,0.15)] relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-cyan-500/10 transition-colors duration-700" />
-            
+
             <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 relative z-10">
               <div className="relative">
                 <div className="absolute inset-0 bg-cyan-500/20 blur-2xl rounded-full animate-pulse" />
                 <div className="w-20 h-20 sm:w-28 sm:h-28 glass-card rounded-2xl sm:rounded-[2rem] flex items-center justify-center border border-cyan-500/30 shadow-[0_0_30px_rgba(6,182,212,0.2)]">
                   {userTeam ? (
-                    <TeamLogo 
-                      primaryColor={userTeam.logo?.primary || '#fff'} 
+                    <TeamLogo
+                      primaryColor={userTeam.logo?.primary || '#fff'}
                       secondaryColor={userTeam.logo?.secondary || '#000'}
                       patternId={userTeam.logo?.patternId as any}
                       symbolId={userTeam.logo?.symbolId}
@@ -167,7 +167,7 @@ export const CareerTab = (props: any) => {
 
           {/* Tactics & Training Overview */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-            <div className="glass-card border-white/5 p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] group hover:border-purple-500/30 transition-all duration-500">
+            <div className="glass-card-neon white-gradient-sheen border-purple-500/20 shadow-[0_0_30px_rgba(168,85,247,0.1)] p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] group hover:border-purple-500/30 transition-all duration-500">
               <div className="flex items-center justify-between mb-4 sm:mb-6">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 sm:w-10 sm:h-10 glass-card rounded-xl flex items-center justify-center text-purple-400 border border-purple-500/30">
@@ -192,7 +192,7 @@ export const CareerTab = (props: any) => {
               </div>
             </div>
 
-            <div className="glass-card border-white/5 p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] group hover:border-emerald-500/30 transition-all duration-500">
+            <div className="glass-card-neon white-gradient-sheen border-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.1)] p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] group hover:border-emerald-500/30 transition-all duration-500">
               <div className="flex items-center justify-between mb-4 sm:mb-6">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 sm:w-10 sm:h-10 glass-card rounded-xl flex items-center justify-center text-emerald-400 border border-emerald-500/30">
@@ -224,7 +224,7 @@ export const CareerTab = (props: any) => {
         {/* Right Column - Side Panels */}
         <div className="lg:col-span-4 space-y-4 sm:space-y-6">
           {/* Calendar Mini View */}
-          <div className="glass-card border-white/5 p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] bg-gradient-to-br from-white/[0.02] to-transparent">
+          <div className="glass-card-neon white-gradient-sheen border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.1)] p-4 sm:p-6 rounded-2xl sm:rounded-[2rem]">
             <div className="flex items-center justify-between mb-4 sm:mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 glass-card rounded-xl flex items-center justify-center text-cyan-400 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.2)]">
@@ -244,8 +244,8 @@ export const CareerTab = (props: any) => {
                       <div className="flex items-center gap-3 sm:gap-4">
                         <div className="w-8 h-8 sm:w-10 sm:h-10 glass-card rounded-lg flex items-center justify-center border border-white/10">
                           {opponent ? (
-                            <TeamLogo 
-                              primaryColor={opponent.logo?.primary || '#fff'} 
+                            <TeamLogo
+                              primaryColor={opponent.logo?.primary || '#fff'}
                               secondaryColor={opponent.logo?.secondary || '#000'}
                               patternId={opponent.logo?.patternId as any}
                               symbolId={opponent.logo?.symbolId}
@@ -258,7 +258,7 @@ export const CareerTab = (props: any) => {
                             {opponent?.name || 'DESCONHECIDO'}
                           </span>
                           <span className="text-[7px] sm:text-[9px] text-cyan-400/50 font-black uppercase tracking-widest">
-                            {new Date(match.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                            {state.world.status === 'LOBBY' ? '--/--' : new Date(match.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
                           </span>
                         </div>
                       </div>
@@ -281,8 +281,95 @@ export const CareerTab = (props: any) => {
             </div>
           </div>
 
+          {/* Trade Inbox */}
+          {state.tradeOffers && state.tradeOffers.filter(t => t.toTeamId === userTeam?.id && t.status === 'PENDING').length > 0 && (
+            <div className="glass-card-neon white-gradient-sheen border border-purple-500/30 rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-[0_0_30px_rgba(168,85,247,0.15)] flex flex-col gap-3">
+              <h3 className="text-[9px] sm:text-[11px] font-black text-purple-400 uppercase tracking-widest flex items-center gap-2">
+                <Search size={14} className="text-purple-400" />
+                Propostas de Troca
+              </h3>
+              <div className="flex flex-col gap-2">
+                {state.tradeOffers.filter(t => t.toTeamId === userTeam?.id && t.status === 'PENDING').map(offer => {
+                  const offeredPlayer = state.players[offer.offeredPlayerId];
+                  const requestedPlayer = state.players[offer.requestedPlayerId];
+                  const fromTeam = state.teams[offer.fromTeamId];
+
+                  if (!offeredPlayer || !requestedPlayer || !fromTeam) return null;
+
+                  return (
+                    <div key={offer.id} className="bg-black/40 border border-white/5 p-3 rounded-xl flex flex-col gap-2">
+                      <div className="flex items-center justify-between text-[10px] uppercase font-bold text-white/70">
+                        <span>{fromTeam.name} oferece:</span>
+                        <span className="text-purple-400">{offer.date}</span>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1 bg-white/5 border border-white/10 p-2 rounded-lg flex flex-col items-center justify-center">
+                          <span className="text-[10px] text-cyan-400 font-bold mb-1">Eles dão</span>
+                          <span className="text-sm font-black text-white">{offeredPlayer.nickname}</span>
+                          <span className="text-xs text-white/50">{offeredPlayer.totalRating} pts</span>
+                        </div>
+                        <Activity size={16} className="text-white/30" />
+                        <div className="flex-1 bg-white/5 border border-white/10 p-2 rounded-lg flex flex-col items-center justify-center">
+                          <span className="text-[10px] text-orange-400 font-bold mb-1">Eles pedem</span>
+                          <span className="text-sm font-black text-white">{requestedPlayer.nickname}</span>
+                          <span className="text-xs text-white/50">{requestedPlayer.totalRating} pts</span>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          onClick={() => {
+                            // Accept Trade
+                            setState(prev => {
+                              const s = { ...prev };
+                              const myTeam = s.teams[userTeam!.id];
+                              const otherTeam = s.teams[fromTeam.id];
+
+                              // Trade arrays
+                              myTeam.squad = myTeam.squad.filter(id => id !== requestedPlayer.id);
+                              myTeam.squad.push(offeredPlayer.id);
+                              otherTeam.squad = otherTeam.squad.filter(id => id !== offeredPlayer.id);
+                              otherTeam.squad.push(requestedPlayer.id);
+
+                              // Lineups
+                              Object.keys(myTeam.lineup).forEach(pos => { if (myTeam.lineup[pos as any] === requestedPlayer.id) delete myTeam.lineup[pos as any]; });
+                              Object.keys(otherTeam.lineup).forEach(pos => { if (otherTeam.lineup[pos as any] === offeredPlayer.id) delete otherTeam.lineup[pos as any]; });
+
+                              // Players
+                              s.players[requestedPlayer.id].contract.teamId = otherTeam.id;
+                              s.players[offeredPlayer.id].contract.teamId = myTeam.id;
+
+                              s.tradeOffers = s.tradeOffers.map(t => t.id === offer.id ? { ...t, status: 'ACCEPTED' as const } : t);
+                              return s;
+                            });
+                          }}
+                          className="flex-1 py-2 bg-emerald-500 hover:bg-emerald-400 rounded-lg text-[10px] text-white uppercase font-black tracking-widest shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all"
+                        >
+                          Aceitar
+                        </button>
+                        <button
+                          onClick={() => {
+                            // Decline Trade
+                            setState(prev => ({
+                              ...prev,
+                              tradeOffers: prev.tradeOffers.map(t => t.id === offer.id ? { ...t, status: 'DECLINED' as const } : t)
+                            }));
+                          }}
+                          className="flex-1 py-2 bg-red-950/40 text-red-400 hover:bg-red-900 border border-red-500/30 rounded-lg text-[10px] uppercase font-black tracking-widest transition-all"
+                        >
+                          Recusar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* GM Panel */}
-          <div className="bg-slate-900/60 backdrop-blur-md border border-red-500/30 rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-[0_0_15px_rgba(239,68,68,0.1)] flex flex-col gap-2 sm:gap-4 relative overflow-hidden">
+          <div className="glass-card-neon white-gradient-sheen border border-red-500/30 rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-[0_0_30px_rgba(239,68,68,0.15)] flex flex-col gap-2 sm:gap-4 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full blur-2xl -mr-12 -mt-12" />
             <h3 className="text-[9px] sm:text-[11px] font-black text-red-400 uppercase tracking-[0.2em] flex items-center gap-2 mb-1 relative z-10">
               <Database size={window.innerWidth < 640 ? 12 : 16} className="drop-shadow-[0_0_5px_rgba(239,68,68,0.5)]" />
@@ -363,7 +450,7 @@ export const CareerTab = (props: any) => {
               ))}
             </div>
           </div>
-          
+
           <button
             onClick={handleAdvanceDay}
             className="w-full flex items-center justify-center gap-2 bg-black/40 border border-white/5 hover:border-red-500/50 p-3 sm:p-4 rounded-xl sm:rounded-2xl transition-all group"

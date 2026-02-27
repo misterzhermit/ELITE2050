@@ -17,7 +17,7 @@ import * as LucideIcons from 'lucide-react';
 const { Home, Trophy, ShoppingCart, Database, User, Clock, Newspaper, TrendingUp, AlertCircle, Award, Calendar, Users, Activity, Sliders, Flame, Target, Zap, FastForward, Globe, MessageSquare, AlertTriangle, TrendingDown, Briefcase, Star, Search, Crown, ChevronRight, Lock, ChevronDown, Eye, Shield, Brain, X, Save } = LucideIcons;
 
 
-export const SquadTab = (props: any) => {
+export const SquadTab = (props: { showLineup?: boolean; lineupOnly?: boolean }) => {
   const { state, setState, addToast } = useGame();
   const dashData = useDashboardData();
   const { userTeam, upcomingMatches } = dashData;
@@ -84,7 +84,31 @@ export const SquadTab = (props: any) => {
         </div>
       )}
 
-      {(Object.keys(playersByPosition) as (keyof typeof playersByPosition)[]).map(pos => {
+      {/* ESCALAÇÃO - LineupBuilder (shown when lineupOnly or showLineup prop) */}
+      {(props.lineupOnly || props.showLineup) && (
+        <div className="space-y-3 sm:space-y-4">
+          <LineupBuilder
+            team={userTeam}
+            allPlayers={state.players}
+            onPlayerSelect={(player) => setSelectedPlayer(player)}
+          />
+        </div>
+      )}
+
+      {props.lineupOnly && selectedPlayer && (
+        <PlayerModal
+          player={selectedPlayer}
+          onClose={() => setSelectedPlayer(null)}
+        />
+      )}
+      {props.lineupOnly && selectedPlayer && (
+        <PlayerModal
+          player={selectedPlayer}
+          onClose={() => setSelectedPlayer(null)}
+        />
+      )}
+
+      {props.lineupOnly ? null : (Object.keys(playersByPosition) as (keyof typeof playersByPosition)[]).map(pos => {
         const players = playersByPosition[pos];
         if (players.length === 0) return null;
 
@@ -92,8 +116,8 @@ export const SquadTab = (props: any) => {
           <div key={pos} className="space-y-3 sm:space-y-6">
             <div className="flex items-center gap-3 sm:gap-4 px-1 sm:px-2">
               <div className={`w-1 sm:w-1.5 h-4 sm:h-6 rounded-full shadow-[0_0_10px_rgba(var(--color-glow),0.5)] ${pos === 'GOL' ? 'bg-amber-500 shadow-amber-500/50' :
-                  pos === 'ZAG' ? 'bg-cyan-500 shadow-cyan-500/50' :
-                    pos === 'MEI' ? 'bg-fuchsia-500 shadow-fuchsia-500/50' : 'bg-red-500 shadow-red-500/50'
+                pos === 'ZAG' ? 'bg-cyan-500 shadow-cyan-500/50' :
+                  pos === 'MEI' ? 'bg-fuchsia-500 shadow-fuchsia-500/50' : 'bg-red-500 shadow-red-500/50'
                 }`} />
               <div className="flex flex-col">
                 <h3 className="text-[9px] sm:text-xs font-black text-white uppercase tracking-[0.2em] sm:tracking-[0.3em] neon-text-white">{
@@ -107,7 +131,7 @@ export const SquadTab = (props: any) => {
               </div>
             </div>
 
-            <div className="flex overflow-x-auto gap-3 sm:gap-6 px-1 sm:px-2 pb-6 sm:pb-8 snap-x snap-mandatory no-scrollbar scroll-smooth">
+            <div className="flex overflow-x-auto gap-3 sm:gap-6 px-1 sm:px-2 pb-6 sm:pb-8 snap-x snap-mandatory scroll-smooth">
               {players.map(player => (
                 <div key={player.id} className="w-[140px] sm:w-[180px] shrink-0 snap-start">
                   <PlayerCard
@@ -123,7 +147,7 @@ export const SquadTab = (props: any) => {
         );
       })}
 
-      {selectedPlayer && (
+      {!props.lineupOnly && selectedPlayer && (
         <PlayerModal
           player={selectedPlayer}
           onClose={() => setSelectedPlayer(null)}

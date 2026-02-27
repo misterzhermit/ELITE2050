@@ -9,6 +9,7 @@ import { useTraining } from '../../hooks/useTraining';
 import { PlayerCard } from '../PlayerCard';
 import { PlayerModal } from '../PlayerModal';
 import { TeamLogo } from '../TeamLogo';
+import { PlayerAvatar } from '../PlayerAvatar';
 import { LineupBuilder } from '../LineupBuilder';
 import { LiveReport, PostGameReport } from '../MatchReports';
 import { getMatchStatus } from '../../utils/matchUtils';
@@ -21,7 +22,7 @@ export const TacticsTab = (props: any) => {
   const { state, setState } = useGame();
   const dashData = useDashboardData();
   const { userTeam, upcomingMatches } = dashData;
-  const { handleMockVod, setSelectedMatchReport } = useMatchSimulation(userTeam?.id || null);
+  const { handleMockReport, setSelectedMatchReport } = useMatchSimulation(userTeam?.id || null);
   const { handleUpdateTactics } = useTactics(userTeam?.id || null);
   const { handleSetFocus, handleStartCardLab, handleChemistryBoost } = useTraining(userTeam?.id || null);
   const { handleAdvanceDay } = useGameDay();
@@ -33,7 +34,7 @@ export const TacticsTab = (props: any) => {
   if (!userTeam) return null;
   const { tactics } = userTeam;
 
-  const playStyles: PlayStyle[] = ['Blitzkrieg', 'Tiki-Taka', 'Retranca Armada', 'Motor Lento', 'Equilibrado', 'Gegenpressing', 'Catenaccio'];
+  const playStyles: PlayStyle[] = ['Blitzkrieg', 'Tiki-Taka', 'Retranca Armada', 'Motor Lento', 'Equilibrado', 'Gegenpressing', 'Catenaccio', 'Vertical'];
   const mentalities: Mentality[] = ['Calculista', 'Emocional', 'Predadora'];
 
   return (
@@ -41,27 +42,26 @@ export const TacticsTab = (props: any) => {
       {/* Estilo de Jogo & Mentalidade */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6">
         {/* Play Style Card */}
-        <div className="relative group overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] bg-slate-900/40 backdrop-blur-xl border border-white/5 p-4 sm:p-8 transition-all duration-500 hover:border-cyan-500/30">
+        <div className="glass-card-neon white-gradient-sheen relative group overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] border-cyan-500/30 p-4 sm:p-8 transition-all duration-500 hover:border-cyan-500/50 shadow-[0_0_30px_rgba(34,211,238,0.15)]">
           <div className="absolute top-0 right-0 p-4 sm:p-6 opacity-10 group-hover:opacity-20 transition-opacity">
             <Zap size={window.innerWidth < 640 ? 48 : 80} className="text-cyan-400" />
           </div>
-          
+
           <div className="relative z-10 space-y-4 sm:space-y-6">
             <div className="space-y-1 sm:space-y-2">
               <span className="text-[10px] sm:text-xs font-black text-cyan-400 uppercase tracking-[0.3em] italic">Estratégia Base</span>
               <h3 className="text-xl sm:text-3xl font-black text-white tracking-tighter italic">ESTILO DE JOGO</h3>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:gap-4">
-              {['Posse', 'Contra-Ataque', 'Gegenpress', 'Equilibrado'].map((style) => (
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              {playStyles.map((style) => (
                 <button
                   key={style}
                   onClick={() => handleUpdateTactics({ playStyle: style as any })}
-                  className={`py-2 sm:py-3 px-2 sm:px-4 rounded-xl border text-[9px] sm:text-xs font-black uppercase tracking-widest transition-all ${
-                    tactics.playStyle === style 
-                    ? 'bg-cyan-500 border-cyan-400 text-black shadow-[0_0_20px_rgba(6,182,212,0.4)]' 
+                  className={`py-2 sm:py-3 px-2 sm:px-4 rounded-xl border text-[8px] sm:text-[10px] font-black uppercase tracking-widest transition-all ${tactics.playStyle === style
+                    ? 'bg-cyan-500 border-cyan-400 text-black shadow-[0_0_20px_rgba(6,182,212,0.4)]'
                     : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10 hover:text-white'
-                  }`}
+                    }`}
                 >
                   {style}
                 </button>
@@ -71,7 +71,7 @@ export const TacticsTab = (props: any) => {
         </div>
 
         {/* Mentality Card */}
-        <div className="relative group overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] bg-slate-900/40 backdrop-blur-xl border border-white/5 p-4 sm:p-8 transition-all duration-500 hover:border-purple-500/30">
+        <div className="glass-card-neon white-gradient-sheen relative group overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] border-purple-500/30 p-4 sm:p-8 transition-all duration-500 hover:border-purple-500/50 shadow-[0_0_30px_rgba(168,85,247,0.15)]">
           <div className="absolute top-0 right-0 p-4 sm:p-6 opacity-10 group-hover:opacity-20 transition-opacity">
             <Brain size={window.innerWidth < 640 ? 48 : 80} className="text-purple-400" />
           </div>
@@ -82,16 +82,15 @@ export const TacticsTab = (props: any) => {
               <h3 className="text-xl sm:text-3xl font-black text-white tracking-tighter italic">MENTALIDADE</h3>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:gap-4">
-              {['Ultra-Defensivo', 'Cauteloso', 'Ofensivo', 'Tudo-ou-Nada'].map((mentality) => (
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              {mentalities.map((mentality) => (
                 <button
                   key={mentality}
                   onClick={() => handleUpdateTactics({ mentality: mentality as any })}
-                  className={`py-2 sm:py-3 px-2 sm:px-4 rounded-xl border text-[9px] sm:text-xs font-black uppercase tracking-widest transition-all ${
-                    tactics.mentality === mentality 
-                    ? 'bg-purple-500 border-purple-400 text-black shadow-[0_0_20px_rgba(168,85,247,0.4)]' 
+                  className={`py-2 sm:py-3 px-2 sm:px-4 rounded-xl border text-[8px] sm:text-[10px] font-black uppercase tracking-widest transition-all ${tactics.mentality === mentality
+                    ? 'bg-purple-500 border-purple-400 text-black shadow-[0_0_20px_rgba(168,85,247,0.4)]'
                     : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10 hover:text-white'
-                  }`}
+                    }`}
                 >
                   {mentality}
                 </button>
@@ -102,7 +101,7 @@ export const TacticsTab = (props: any) => {
       </div>
 
       {/* Sliders Táticos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 bg-black/20 backdrop-blur-md border border-white/5 rounded-[1.5rem] sm:rounded-[2.5rem] p-4 sm:p-10">
+      <div className="glass-card-neon white-gradient-sheen grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 border-white/10 rounded-[1.5rem] sm:rounded-[2.5rem] p-4 sm:p-10 shadow-[0_0_30px_rgba(255,255,255,0.05)]">
         <div className="space-y-6 sm:space-y-10">
           {/* Posicionamento */}
           <div className="space-y-3 sm:space-y-4">
@@ -123,8 +122,8 @@ export const TacticsTab = (props: any) => {
                 onChange={(e) => handleUpdateTactics({ linePosition: parseInt(e.target.value) })}
                 className="w-full h-1 sm:h-1.5 bg-transparent appearance-none cursor-pointer accent-purple-500 relative z-10"
               />
-              <div 
-                className="absolute h-1 sm:h-1.5 my-auto bg-gradient-to-r from-purple-600 to-purple-400 rounded-full shadow-[0_0_15px_rgba(168,85,247,0.5)] transition-all pointer-events-none" 
+              <div
+                className="absolute h-1 sm:h-1.5 my-auto bg-gradient-to-r from-purple-600 to-purple-400 rounded-full shadow-[0_0_15px_rgba(168,85,247,0.5)] transition-all pointer-events-none"
                 style={{ width: `${tactics.linePosition}%` }}
               />
             </div>
@@ -149,8 +148,8 @@ export const TacticsTab = (props: any) => {
                 onChange={(e) => handleUpdateTactics({ intensity: parseInt(e.target.value) })}
                 className="w-full h-1 sm:h-1.5 bg-transparent appearance-none cursor-pointer accent-cyan-500 relative z-10"
               />
-              <div 
-                className="absolute h-1 sm:h-1.5 my-auto bg-gradient-to-r from-cyan-600 to-cyan-400 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.5)] transition-all pointer-events-none" 
+              <div
+                className="absolute h-1 sm:h-1.5 my-auto bg-gradient-to-r from-cyan-600 to-cyan-400 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.5)] transition-all pointer-events-none"
                 style={{ width: `${tactics.intensity}%` }}
               />
             </div>
@@ -177,8 +176,8 @@ export const TacticsTab = (props: any) => {
                 onChange={(e) => handleUpdateTactics({ width: parseInt(e.target.value) })}
                 className="w-full h-1 sm:h-1.5 bg-transparent appearance-none cursor-pointer accent-emerald-500 relative z-10"
               />
-              <div 
-                className="absolute h-1 sm:h-1.5 my-auto bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.5)] transition-all pointer-events-none" 
+              <div
+                className="absolute h-1 sm:h-1.5 my-auto bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.5)] transition-all pointer-events-none"
                 style={{ width: `${tactics.width}%` }}
               />
             </div>
@@ -203,8 +202,8 @@ export const TacticsTab = (props: any) => {
                 onChange={(e) => handleUpdateTactics({ passing: parseInt(e.target.value) })}
                 className="w-full h-1 sm:h-1.5 bg-transparent appearance-none cursor-pointer accent-amber-500 relative z-10"
               />
-              <div 
-                className="absolute h-1 sm:h-1.5 my-auto bg-gradient-to-r from-amber-600 to-amber-400 rounded-full shadow-[0_0_15px_rgba(245,158,11,0.5)] transition-all pointer-events-none" 
+              <div
+                className="absolute h-1 sm:h-1.5 my-auto bg-gradient-to-r from-amber-600 to-amber-400 rounded-full shadow-[0_0_15px_rgba(245,158,11,0.5)] transition-all pointer-events-none"
                 style={{ width: `${tactics.passing}%` }}
               />
             </div>
@@ -222,13 +221,22 @@ export const TacticsTab = (props: any) => {
           <span className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest italic">Game Changers</span>
         </div>
 
-        <div className="flex overflow-x-auto gap-3 sm:gap-6 px-1 sm:px-2 pb-6 sm:pb-8 no-scrollbar">
+        <div className="flex gap-3 sm:gap-6 px-1 sm:px-2 pb-4 sm:pb-6">
           {userTeam.squad?.slice(0, 3).map(playerId => {
             const player = state.players[playerId];
             if (!player) return null;
             return (
-              <div key={playerId} className="w-[120px] sm:w-[150px] shrink-0 grayscale hover:grayscale-0 transition-all duration-500">
-                <PlayerCard player={player} variant="compact" />
+              <div key={playerId} className="flex flex-col items-center gap-2 group">
+                <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border border-white/10 bg-white/5 group-hover:border-cyan-500/40 transition-all shadow-lg">
+                  <PlayerAvatar player={player} size="md" mode="head" className="w-full h-full" />
+                  <div className="absolute bottom-0 right-0 bg-black/80 text-white text-[8px] sm:text-[10px] font-black px-1.5 py-0.5 rounded-tl-lg border-t border-l border-white/10">
+                    {player.totalRating}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[9px] sm:text-[10px] font-black text-white uppercase tracking-tight truncate max-w-[80px]">{player.nickname}</div>
+                  <div className="text-[7px] sm:text-[8px] font-bold text-white/30 uppercase tracking-widest">{player.role}</div>
+                </div>
               </div>
             );
           })}

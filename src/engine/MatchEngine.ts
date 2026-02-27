@@ -61,32 +61,42 @@ const pickWeightedRandom = (players: Player[], count: number, attributeKey: keyo
   return selected;
 };
 
+// Dynamic templates will be generated inside the simulation loop
+// but we keep some structural constants here
+const GOAL_DESCRIPTIONS = [
+  "Balançou o capim no fundo do gol! Golaço de {player}!",
+  "Sabe de quem? {player}! Recebe na área e fuzila para as redes!",
+  "É disso que o povo gosta! {player} faz a festa na arquibancada com uma finalização perfeita.",
+  "Ripa na chulipa e pimba na gorduchinha! {player} bota lá no fundo!",
+  "Lá onde a coruja dorme! {player} tira do goleiro e corre pro abraço."
+];
+
+const DEFENSE_DESCRIPTIONS = [
+  "Pelo amor dos meus filhinhos! Que defesa inacreditável do goleiro adversário no chute de {player}!",
+  "Olho no lance... Espalma pro lado! Defesa gigante após a bomba de {player}.",
+  "Xiiii... A zaga travou na hora H! {player} já ia comemorar.",
+  "O goleiro voa como um gato e tira a bola no ângulo! Que chance de {player}.",
+  "Cruzamento cortado! A defesa corta o perigo de {player} na pequena área."
+];
+
 const COMMENTARY_TEMPLATES = [
-  { title: "INÍCIO DE JOGO", description: "O árbitro apita e a bola rola no gramado sintético de Neo-City!" },
-  { title: "ESTRATÉGIA", description: "Os técnicos gesticulam muito na beira do campo, ajuste tático detectado." },
-  { title: "CLIMA", description: "A chuva ácida começa a cair, deixando o gramado mais veloz." },
-  { title: "TORCIDA", description: "Os hologramas da torcida vibram com a intensidade da partida!" },
-  { title: "ANÁLISE", description: "A posse de bola está muito disputada no círculo central." },
-  { title: "CURIOSIDADE", description: "Você sabia? Este estádio foi construído sobre as ruínas da antiga bolsa de valores." },
-  { title: "DESEMPENHO", description: "O sistema de análise aponta alta eficiência nos passes curtos." },
-  { title: "RADAR", description: "Scouts de ligas superiores estão observando alguns talentos hoje." },
-  { title: "FÍSICO", description: "O desgaste começa a aparecer, o ritmo de jogo diminui levemente." },
-  { title: "TÁTICA", description: "Marcação individual por todo o campo, ninguém tem espaço para respirar." },
-  { title: "TECNOLOGIA", description: "O VAR revisou um lance anterior rapidamente, jogo segue limpo." },
-  { title: "DRONES", description: "Drones de transmissão captam ângulos incríveis da disputa aérea." },
-  { title: "ENERGIA", description: "Os refletores de neon aumentam de intensidade para o segundo tempo." },
-  { title: "MERCADO", description: "Rumores indicam que o destaque da partida pode ser transferido em breve." },
-  { title: "SISTEMA", description: "Atualização de firmware dos sensores de campo concluída com sucesso." },
-  { title: "CONFRONTO", description: "Duelos individuais acirrados nas laterais do campo." },
-  { title: "ESTATÍSTICA", description: "O número de interceptações hoje está acima da média da liga." },
-  { title: "ARBITRAGEM", description: "O juiz mantém o controle da partida com autoridade cibernética." },
-  { title: "LOGÍSTICA", description: "A equipe médica está de prontidão com os mais modernos nano-sprays." },
-  { title: "VISÃO", description: "Que visão de jogo! Os lançamentos em profundidade estão perigosos." },
-  { title: "DETERMINAÇÃO", description: "Os jogadores mostram uma vontade incrível de vencer este clássico." },
-  { title: "CONEXÃO", description: "A química entre os meio-campistas está facilitando as transições." },
-  { title: "PRESSÃO", description: "A torcida local aumenta o volume, pressionando o time visitante." },
-  { title: "RESISTÊNCIA", description: "Defesas sólidas de ambos os lados impedem grandes chances." },
-  { title: "FIM DE JOGO", description: "Apito final! Uma partida para ficar na história de 2050." }
+  { title: "INÍCIO DE JOGO", desc: "A bola rola! Começa o duelo no tapete sintético de Neo-City!" },
+  { title: "ESTRATÉGIA", desc: "Os técnicos gesticulam na área técnica, ajuste rápido após os primeiros toques." },
+  { title: "POSSE DE BOLA", desc: "Jogo truncado no meio campo. Ninguém quer abrir alas para o adversário." },
+  { title: "FOCO TOTAL", desc: "Olho no lance! A movimentação no último terço do campo é agressiva." },
+  { title: "RITMO ACELERADO", desc: "Lá vai a equipe buscando a linha de fundo com velocidade absurda!" },
+  { title: "DISPUTA FÍSICA", desc: "Dividida ríspida, mas o árbitro cibernético manda o jogo seguir." },
+  { title: "TRANSCRIÇÃO", desc: "Scouts analisando tempo real: precisão de passes alta nesta etapa." },
+  { title: "PRESSÃO ALTA", desc: "Marcação lá em cima! Não deixam o adversário respirar na saída de bola." },
+  { title: "CADÊNCIA", desc: "Agora o ritmo cai um pouco. A bola gira de um lado pro outro com paciência." },
+  { title: "TORCIDA EM FÚRIA", desc: "Os decibéis dos hologramas batem no teto. Que barulho no estádio!" },
+  { title: "DEFESA SÓLIDA", desc: "A linha de zagueiros funciona que é uma beleza. Parecem um muro!" },
+  { title: "ESTATÍSTICA", desc: "O banco de dados aponta: mais desarmes neste tempo do que na rodada inteira." },
+  { title: "SISTEMA TÁTICO", desc: "Triangulações perigosas! A bola roda de pé em pé buscando brechas." },
+  { title: "FÔLEGO", desc: "Alguns jogadores começam a mostrar cansaço. A exigência física é alta." },
+  { title: "CLIMA", desc: "Chuva fina começa a cair, deixando a bola muito mais rápida neste gramado." },
+  { title: "APROXIMAÇÃO", desc: "Bate e rebate na entrada da área! Defesa se estica toda pra afastar!" },
+  { title: "FIM DE PAPO", desc: "Apito final do árbitro cibernético! Batalha encerrada." }
 ];
 
 export function simulateMatch(
@@ -107,6 +117,11 @@ export function simulateMatch(
 
   let homeShotsOnTarget = 0;
   let awayShotsOnTarget = 0;
+
+  let homeMomentum = 0;
+  let awayMomentum = 0;
+
+  let halfTimeEventPushed = false;
 
   const playerRatings: Record<string, number[]> = {};
   const scorers: Array<{ playerId: string; teamId: string }> = [];
@@ -176,20 +191,25 @@ export function simulateMatch(
     tacticalBonus: (awayEffect.def || 1.0) * (awayCards.def || 1.0) * (1 + (50 - (away.linePosition || 50)) / 200) - (awayMentality.defPenalty || 0)
   };
 
-  // --- INJECT 25 COMMENTARY CARDS (Every 15s in 360s window) ---
+  // --- INJECT COMMENTARY CARDS (Distributed across the match) ---
   for (let i = 0; i < COMMENTARY_COUNT; i++) {
     const second = i * COMMENTARY_INTERVAL_SECONDS;
     const minute = Math.floor((second / MATCH_REAL_TIME_SECONDS) * MATCH_DURATION_MINUTES);
-    const template = COMMENTARY_TEMPLATES[i];
+
+    // Pick appropriate template (start/end anchored, middle randomized)
+    let tmpl;
+    if (i === 0) tmpl = COMMENTARY_TEMPLATES[0]; // INÍCIO
+    else if (i === COMMENTARY_COUNT - 1) tmpl = COMMENTARY_TEMPLATES[COMMENTARY_TEMPLATES.length - 1]; // FIM
+    else tmpl = COMMENTARY_TEMPLATES[1 + Math.floor(Math.random() * (COMMENTARY_TEMPLATES.length - 2))];
 
     events.push({
       id: `comm_${i}_${Date.now()}`,
       minute,
       realTimeSecond: second,
       type: 'COMMENTARY',
-      title: template.title,
-      description: template.description,
-      teamId: 'system' // Special ID for neutral commentary
+      title: tmpl.title,
+      description: tmpl.desc,
+      teamId: 'system' // Neutral
     });
   }
 
@@ -205,8 +225,45 @@ export function simulateMatch(
     const possessionRoll = Math.random() * totalMid;
     const hasPossession = possessionRoll < homeMid ? 'home' : 'away';
 
-    if (hasPossession === 'home') homePossessionWon++;
-    else awayPossessionWon++;
+    if (hasPossession === 'home') {
+      homePossessionWon++;
+      homeMomentum++;
+      awayMomentum = 0;
+    } else {
+      awayPossessionWon++;
+      awayMomentum++;
+      homeMomentum = 0;
+    }
+
+    // Half Time Check
+    if (minute === 45 && !halfTimeEventPushed) {
+      halfTimeEventPushed = true;
+      const baseSecondHalf = Math.floor((45 / MATCH_DURATION_MINUTES) * MATCH_REAL_TIME_SECONDS);
+      events.push({
+        id: `half_time_${Date.now()}`,
+        minute: 45,
+        realTimeSecond: baseSecondHalf,
+        type: 'COMMENTARY',
+        title: 'FIM DO 1º TEMPO',
+        description: `As equipes vão pro vestiário! Placar no intervalo: ${homeScore} a ${awayScore}.`,
+        teamId: 'system'
+      });
+    }
+
+    // Check Momentum Domination
+    if (homeMomentum === 3) {
+      const ms = Math.floor((minute / MATCH_DURATION_MINUTES) * MATCH_REAL_TIME_SECONDS);
+      events.push({
+        id: `mom_h_${minute}_${Date.now()}`, minute, realTimeSecond: ms, type: 'COMMENTARY',
+        title: 'DOMÍNIO ESTABELECIDO', description: `${home.name} domina o meio-campo e não deixa o adversário respirar!`, teamId: 'system'
+      });
+    } else if (awayMomentum === 3) {
+      const ms = Math.floor((minute / MATCH_DURATION_MINUTES) * MATCH_REAL_TIME_SECONDS);
+      events.push({
+        id: `mom_a_${minute}_${Date.now()}`, minute, realTimeSecond: ms, type: 'COMMENTARY',
+        title: 'PRESSÃO ALTA!', description: `Momentum total pro ${away.name}, parece que eles acamparam no campo de ataque!`, teamId: 'system'
+      });
+    }
 
     // Calculate second within the 6-minute (360s) window
     const baseSecond = Math.floor((minute / MATCH_DURATION_MINUTES) * MATCH_REAL_TIME_SECONDS);
@@ -239,13 +296,10 @@ export function simulateMatch(
         const assistant = activeHome[1];
         if (assistant) assists.push({ playerId: assistant.id, teamId: home.id });
 
-        const goalDescriptions = [
-          `Golaço de ${mainAttacker.nickname}! Chute sem chances para o goleiro.`,
-          `${mainAttacker.nickname} recebe livre e empurra para as redes!`,
-          `Que jogada! ${mainAttacker.nickname} dribla o goleiro e marca!`,
-          `Fuzilamento de ${mainAttacker.nickname}! A bola estufa a rede.`,
-          `Pura categoria! ${mainAttacker.nickname} coloca a bola onde a coruja dorme.`
-        ];
+        const descTmpl = GOAL_DESCRIPTIONS[Math.floor(Math.random() * GOAL_DESCRIPTIONS.length)];
+        const goalDesc = assistant
+          ? `${descTmpl.replace('{player}', mainAttacker.nickname)} Com um passe magistral de ${assistant.nickname}!`
+          : descTmpl.replace('{player}', mainAttacker.nickname);
 
         events.push({
           id: `event_${home.id}_${minute}_${Date.now()}_${Math.random()}`,
@@ -253,7 +307,7 @@ export function simulateMatch(
           realTimeSecond: currentEventSecond,
           type: 'GOAL',
           title: 'GOL!',
-          description: goalDescriptions[Math.floor(Math.random() * goalDescriptions.length)],
+          description: goalDesc,
           playerId: mainAttacker.id,
           assistantId: assistant?.id,
           teamId: home.id
@@ -262,13 +316,8 @@ export function simulateMatch(
         homeShots++;
         if (Math.random() > 0.4) homeShotsOnTarget++;
 
-        const defenseDescriptions = [
-          `${defender.nickname} intercepta o chute de ${mainAttacker.nickname}!`,
-          `Milagre! O goleiro espalma a bomba de ${mainAttacker.nickname}!`,
-          `${defender.nickname} trava o chute no momento exato!`,
-          `A zaga do ${away.name} se joga na bola para evitar o gol!`,
-          `Que defesa espetacular de ${defender.nickname}! Impediu o gol certo.`
-        ];
+        const descTmpl = DEFENSE_DESCRIPTIONS[Math.floor(Math.random() * DEFENSE_DESCRIPTIONS.length)];
+        const defDesc = descTmpl.replace('{player}', mainAttacker.nickname);
 
         events.push({
           id: `event_${away.id}_${minute}_${Date.now()}_${Math.random()}`,
@@ -276,7 +325,7 @@ export function simulateMatch(
           realTimeSecond: currentEventSecond,
           type: 'CHANCE',
           title: 'DEFESA!',
-          description: defenseDescriptions[Math.floor(Math.random() * defenseDescriptions.length)],
+          description: defDesc,
           playerId: defender.id,
           teamId: away.id
         });
@@ -337,13 +386,18 @@ export function simulateMatch(
         const assistant = activeAway[1];
         if (assistant) assists.push({ playerId: assistant.id, teamId: away.id });
 
+        const descTmpl = GOAL_DESCRIPTIONS[Math.floor(Math.random() * GOAL_DESCRIPTIONS.length)];
+        const goalDesc = assistant
+          ? `${descTmpl.replace('{player}', mainAttacker.nickname)} Com um passe magistral de ${assistant.nickname}!`
+          : descTmpl.replace('{player}', mainAttacker.nickname);
+
         events.push({
           id: `event_${away.id}_${minute}_goal`,
           minute,
           realTimeSecond: currentEventSecond,
           type: 'GOAL',
           title: 'GOL!',
-          description: `${mainAttacker.nickname} marca para o ${away.name}!`,
+          description: goalDesc,
           playerId: mainAttacker.id,
           assistantId: assistant?.id,
           teamId: away.id
@@ -351,13 +405,17 @@ export function simulateMatch(
       } else if (result.outcome === 'defense') {
         awayShots++;
         if (Math.random() > 0.4) awayShotsOnTarget++;
+
+        const descTmpl = DEFENSE_DESCRIPTIONS[Math.floor(Math.random() * DEFENSE_DESCRIPTIONS.length)];
+        const defDesc = descTmpl.replace('{player}', mainAttacker.nickname);
+
         events.push({
           id: `event_${home.id}_${minute}_defense`,
           minute,
           realTimeSecond: currentEventSecond,
           type: 'CHANCE',
           title: 'DEFESA!',
-          description: `O goleiro do ${home.name} evita o gol de ${mainAttacker.nickname}!`,
+          description: defDesc,
           playerId: defender.id,
           teamId: home.id
         });
@@ -406,11 +464,13 @@ export function simulateMatch(
   });
 
   // Generate Headline
-  let headline = `Empate eletrizante entre ${home.name} e ${away.name}`;
+  let headline = `Equilíbrio total: ${home.name} e ${away.name} dividem os pontos em clássico eletrizante`;
   if (homeScore > awayScore) {
-    headline = homeScore - awayScore >= 3 ? `Massacre! ${home.name} domina o ${away.name}` : `Vitória suada do ${home.name} em casa`;
+    if (homeScore - awayScore >= 3) headline = `Que goleada! ${home.name} massacra ${away.name} e avisa a liga!`;
+    else headline = `Dever cumprido: Vitória suada e importante do ${home.name} em casa`;
   } else if (awayScore > homeScore) {
-    headline = awayScore - homeScore >= 3 ? `Visitante indigesto: ${away.name} goleia` : `${away.name} cala o estádio com vitória nos minutos finais`;
+    if (awayScore - homeScore >= 3) headline = `Passeio no parque! Visitante indigesto, ${away.name} goleia e cala o estádio.`;
+    else headline = `Guerreiros! ${away.name} arranca vitória heroica fora de casa nos minutos finais.`;
   }
 
   return {
@@ -422,7 +482,6 @@ export function simulateMatch(
     scorers,
     assists,
     events,
-    headline,
     stats: {
       possession: {
         home: totalPossession > 0 ? Math.round((homePossessionWon / totalPossession) * 100) : 50,

@@ -20,16 +20,16 @@ export const CompetitionTab = (props: any) => {
   const { state, setState } = useGame();
   const dashData = useDashboardData();
   const { userTeam, upcomingMatches, userTeamMatches } = dashData;
-  const { 
-    handleMockReport, 
-    selectedMatchReport, 
-    setSelectedMatchReport, 
-    setReportSecond 
+  const {
+    handleMockReport,
+    selectedMatchReport,
+    setSelectedMatchReport,
+    setReportSecond
   } = useMatchSimulation(userTeam?.id || null);
   const { handleUpdateTactics } = useTactics(userTeam?.id || null);
   const { handleSetFocus, handleStartCardLab, handleChemistryBoost } = useTraining(userTeam?.id || null);
   const { handleAdvanceDay } = useGameDay();
-  
+
   const [timeLeft, setTimeLeft] = useState<string>('');
 
   React.useEffect(() => {
@@ -37,6 +37,11 @@ export const CompetitionTab = (props: any) => {
     if (!nextMatch) return;
 
     const timer = setInterval(() => {
+      if (state.world.status === 'LOBBY') {
+        setTimeLeft('--D • --H');
+        return;
+      }
+
       const matchDate = new Date(`${nextMatch.date}T${nextMatch.time}`);
       const now = new Date(state.world.currentDate);
       const diff = matchDate.getTime() - now.getTime();
@@ -59,14 +64,14 @@ export const CompetitionTab = (props: any) => {
 
     return () => clearInterval(timer);
   }, [upcomingMatches, state.world.currentDate]);
-  
+
   const calendarEvents = React.useMemo(() => {
     const events: any[] = [];
-    
+
     if (userTeamMatches) {
       userTeamMatches.forEach(m => {
         const matchDate = new Date(`${m.date}T${m.time}`);
-        
+
         events.push({
           id: `match_${m.id}`,
           type: 'match',
@@ -77,10 +82,10 @@ export const CompetitionTab = (props: any) => {
 
         // Generate news for played matches
         if (m.played) {
-          const isWin = (m.homeId === userTeam?.id && m.homeScore > m.awayScore) || 
-                        (m.awayId === userTeam?.id && m.awayScore > m.homeScore);
+          const isWin = (m.homeId === userTeam?.id && m.homeScore > m.awayScore) ||
+            (m.awayId === userTeam?.id && m.awayScore > m.homeScore);
           const isDraw = m.homeScore === m.awayScore;
-          
+
           if (isWin) {
             events.push({
               id: `news_win_${m.id}`,
@@ -90,7 +95,7 @@ export const CompetitionTab = (props: any) => {
               subtitle: `O ${userTeam?.name} superou o ${m.homeId === userTeam?.id ? m.away : m.home} e subiu na tabela.`
             });
           } else if (!isDraw) {
-             events.push({
+            events.push({
               id: `news_loss_${m.id}`,
               type: 'news',
               date: new Date(matchDate.getTime() + 7200000),
@@ -101,7 +106,7 @@ export const CompetitionTab = (props: any) => {
         }
       });
     }
-    
+
     return events.sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [userTeamMatches, userTeam]);
 
@@ -126,22 +131,22 @@ export const CompetitionTab = (props: any) => {
   return (
     <div className="space-y-4 sm:space-y-8 animate-in fade-in duration-700 max-w-6xl mx-auto pb-12 px-2 sm:px-0">
       {/* Main Highlight Match - Futuristic Redesign */}
-      <div className="relative overflow-hidden rounded-[1.5rem] sm:rounded-[2.5rem] bg-black/10 backdrop-blur-3xl border border-cyan-400/20 p-5 sm:p-12 shadow-[0_0_50px_rgba(34,211,238,0.1)] group transition-all duration-700 hover:border-cyan-400/40">
+      <div className="glass-card-neon white-gradient-sheen relative overflow-hidden rounded-[1.5rem] sm:rounded-[2.5rem] border-cyan-400/30 p-5 sm:p-12 shadow-[0_0_50px_rgba(34,211,238,0.15)] group transition-all duration-700 hover:border-cyan-400/50">
         {/* Neon Glow Effects */}
         <div className="absolute top-0 left-0 w-32 h-32 bg-cyan-500/10 blur-[80px] -translate-x-1/2 -translate-y-1/2" />
         <div className="absolute bottom-0 right-0 w-32 h-32 bg-purple-500/10 blur-[80px] translate-x-1/2 translate-y-1/2" />
-        
+
         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 sm:gap-12">
           {/* Left Side: Info */}
           <div className="flex-1 space-y-3 sm:space-y-6 text-center md:text-left">
             <div className="space-y-0.5 sm:space-y-2">
               <h3 className="text-[9px] sm:text-xs font-black text-cyan-400 uppercase tracking-[0.4em] sm:tracking-[0.5em] italic">
-                  PRÓXIMO JOGO
-                </h3>
-                <div className="text-3xl sm:text-7xl font-black text-white tracking-tighter italic leading-tight">
-                  {timeLeft}
-                </div>
+                PRÓXIMO JOGO
+              </h3>
+              <div className="text-3xl sm:text-7xl font-black text-white tracking-tighter italic leading-tight">
+                {state.world.status === 'LOBBY' ? '--D • --H' : timeLeft}
               </div>
+            </div>
 
             <div className="space-y-1">
               <div className="flex items-center justify-center md:justify-start gap-2 sm:gap-3 text-white/80 font-black text-xs sm:text-lg uppercase tracking-tight italic">
@@ -150,7 +155,7 @@ export const CompetitionTab = (props: any) => {
                 <span className={`truncate max-w-[100px] sm:max-w-none ${nextMatch.awayId === userTeam?.id ? 'text-cyan-400' : ''}`}>{nextMatch.away}</span>
               </div>
               <p className="text-[8px] sm:text-xs text-slate-500 font-bold uppercase tracking-[0.2em] sm:tracking-[0.3em]">
-                {formattedDate} • {nextMatch.time} • RODADA {nextMatch.id.split('_')[1]}
+                {state.world.status === 'LOBBY' ? '--/--' : formattedDate} • {state.world.status === 'LOBBY' ? '--:--' : nextMatch.time} • RODADA {nextMatch.id.split('_')[1]}
               </p>
             </div>
           </div>
@@ -159,7 +164,7 @@ export const CompetitionTab = (props: any) => {
           <div className="flex items-center gap-3 sm:gap-8 relative scale-90 sm:scale-100">
             {/* Connection Line */}
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent hidden sm:block" />
-            
+
             <div className="relative group/home">
               <div className="absolute inset-0 bg-cyan-500/20 blur-2xl rounded-full opacity-0 group-hover/home:opacity-100 transition-opacity duration-500" />
               <div className="w-14 h-14 sm:w-28 sm:h-28 rounded-xl sm:rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center shadow-2xl relative overflow-hidden backdrop-blur-md transition-transform duration-500 group-hover/home:scale-110 group-hover/home:border-cyan-500/50">
@@ -234,10 +239,10 @@ export const CompetitionTab = (props: any) => {
                     {/* Date & Time */}
                     <div className="flex flex-col items-center justify-center min-w-[2.5rem] sm:min-w-[4rem] pr-2 sm:pr-3 border-r border-white/5 h-full">
                       <span className="text-[7px] sm:text-[10px] font-black text-white/50 uppercase leading-none mb-0.5">
-                        {event.date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '').toUpperCase()}
+                        {state.world.status === 'LOBBY' ? '--/--' : event.date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '').toUpperCase()}
                       </span>
                       <span className={`text-[8px] sm:text-[11px] font-bold ${isPlayed ? 'text-slate-500' : 'text-cyan-400'} leading-none`}>
-                        {isPlayed ? 'FIM' : event.data.time}
+                        {isPlayed ? 'FIM' : state.world.status === 'LOBBY' ? '--:--' : event.data.time}
                       </span>
                     </div>
 

@@ -24,11 +24,11 @@ export const TrainingTab = (props: any) => {
   const { state, setState } = useGame();
   const dashData = useDashboardData();
   const { userTeam, upcomingMatches } = dashData;
-  const { handleMockVod, setSelectedMatchReport } = useMatchSimulation(userTeam?.id || null);
+  const { handleMockReport, setSelectedMatchReport } = useMatchSimulation(userTeam?.id || null);
   const { handleUpdateTactics } = useTactics(userTeam?.id || null);
   const { handleSetFocus, handleStartCardLab, handleSetPlaystyleTraining } = useTraining(userTeam?.id || null);
   const { handleAdvanceDay } = useGameDay();
-  
+
   // Modal and Interaction States
   const [isEvolutionModalOpen, setIsEvolutionModalOpen] = useState(false);
   const [isStabilizationModalOpen, setIsStabilizationModalOpen] = useState(false);
@@ -77,30 +77,17 @@ export const TrainingTab = (props: any) => {
             Treinamento
           </h2>
         </div>
-        <div className="flex flex-col items-end gap-1">
-          <button
-            onClick={handleAdvanceDay}
-            disabled={isSaving}
-            className={`group flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl font-black transition-all border text-[8px] sm:text-[10px] uppercase tracking-[0.1em] sm:tracking-[0.2em] italic ${isSaving
-              ? 'bg-white/5 border-white/10 text-white/20 cursor-wait'
-              : 'glass-card-neon border-cyan-500/30 text-white hover:border-cyan-500 shadow-lg active:scale-95'
-              }`}
-          >
-            <FastForward size={window.innerWidth < 640 ? 12 : 14} className={isSaving ? 'animate-spin' : 'group-hover:translate-x-1 transition-transform'} />
-            {isSaving ? 'Avançando...' : 'Avançar Dia'}
-          </button>
-        </div>
       </header>
 
       {/* Treino de Estilo */}
       <section className="relative group overflow-hidden rounded-[1.2rem] sm:rounded-[2rem] glass-card-neon p-4 sm:p-6 transition-all hover:scale-[1.01] sm:hover:scale-[1.02] duration-500 shadow-2xl">
         <div className="absolute -top-24 -right-24 w-48 h-48 bg-cyan-500/10 blur-[100px] group-hover:bg-cyan-500/20 transition-all duration-700" />
-        
+
         <div className="relative z-10">
           <div className="flex justify-between items-start mb-3 sm:mb-6">
             <div className="flex flex-col gap-0.5 sm:gap-1">
               <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] text-cyan-400 neon-text-cyan flex items-center gap-2">
-                <BookOpen size={window.innerWidth < 640 ? 10 : 12} /> Doutrina Tática
+                <BookOpen size={window.innerWidth < 640 ? 10 : 12} /> Estilo de Jogo
               </span>
               <span className="text-[8px] sm:text-[10px] font-bold text-white/30 uppercase tracking-widest">Evolução do Estilo Coletivo</span>
             </div>
@@ -108,31 +95,54 @@ export const TrainingTab = (props: any) => {
 
           <button
             onClick={() => setIsPlaystyleModalOpen(true)}
-            className="w-full relative overflow-hidden glass-card border-white/10 hover:border-cyan-500/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 transition-all group/btn"
+            className="w-full relative overflow-hidden glass-card border-white/10 hover:border-cyan-500/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 transition-all group/btn active:scale-95"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-transparent opacity-0 group-hover/btn:opacity-100 transition-opacity" />
-            
-            <div className="relative z-10 flex flex-col items-center gap-3 sm:gap-4">
+
+            <div className="relative z-10 flex flex-col items-center gap-3 sm:gap-5">
               <div className="text-lg sm:text-2xl font-black text-white uppercase italic tracking-tighter group-hover/btn:scale-105 transition-transform duration-500">
-                {state.training.playstyleTraining?.currentStyle || 'Definir Doutrina'}
+                {state.training.playstyleTraining?.currentStyle || 'Definir Estilo'}
               </div>
-              
+
               {state.training.playstyleTraining?.currentStyle ? (
-                <div className="w-full flex flex-col items-center gap-2 sm:gap-3">
-                  <div className="flex justify-between w-full text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-white/40">
-                    <span>Entendimento</span>
-                    <span className="text-cyan-400">{state.training.playstyleTraining.understanding[state.training.playstyleTraining.currentStyle] || 0}%</span>
+                <div className="w-full flex flex-col gap-4">
+                  <div className="w-full flex flex-col gap-1.5 bg-black/40 p-3 rounded-xl border border-white/5 shadow-inner">
+                    <div className="flex justify-between w-full text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-white/40">
+                      <span>Progresso Nível 1</span>
+                      <span className="text-cyan-400">
+                        {Math.min(10, Math.floor((state.training.playstyleTraining.understanding[state.training.playstyleTraining.currentStyle] || 0) / 10))}/10 DIAS
+                      </span>
+                    </div>
+                    <div className="w-full flex gap-1 h-3 sm:h-4">
+                      {Array.from({ length: 10 }).map((_, i) => {
+                        const currentDays = Math.min(10, Math.floor((state.training.playstyleTraining.understanding[state.training.playstyleTraining!.currentStyle] || 0) / 10));
+                        const isFilled = i < currentDays;
+                        return (
+                          <div
+                            key={i}
+                            className={`flex-1 rounded-sm sm:rounded transition-all duration-500 ${isFilled ? 'bg-cyan-500 shadow-[0_0_10px_rgba(34,211,238,0.5)]' : 'bg-white/10'}`}
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="w-full h-1 sm:h-1.5 bg-white/5 rounded-full overflow-hidden p-[1px] border border-white/5">
-                    <div
-                      className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 rounded-full shadow-[0_0_10px_rgba(34,211,238,0.5)] transition-all duration-1000"
-                      style={{ width: `${state.training.playstyleTraining.understanding[state.training.playstyleTraining.currentStyle] || 0}%` }}
-                    />
+
+                  <div className="w-full flex flex-col gap-1.5">
+                    <div className="flex justify-between w-full text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-white/40">
+                      <span>Entendimento Total</span>
+                      <span className="text-emerald-400">{state.training.playstyleTraining.understanding[state.training.playstyleTraining.currentStyle] || 0}%</span>
+                    </div>
+                    <div className="w-full h-1 sm:h-1.5 bg-white/5 rounded-full overflow-hidden p-[1px] border border-white/5">
+                      <div
+                        className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all duration-1000"
+                        style={{ width: `${state.training.playstyleTraining.understanding[state.training.playstyleTraining.currentStyle] || 0}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
               ) : (
-                <div className="text-[8px] sm:text-[9px] text-cyan-400/60 font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] animate-pulse">
-                  Selecione um Estilo para Treinar
+                <div className="text-[8px] sm:text-[9px] text-cyan-400/60 font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] animate-pulse py-4">
+                  Toque para Selecionar um Estilo
                 </div>
               )}
             </div>
@@ -143,7 +153,7 @@ export const TrainingTab = (props: any) => {
       {/* Foco Individual */}
       <section className="relative group overflow-hidden rounded-[1.2rem] sm:rounded-[2rem] glass-card-neon p-4 sm:p-6 transition-all hover:scale-[1.01] sm:hover:scale-[1.02] duration-500 shadow-2xl">
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-fuchsia-500/10 blur-[100px] group-hover:bg-fuchsia-500/20 transition-all duration-700" />
-        
+
         <div className="relative z-10">
           <div className="flex justify-between items-start mb-3 sm:mb-6">
             <div className="flex flex-col gap-0.5 sm:gap-1">
@@ -209,7 +219,7 @@ export const TrainingTab = (props: any) => {
       {/* Laboratório de Cartas */}
       <section className="relative group overflow-hidden rounded-[1.2rem] sm:rounded-[2rem] glass-card-neon p-4 sm:p-6 transition-all hover:scale-[1.01] sm:hover:scale-[1.02] duration-500 shadow-2xl">
         <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-amber-500/10 blur-[100px] group-hover:bg-amber-500/20 transition-all duration-700" />
-        
+
         <div className="relative z-10">
           <div className="flex justify-between items-start mb-3 sm:mb-6">
             <div className="flex flex-col gap-0.5 sm:gap-1">
@@ -259,7 +269,7 @@ export const TrainingTab = (props: any) => {
           <div className="absolute inset-0 bg-black/90 sm:bg-black/80 backdrop-blur-xl sm:backdrop-blur-sm" onClick={() => { setIsEvolutionModalOpen(false); setIsStabilizationModalOpen(false); }} />
           <div className="relative glass-card-neon border-fuchsia-500/30 rounded-[1.5rem] sm:rounded-[2rem] w-full max-w-md max-h-[80vh] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
             <div className="absolute -top-24 -right-24 w-48 h-48 bg-fuchsia-500/10 blur-[100px]" />
-            
+
             <header className="relative z-10 p-4 sm:p-6 border-b border-white/5 bg-white/5">
               <div className="flex flex-col gap-0.5 sm:gap-1">
                 <span className="text-[8px] sm:text-[10px] font-black text-fuchsia-400 uppercase tracking-[0.2em] sm:tracking-[0.3em] neon-text-magenta">Bio-Otimização</span>
@@ -305,7 +315,7 @@ export const TrainingTab = (props: any) => {
           <div className="absolute inset-0 bg-black/80 backdrop-blur-xl" onClick={() => setIsCardLabModalOpen(false)} />
           <div className="relative glass-card-neon border-amber-500/30 rounded-[2rem] w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
             <div className="absolute -top-24 -right-24 w-48 h-48 bg-amber-500/10 blur-[100px]" />
-            
+
             <header className="relative z-10 p-6 border-b border-white/5 bg-white/5 text-center">
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-black text-amber-400 uppercase tracking-[0.3em] neon-text-amber">Lab de Pesquisa</span>
@@ -345,10 +355,10 @@ export const TrainingTab = (props: any) => {
           <div className="absolute inset-0 bg-black/80 backdrop-blur-xl" onClick={() => setIsPlaystyleModalOpen(false)} />
           <div className="relative glass-card-neon border-cyan-500/30 rounded-[2rem] w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
             <div className="absolute -top-24 -right-24 w-48 h-48 bg-cyan-500/10 blur-[100px]" />
-            
+
             <header className="relative z-10 p-6 border-b border-white/5 bg-white/5 text-center">
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.3em] neon-text-cyan">Doutrina Tática</span>
+                <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.3em] neon-text-cyan">Estilo de Jogo</span>
                 <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">Selecionar Estilo</h3>
                 <p className="text-[8px] text-white/30 font-bold uppercase tracking-widest mt-1">O entendimento sobe 1-3% por dia</p>
               </div>
@@ -371,9 +381,8 @@ export const TrainingTab = (props: any) => {
                   <button
                     key={style}
                     onClick={() => handleSetPlaystyleTrainingWithClose(style)}
-                    className={`w-full group relative overflow-hidden glass-card transition-all text-left p-4 rounded-2xl border ${
-                      isActive ? 'border-cyan-500/50 bg-cyan-500/10' : 'border-white/5 hover:border-cyan-500/50'
-                    }`}
+                    className={`w-full group relative overflow-hidden glass-card transition-all text-left p-4 rounded-2xl border ${isActive ? 'border-cyan-500/50 bg-cyan-500/10' : 'border-white/5 hover:border-cyan-500/50'
+                      }`}
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                     <div className="relative z-10 flex justify-between items-center">

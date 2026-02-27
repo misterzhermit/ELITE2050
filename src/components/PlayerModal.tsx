@@ -6,6 +6,7 @@ import { TeamLogo } from './TeamLogo';
 import { PlayerAvatar } from './PlayerAvatar';
 import { useGame } from '../store/GameContext';
 import { calculateTeamPower } from '../engine/gameLogic';
+import { useTransfers } from '../hooks/useTransfers';
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 
 interface PlayerModalProps {
@@ -15,41 +16,41 @@ interface PlayerModalProps {
 
 export const PlayerModal: React.FC<PlayerModalProps> = ({ player, onClose }) => {
   const { state } = useGame();
-  
+
   const getTheme = (district: District) => {
     switch (district) {
-      case 'NORTE': return { 
-        main: 'text-cyan-400', 
-        border: 'border-cyan-400', 
-        bg: 'bg-cyan-950/30', 
+      case 'NORTE': return {
+        main: 'text-cyan-400',
+        border: 'border-cyan-400',
+        bg: 'bg-cyan-950/30',
         glow: 'shadow-[0_0_20px_rgba(34,211,238,0.3)]',
         gradient: 'from-cyan-900/50 to-slate-900'
       };
-      case 'SUL': return { 
-        main: 'text-orange-500', 
-        border: 'border-orange-500', 
-        bg: 'bg-orange-950/30', 
+      case 'SUL': return {
+        main: 'text-orange-500',
+        border: 'border-orange-500',
+        bg: 'bg-orange-950/30',
         glow: 'shadow-[0_0_20px_rgba(249,115,22,0.3)]',
         gradient: 'from-orange-900/50 to-stone-900'
       };
-      case 'LESTE': return { 
-        main: 'text-emerald-500', 
-        border: 'border-emerald-500', 
-        bg: 'bg-emerald-950/30', 
+      case 'LESTE': return {
+        main: 'text-emerald-500',
+        border: 'border-emerald-500',
+        bg: 'bg-emerald-950/30',
         glow: 'shadow-[0_0_20px_rgba(16,185,129,0.3)]',
         gradient: 'from-emerald-900/50 to-slate-900'
       };
-      case 'OESTE': return { 
-        main: 'text-purple-500', 
-        border: 'border-purple-500', 
-        bg: 'bg-purple-950/30', 
+      case 'OESTE': return {
+        main: 'text-purple-500',
+        border: 'border-purple-500',
+        bg: 'bg-purple-950/30',
         glow: 'shadow-[0_0_20px_rgba(168,85,247,0.3)]',
         gradient: 'from-purple-900/50 to-slate-900'
       };
-      default: return { 
-        main: 'text-cyan-400', 
-        border: 'border-cyan-400', 
-        bg: 'bg-cyan-950/30', 
+      default: return {
+        main: 'text-cyan-400',
+        border: 'border-cyan-400',
+        bg: 'bg-cyan-950/30',
         glow: 'shadow-[0_0_20px_rgba(34,211,238,0.3)]',
         gradient: 'from-cyan-900/50 to-slate-900'
       };
@@ -57,9 +58,9 @@ export const PlayerModal: React.FC<PlayerModalProps> = ({ player, onClose }) => 
   };
 
   const theme = getTheme(player.district);
-  
+
   const lastRatings = player.history.lastMatchRatings || [];
-  const currentForm = lastRatings.length > 0 
+  const currentForm = lastRatings.length > 0
     ? (lastRatings.reduce((a, b) => a + b, 0) / lastRatings.length).toFixed(1)
     : 'N/A';
 
@@ -85,18 +86,25 @@ export const PlayerModal: React.FC<PlayerModalProps> = ({ player, onClose }) => 
   const { setState, saveGame } = useGame();
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [showSuccess, setShowSuccess] = React.useState(false);
-  
+
   const userManager = state.userManagerId ? state.managers[state.userManagerId] : null;
   const userTeam = userManager?.career.currentTeamId ? state.teams[userManager.career.currentTeamId] : null;
   const isMyPlayer = userTeam?.squad.includes(player.id);
-  
+  const isFreeAgent = !player.contract.teamId;
+  const isOpponentPlayer = !isMyPlayer && !isFreeAgent;
+
+  const { handleSendTradeOffer } = useTransfers(userTeam?.id || null, calculateTeamPower(userTeam!, state.players), userTeam?.powerCap || 0);
+
+  const [tradeMode, setTradeMode] = React.useState(false);
+  const [selectedOfferId, setSelectedOfferId] = React.useState<string | null>(null);
+
   const handleProposal = async () => {
     if (!userTeam || isMyPlayer || player.satisfaction >= 80) return;
-    
+
     const currentPower = calculateTeamPower(userTeam, state.players);
     const powerCap = userTeam.powerCap ?? (userTeam.league === 'Cyan' ? 12000 : (userTeam.league === 'Orange' || userTeam.league === 'Purple') ? 10000 : 8000);
     const pointsLeft = powerCap - currentPower;
-    
+
     if (pointsLeft < player.totalRating) {
       return; // UI already handles visual feedback or button state
     }
@@ -108,7 +116,7 @@ export const PlayerModal: React.FC<PlayerModalProps> = ({ player, onClose }) => 
 
     // Process Transfer
     const newState = { ...state };
-    
+
     // Add to user team
     newState.teams[userTeam.id] = {
       ...newState.teams[userTeam.id],
@@ -146,62 +154,95 @@ export const PlayerModal: React.FC<PlayerModalProps> = ({ player, onClose }) => 
 
     setState(newState);
     await saveGame(newState);
-    
+
     setShowSuccess(true);
     setIsProcessing(false);
-    
+
     // Close after showing success
     setTimeout(() => {
       onClose();
     }, 1500);
   };
 
-  const handleSellPlayer = async () => {
-    if (!userTeam || !isMyPlayer) return;
-    
-    if (userTeam.squad.length <= 11) {
-      alert('Você não pode vender jogadores se tiver 11 ou menos no elenco!');
+  const [holdProgress, setHoldProgress] = React.useState(0);
+  const holdIntervalRef = React.useRef<NodeJS.Timeout>();
+
+  const startHold = () => {
+    if (isProcessing || !userTeam || !isMyPlayer) return;
+    if (userTeam.squad.length <= 15) {
+      alert('Você precisa de no mínimo 15 jogadores no elenco!');
       return;
     }
-
-    if (window.confirm(`Deseja dispensar ${player.nickname}? O teto de score de ${userTeam.powerCap} pts será mantido.`)) {
-      setIsProcessing(true);
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      const newState = { ...state };
-      
-      // Remove from user team
-      newState.teams[userTeam.id] = {
-        ...newState.teams[userTeam.id],
-        squad: newState.teams[userTeam.id].squad.filter(id => id !== player.id)
-      };
-
-      // Update player contract to free agent
-      newState.players[player.id] = {
-        ...newState.players[player.id],
-        contract: {
-          ...newState.players[player.id].contract,
-          teamId: ''
+    setHoldProgress(0);
+    holdIntervalRef.current = setInterval(() => {
+      setHoldProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(holdIntervalRef.current);
+          handleSellPlayer();
+          return 100;
         }
-      };
+        return prev + 5;
+      });
+    }, 50);
+  };
 
-      // Notification
-      const newNotif = {
-        id: `sell_${Date.now()}`,
-        type: 'transfer' as const,
-        title: 'Atleta Dispensado',
-        message: `${player.nickname} deixou o ${userTeam.name}.`,
-        date: new Date().toISOString(),
-        read: false
-      };
-      newState.notifications = [newNotif, ...newState.notifications];
+  const stopHold = () => {
+    if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
+    if (!isProcessing) setHoldProgress(0);
+  };
 
-      setState(newState);
-      await saveGame(newState);
-      
-      setIsProcessing(false);
-      onClose();
+  const handleSellPlayer = async () => {
+    if (!userTeam || !isMyPlayer) return;
+
+    setIsProcessing(true);
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const newState = { ...state };
+    const teamState = { ...newState.teams[userTeam.id] };
+
+    // Remove from squad
+    teamState.squad = teamState.squad.filter(id => id !== player.id);
+
+    // Remove from lineup if present
+    const newLineup = { ...teamState.lineup };
+    let removedFromLineup = false;
+    Object.keys(newLineup).forEach(pos => {
+      if (newLineup[pos] === player.id) {
+        delete newLineup[pos];
+        removedFromLineup = true;
+      }
+    });
+    if (removedFromLineup) {
+      teamState.lineup = newLineup;
     }
+
+    newState.teams[userTeam.id] = teamState;
+
+    // Update player contract to free agent
+    newState.players[player.id] = {
+      ...newState.players[player.id],
+      contract: {
+        ...newState.players[player.id].contract,
+        teamId: null
+      }
+    };
+
+    // Notification
+    const newNotif = {
+      id: `sell_${Date.now()}`,
+      type: 'transfer' as const,
+      title: 'Atleta Dispensado',
+      message: `${player.nickname} deixou o ${userTeam.name}.`,
+      date: new Date().toISOString(),
+      read: false
+    };
+    newState.notifications = [newNotif, ...newState.notifications];
+
+    setState(newState);
+    await saveGame(newState);
+
+    setIsProcessing(false);
+    onClose();
   };
 
   const playerWithBoot2 = {
@@ -213,77 +254,77 @@ export const PlayerModal: React.FC<PlayerModalProps> = ({ player, onClose }) => 
   };
 
   return (
-    <div 
+    <div
       className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/90 backdrop-blur-md"
       onClick={onClose}
     >
-      <motion.div 
+      <motion.div
         layoutId={`player-card-${player.id}`}
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
-        className={`relative w-full max-w-md bg-slate-950/70 backdrop-blur-2xl rounded-xl border ${theme.border} shadow-[0_0_30px_rgba(0,0,0,0.6)] overflow-hidden flex flex-col`}
+        className={`relative w-full max-w-md max-h-[90vh] bg-slate-950/70 backdrop-blur-2xl rounded-xl border ${theme.border} shadow-[0_0_30px_rgba(0,0,0,0.6)] flex flex-col overflow-y-auto overflow-x-hidden slim-scrollbar`}
       >
-        <button 
+        <button
           onClick={onClose}
           className="absolute top-3 right-3 z-20 p-1.5 bg-black/60 hover:bg-white/10 rounded-full text-white/50 hover:text-white transition-colors"
         >
           <X size={16} />
         </button>
 
-        <div className={`relative h-48 sm:h-56 bg-gradient-to-b ${theme.gradient} flex items-end p-3 sm:p-4 overflow-hidden`}>
-           <div className="absolute inset-0 opacity-20" 
-                style={{ filter: 'blur(2px)' }} 
-           >
-             <PlayerAvatar player={playerWithBoot2} size="xl" mode="full" className="w-full h-full object-cover translate-y-8" />
-           </div>
-           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
-           
-           <div className="relative z-10 flex items-end gap-3 sm:gap-4 w-full">
-             <div className={`w-20 h-20 sm:w-28 sm:h-28 rounded-xl sm:rounded-2xl border ${theme.border} bg-black/60 shadow-2xl overflow-hidden flex-shrink-0 group relative`}>
-                <PlayerAvatar player={playerWithBoot2} size="lg" mode="full" className="w-full h-full object-contain translate-y-2 group-hover:scale-110 transition-transform duration-500" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
-             </div>
-             
-             <div className="flex-1 mb-1">
-               <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
-                 {player.contract.teamId && state.teams[player.contract.teamId]?.logo ? (
-                   <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 overflow-hidden flex items-center justify-center">
-                     <TeamLogo 
-                       primaryColor={state.teams[player.contract.teamId].logo!.primary}
-                       secondaryColor={state.teams[player.contract.teamId].logo!.secondary}
-                       patternId={state.teams[player.contract.teamId].logo!.patternId as any}
-                       symbolId={state.teams[player.contract.teamId].logo!.symbolId}
-                       size={window.innerWidth < 640 ? 12 : 14}
-                     />
-                   </div>
-                 ) : (
-                   <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 overflow-hidden flex items-center justify-center">
-                     <TeamLogo 
-                       primaryColor={theme.main.includes('cyan') ? '#22d3ee' : theme.main.includes('orange') ? '#f97316' : theme.main.includes('emerald') ? '#10b981' : '#a855f7'}
-                       secondaryColor={theme.main.includes('cyan') ? '#0891b2' : theme.main.includes('orange') ? '#c2410c' : theme.main.includes('emerald') ? '#059669' : '#7e22ce'}
-                       patternId="none"
-                       symbolId="Shield"
-                       size={window.innerWidth < 640 ? 12 : 14}
-                     />
-                   </div>
-                 )}
-                 <span className={`text-[8px] sm:text-[10px] font-semibold tracking-[0.2em] uppercase ${theme.main}`}>{player.district} CLAN</span>
-               </div>
-               <h2 className="text-xl sm:text-2xl font-semibold text-white leading-none uppercase tracking-tight drop-shadow-lg flex items-center gap-2 sm:gap-3">
-                 {player.nickname}
-                 <span className="text-[8px] sm:text-[10px] font-bold text-cyan-400 uppercase tracking-widest bg-cyan-900/50 px-1.5 sm:px-2 py-0.5 rounded-lg border border-cyan-500/50">
+        <div className={`relative h-48 sm:h-56 shrink-0 bg-gradient-to-b ${theme.gradient} flex items-end p-3 sm:p-4 overflow-hidden rounded-t-xl`}>
+          <div className="absolute inset-0 opacity-20"
+            style={{ filter: 'blur(2px)' }}
+          >
+            <PlayerAvatar player={playerWithBoot2} size="xl" mode="full" className="w-full h-full object-cover translate-y-8" />
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
+
+          <div className="relative z-10 flex items-end gap-3 sm:gap-4 w-full">
+            <div className={`w-20 h-20 sm:w-28 sm:h-28 rounded-xl sm:rounded-2xl border ${theme.border} bg-black/60 shadow-2xl overflow-hidden flex-shrink-0 group relative`}>
+              <PlayerAvatar player={playerWithBoot2} size="lg" mode="full" className="w-full h-full object-contain translate-y-2 group-hover:scale-110 transition-transform duration-500" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+            </div>
+
+            <div className="flex-1 mb-1">
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+                {player.contract.teamId && state.teams[player.contract.teamId]?.logo ? (
+                  <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 overflow-hidden flex items-center justify-center">
+                    <TeamLogo
+                      primaryColor={state.teams[player.contract.teamId].logo!.primary}
+                      secondaryColor={state.teams[player.contract.teamId].logo!.secondary}
+                      patternId={state.teams[player.contract.teamId].logo!.patternId as any}
+                      symbolId={state.teams[player.contract.teamId].logo!.symbolId}
+                      size={window.innerWidth < 640 ? 12 : 14}
+                    />
+                  </div>
+                ) : (
+                  <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 overflow-hidden flex items-center justify-center">
+                    <TeamLogo
+                      primaryColor={theme.main.includes('cyan') ? '#22d3ee' : theme.main.includes('orange') ? '#f97316' : theme.main.includes('emerald') ? '#10b981' : '#a855f7'}
+                      secondaryColor={theme.main.includes('cyan') ? '#0891b2' : theme.main.includes('orange') ? '#c2410c' : theme.main.includes('emerald') ? '#059669' : '#7e22ce'}
+                      patternId="none"
+                      symbolId="Shield"
+                      size={window.innerWidth < 640 ? 12 : 14}
+                    />
+                  </div>
+                )}
+                <span className={`text-[8px] sm:text-[10px] font-semibold tracking-[0.2em] uppercase ${theme.main}`}>{player.district} CLAN</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-semibold text-white leading-none uppercase tracking-tight drop-shadow-lg flex items-center gap-2 sm:gap-3">
+                {player.nickname}
+                <span className="text-[8px] sm:text-[10px] font-bold text-cyan-400 uppercase tracking-widest bg-cyan-900/50 px-1.5 sm:px-2 py-0.5 rounded-lg border border-cyan-500/50">
                   {player.role === 'GOL' ? 'GOL' : player.role === 'ZAG' ? 'ZAG' : player.role === 'MEI' ? 'MEI' : 'ATA'}
                 </span>
-               </h2>
-               <p className="text-[10px] sm:text-xs text-slate-400 font-medium tracking-wide">{player.name}</p>
-             </div>
-           </div>
+              </h2>
+              <p className="text-[10px] sm:text-xs text-slate-400 font-medium tracking-wide">{player.name}</p>
+            </div>
+          </div>
         </div>
 
         <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
-          
+
           <div className="grid grid-cols-2 gap-2 sm:gap-3">
             <div className="bg-black/50 border border-white/10 rounded-xl p-2.5 sm:p-3 relative overflow-hidden">
               <div className={`absolute top-0 right-0 p-2 opacity-20 ${theme.main}`}>
@@ -336,20 +377,20 @@ export const PlayerModal: React.FC<PlayerModalProps> = ({ player, onClose }) => 
               </div>
 
               <div className="relative h-12 sm:h-14 w-full bg-black/30 rounded-lg border border-white/5 overflow-hidden">
-                 <svg width="100%" height="100%" viewBox={`0 0 ${graphWidth} ${graphHeight}`} preserveAspectRatio="none">
-                   <polyline 
-                      fill="none" 
-                      stroke="currentColor" 
-                      strokeWidth="2" 
-                      points={graphPoints} 
-                      className={`${theme.main} drop-shadow-[0_0_6px_rgba(255,255,255,0.5)]`}
-                   />
-                 </svg>
-                 <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10">
-                   <div className="border-b border-white w-full h-1/4"></div>
-                   <div className="border-b border-white w-full h-1/4"></div>
-                   <div className="border-b border-white w-full h-1/4"></div>
-                 </div>
+                <svg width="100%" height="100%" viewBox={`0 0 ${graphWidth} ${graphHeight}`} preserveAspectRatio="none">
+                  <polyline
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    points={graphPoints}
+                    className={`${theme.main} drop-shadow-[0_0_6px_rgba(255,255,255,0.5)]`}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10">
+                  <div className="border-b border-white w-full h-1/4"></div>
+                  <div className="border-b border-white w-full h-1/4"></div>
+                  <div className="border-b border-white w-full h-1/4"></div>
+                </div>
               </div>
             </div>
 
@@ -389,74 +430,137 @@ export const PlayerModal: React.FC<PlayerModalProps> = ({ player, onClose }) => 
                 <span className={player.satisfaction > 80 ? 'text-emerald-400' : 'text-red-400'}>{player.satisfaction}%</span>
               </div>
               <div className="h-1.5 sm:h-2 mt-2 bg-black/60 rounded-full overflow-hidden border border-white/10">
-                <div 
-                  className={`h-full transition-all duration-500 ${player.satisfaction > 80 ? 'bg-emerald-500' : player.satisfaction > 50 ? 'bg-amber-500' : 'bg-red-500'}`} 
+                <div
+                  className={`h-full transition-all duration-500 ${player.satisfaction > 80 ? 'bg-emerald-500' : player.satisfaction > 50 ? 'bg-amber-500' : 'bg-red-500'}`}
                   style={{ width: `${player.satisfaction}%` }}
                 />
               </div>
             </div>
           </div>
 
-          {!isMyPlayer && (
-             <button 
-               onClick={handleProposal}
-               className={`w-full py-3 sm:py-4 rounded-xl font-black uppercase tracking-[0.3em] sm:tracking-[0.4em] text-[10px] sm:text-[11px] transition-all shadow-lg hover:scale-[1.02] active:scale-[0.98] relative overflow-hidden group/btn ${
-                 showSuccess 
-                   ? 'bg-emerald-500 text-white shadow-[0_0_30px_rgba(16,185,129,0.5)]'
-                   : isProcessing
-                   ? 'bg-slate-700 text-slate-400 cursor-wait'
-                   : player.satisfaction < 80
-                   ? `bg-white text-black hover:bg-cyan-50 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(34,211,238,0.3)]` 
-                   : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
-               }`}
-               disabled={player.satisfaction >= 80 || isProcessing || showSuccess}
-             >
-               <div className="relative z-10 flex items-center justify-center gap-2 sm:gap-3">
-                 {showSuccess ? (
-                   <>
-                     <Activity size={12} className="animate-bounce sm:size-[14px]" />
-                     CONTRATADO COM SUCESSO!
-                   </>
-                 ) : isProcessing ? (
-                   <>
-                     <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-                     NEGOCIANDO...
-                   </>
-                 ) : player.satisfaction >= 80 ? (
-                   <>
-                     <Lock size={12} className="opacity-50 sm:size-[14px]" />
-                     CONTRATO ESTÁVEL
-                   </>
-                 ) : (
-                   <>
-                     <Zap size={12} className="animate-pulse sm:size-[14px]" />
-                     FAZER PROPOSTA ({player.totalRating} PTS)
-                   </>
-                 )}
-               </div>
-               {!isProcessing && !showSuccess && player.satisfaction < 80 && (
-                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent -translate-x-full group-hover/btn:animate-[shimmer_1.5s_infinite]" />
-               )}
-             </button>
+          {isOpponentPlayer && !tradeMode && (
+            <button
+              onClick={() => setTradeMode(true)}
+              className={`w-full py-3 sm:py-4 rounded-xl font-black uppercase tracking-[0.3em] text-[10px] sm:text-[11px] transition-all shadow-lg hover:scale-[1.02] active:scale-[0.98] relative overflow-hidden group/btn bg-purple-600 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:shadow-[0_0_25px_rgba(168,85,247,0.5)]`}
+            >
+              FAZER PROPOSTA DE TROCA
+            </button>
           )}
-          
+
+          {isOpponentPlayer && tradeMode && (
+            <div className="flex flex-col gap-2 p-3 bg-white/5 border border-white/10 rounded-xl">
+              <span className="text-[10px] font-bold text-white uppercase tracking-widest text-center mb-2">Selecione quem oferecer:</span>
+              <div className="flex flex-col gap-1 max-h-32 overflow-y-auto slim-scrollbar">
+                {userTeam?.squad.map(id => {
+                  const p = state.players[id];
+                  if (!p) return null;
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => setSelectedOfferId(id)}
+                      className={`flex justify-between p-2 rounded-lg border text-[10px] uppercase font-bold transition-all ${selectedOfferId === id ? 'bg-cyan-500/20 border-cyan-400 text-white' : 'bg-black/40 border-white/5 text-white/50 hover:text-white'}`}
+                    >
+                      <span>{p.nickname}</span>
+                      <span className="text-cyan-400">{p.totalRating} pts</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => setTradeMode(false)}
+                  className="flex-1 py-2 rounded-lg bg-slate-800 text-white/50 text-[10px] uppercase tracking-widest font-bold"
+                >Cancelar</button>
+                <button
+                  disabled={!selectedOfferId}
+                  onClick={() => {
+                    handleSendTradeOffer(player.id, selectedOfferId!);
+                    onClose();
+                  }}
+                  className={`flex-1 py-2 rounded-lg text-white text-[10px] uppercase tracking-widest font-bold ${selectedOfferId ? 'bg-cyan-500 hover:bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.4)]' : 'bg-slate-700 text-slate-500'}`}
+                >Propor</button>
+              </div>
+            </div>
+          )}
+
+          {isFreeAgent && (
+            <button
+              onClick={handleProposal}
+              className={`w-full py-3 sm:py-4 rounded-xl font-black uppercase tracking-[0.3em] sm:tracking-[0.4em] text-[10px] sm:text-[11px] transition-all shadow-lg hover:scale-[1.02] active:scale-[0.98] relative overflow-hidden group/btn ${showSuccess
+                ? 'bg-emerald-500 text-white shadow-[0_0_30px_rgba(16,185,129,0.5)]'
+                : isProcessing
+                  ? 'bg-slate-700 text-slate-400 cursor-wait'
+                  : player.satisfaction < 80
+                    ? `bg-white text-black hover:bg-cyan-50 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(34,211,238,0.3)]`
+                    : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                }`}
+              disabled={player.satisfaction >= 80 || isProcessing || showSuccess}
+            >
+              <div className="relative z-10 flex items-center justify-center gap-2 sm:gap-3">
+                {showSuccess ? (
+                  <>
+                    <Activity size={12} className="animate-bounce sm:size-[14px]" />
+                    CONTRATADO COM SUCESSO!
+                  </>
+                ) : isProcessing ? (
+                  <>
+                    <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                    NEGOCIANDO...
+                  </>
+                ) : player.satisfaction >= 80 ? (
+                  <>
+                    <Lock size={12} className="opacity-50 sm:size-[14px]" />
+                    CONTRATO ESTÁVEL
+                  </>
+                ) : (
+                  <>
+                    <Zap size={12} className="animate-pulse sm:size-[14px]" />
+                    ASSINAR LIVRE ({player.totalRating} PTS)
+                  </>
+                )}
+              </div>
+              {!isProcessing && !showSuccess && player.satisfaction < 80 && (
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent -translate-x-full group-hover/btn:animate-[shimmer_1.5s_infinite]" />
+              )}
+            </button>
+          )}
+
           {isMyPlayer && (
-             <div className="flex flex-col gap-2 sm:gap-3">
-               <div className="w-full py-3 sm:py-4 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center gap-2 sm:gap-3">
-                 <Shield size={14} className="text-cyan-400 sm:size-[16px]" />
-                 <span className="text-[10px] sm:text-[11px] font-black text-white/40 uppercase tracking-[0.2em] sm:tracking-[0.3em]">Atleta do seu Elenco</span>
-               </div>
-               
-               <button 
-                 onClick={handleSellPlayer}
-                 className="w-full py-3 sm:py-4 rounded-xl font-black uppercase tracking-[0.3em] sm:tracking-[0.4em] text-[10px] sm:text-[11px] bg-red-950/40 text-red-400 border border-red-500/30 hover:bg-red-900/40 hover:border-red-400 transition-all"
-               >
-                 Dispensar Atleta
-               </button>
-             </div>
+            <div className="flex flex-col gap-2 sm:gap-3">
+              <div className="w-full py-3 sm:py-4 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center gap-2 sm:gap-3">
+                <Shield size={14} className="text-cyan-400 sm:size-[16px]" />
+                <span className="text-[10px] sm:text-[11px] font-black text-white/40 uppercase tracking-[0.2em] sm:tracking-[0.3em]">Atleta do seu Elenco</span>
+              </div>
+
+              <button
+                onPointerDown={startHold}
+                onPointerUp={stopHold}
+                onPointerLeave={stopHold}
+                disabled={isProcessing}
+                className={`relative w-full py-3 sm:py-4 rounded-xl font-black uppercase tracking-[0.3em] sm:tracking-[0.4em] text-[10px] sm:text-[11px] transition-all flex items-center justify-center gap-2 overflow-hidden ${isProcessing
+                  ? 'bg-slate-800 text-slate-500 cursor-wait border border-slate-700'
+                  : 'bg-red-950/40 text-red-400 border border-red-500/30 hover:bg-red-900/40 hover:border-red-400 active:scale-95'
+                  }`}
+              >
+                {/* Hold Progress Bar */}
+                {!isProcessing && holdProgress > 0 && (
+                  <div
+                    className="absolute left-0 top-0 bottom-0 bg-red-600/80 transition-all duration-75 z-0 flex items-center justify-end pr-2 overflow-hidden"
+                    style={{ width: `${holdProgress}%` }}
+                  >
+                    <div className="w-1 h-full bg-white/50 animate-pulse" />
+                  </div>
+                )}
+
+                <span className="relative z-10">
+                  {isProcessing ? 'PROCESSANDO...' : holdProgress > 0 ? 'SEGURE PARA DISPENSAR...' : 'DISPENSAR ATLETA'}
+                </span>
+              </button>
+            </div>
           )}
-          
-          <style dangerouslySetInnerHTML={{ __html: `
+
+          <style dangerouslySetInnerHTML={{
+            __html: `
             @keyframes shimmer {
               100% { transform: translateX(100%); }
             }

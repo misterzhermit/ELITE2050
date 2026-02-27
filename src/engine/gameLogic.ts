@@ -430,6 +430,95 @@ const buildTopMovers = (prevState: GameState, newState: GameState, count: number
   return { rises, falls };
 };
 
+// --- SIMULATE AI BEHAVIOR LOGIC ---
+const simulateAITeamDay = (state: GameState, teamId: string) => {
+  const team = state.teams[teamId];
+  if (!team) return;
+
+  const squadPlayers = team.squad.map(id => state.players[id]).filter(p => !!p);
+
+  // 1. Check satisfaction & release (40% chance if satisfaction < 45)
+  // Need to ensure squad doesnt drop below 15 for safety
+  squadPlayers.forEach(player => {
+    if (team.squad.length > SAFETY_NET_MIN_PLAYERS && player.satisfaction < 45) {
+      if (Math.random() < 0.40) {
+        // Release player
+        player.contract.teamId = '';
+        team.squad = team.squad.filter(id => id !== player.id);
+
+        // Remove from lineup if present
+        Object.keys(team.lineup).forEach(pos => {
+          if (team.lineup[pos as any] === player.id) {
+            delete team.lineup[pos as any];
+          }
+        });
+
+        state.notifications.unshift({
+          id: `ai_release_${Date.now()}_${player.id}`,
+          date: state.world.currentDate,
+          title: 'Jogador Dispensado pela IA',
+          message: `O ${team.name} dispensou ${player.nickname} devido a baixa satisfação.`,
+          type: 'transfer',
+          read: false
+        });
+      }
+    }
+  });
+
+  // 2. Sign Free Agents if squad < 16
+  if (team.squad.length < 16 && state.world.transferWindowOpen) {
+    const freeAgents = Object.values(state.players)
+      .filter(p => p.contract.teamId === '')
+      .sort((a, b) => b.totalRating - a.totalRating);
+
+    if (freeAgents.length > 0) {
+      const bestAvailable = freeAgents[0];
+      const newTotalPower = calculateTeamPower(team, state.players) + bestAvailable.totalRating;
+
+      // Safety check: ensure AI doesn't break powerCap limits during normal signing
+      if (newTotalPower <= (team.powerCap || MAX_TEAM_POWER_TIER_1)) {
+        bestAvailable.contract.teamId = team.id;
+        team.squad.push(bestAvailable.id);
+
+        state.notifications.unshift({
+          id: `ai_sign_${Date.now()}_${bestAvailable.id}`,
+          date: state.world.currentDate,
+          title: 'Mercado Agitado',
+          message: `Sem muito alarde, o ${team.name} contratou o agente livre ${bestAvailable.nickname}.`,
+          type: 'transfer',
+          read: false
+        });
+      }
+    }
+  }
+
+  // 3. Adapt Playstyle after losses. Since we don't have consecutiveLosses tracking,
+  // we do a simple check over the league's played matches for this team.
+  // We look backwards from currentRound downward.
+  const leagueId = team.district.toLowerCase();
+  const league = state.world.leagues[leagueId as keyof typeof state.world.leagues];
+  if (league && league.matches) {
+    const myMatches = league.matches.filter(m => m.played && (m.homeTeamId === team.id || m.awayTeamId === team.id));
+    // Sort by round desc
+    myMatches.sort((a, b) => b.round - a.round);
+
+    if (myMatches.length >= 3) {
+      const last3 = myMatches.slice(0, 3);
+      const isLoss = (m: any) => {
+        const scoreA = m.homeTeamId === team.id ? m.homeScore : m.awayScore;
+        const scoreB = m.homeTeamId === team.id ? m.awayScore : m.homeScore;
+        return scoreA < scoreB;
+      };
+      if (last3.every(isLoss)) {
+        // Change playstyle to 'Retranca Armada' if they are taking too many goals, or random otherwise
+        const current = team.tactics.playStyle;
+        const alternatives: any[] = ['Retranca Armada', 'Equilibrado', 'Vertical'];
+        team.tactics.playStyle = alternatives.find(s => s !== current) || 'Retranca Armada';
+      }
+    }
+  }
+};
+
 // --- Main Advance Function ---
 
 export const advanceGameDay = (prevState: GameState, skipDateIncrement = false): GameState => {
@@ -463,7 +552,8 @@ export const advanceGameDay = (prevState: GameState, skipDateIncrement = false):
   const isMatchDay = isSeasonMatchDay(dayNumber);
 
   // Transfer Window Logic
-  world.transferWindowOpen = dayNumber <= 2 || dayNumber >= SEASON_DAYS;
+  // Open only if it's NOT a match day, OR if it's pre-season/post-season
+  world.transferWindowOpen = (!isMatchDay && dayNumber > 0 && dayNumber < SEASON_DAYS) || dayNumber <= 2 || dayNumber >= SEASON_DAYS;
 
   // --- Progress Card Laboratory ---
   if (state.training?.cardLaboratory?.slots) {
@@ -536,6 +626,14 @@ export const advanceGameDay = (prevState: GameState, skipDateIncrement = false):
 
     state.training.playstyleTraining.understanding[currentStyle] = newUnderstanding;
   }
+
+  // --- Process AI Daily Routines ---
+  Object.keys(state.teams).forEach(teamId => {
+    // Basic check: don't automate the human user team
+    if (teamId !== state.userTeamId) {
+      simulateAITeamDay(state, teamId);
+    }
+  });
 
   if (isMatchDay) {
     const round = getRoundFromDay(dayNumber);

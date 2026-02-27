@@ -27,15 +27,15 @@ export const HomeTab = () => {
     const current = new Date(state.world.currentDate);
     return Math.floor((current.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   }, [state.world.currentDate, state.world.seasonStartReal]);
-  const { 
-    handleStartReport, 
-    handleMockReport, 
-    selectedMatchReport, 
-    setSelectedMatchReport, 
-    isWatchingReport, 
-    setIsWatchingReport, 
-    reportSecond, 
-    setReportSecond 
+  const {
+    handleStartReport,
+    handleMockReport,
+    selectedMatchReport,
+    setSelectedMatchReport,
+    isWatchingReport,
+    setIsWatchingReport,
+    reportSecond,
+    setReportSecond
   } = useMatchSimulation(userTeam?.id || null);
   const { handleUpdateTactics } = useTactics(userTeam?.id || null);
   const { handleSetFocus, handleStartCardLab, handleChemistryBoost } = useTraining(userTeam?.id || null);
@@ -52,10 +52,10 @@ export const HomeTab = () => {
       const userScore = isHome ? lastMatch.homeScore : lastMatch.awayScore;
       const oppScore = isHome ? lastMatch.awayScore : lastMatch.homeScore;
       const opponentName = isHome ? lastMatch.away : lastMatch.home;
-      
+
       const isWin = userScore > oppScore;
       const isDraw = userScore === oppScore;
-      
+
       return {
         type: 'match',
         title: isWin ? "Vitória Espetacular!" : isDraw ? "Empate Tático" : "Derrota Amarga",
@@ -73,11 +73,11 @@ export const HomeTab = () => {
   // Calendar events for news feed
   const newsFeed = React.useMemo(() => {
     const feed: any[] = [];
-    
+
     if (pastMatches) {
       pastMatches.slice(0, 5).forEach(m => {
-        const isWin = (m.homeId === userTeam?.id && m.homeScore > m.awayScore) || 
-                      (m.awayId === userTeam?.id && m.awayScore > m.homeScore);
+        const isWin = (m.homeId === userTeam?.id && m.homeScore > m.awayScore) ||
+          (m.awayId === userTeam?.id && m.awayScore > m.homeScore);
         const isDraw = m.homeScore === m.awayScore;
         const opponent = m.homeId === userTeam?.id ? m.away : m.home;
 
@@ -113,7 +113,7 @@ export const HomeTab = () => {
     if (!userLeague) return null;
 
     const userMatches = userLeague.matches.filter(m => (m.homeTeamId === userTeam.id || m.awayTeamId === userTeam.id));
-    
+
     // 1. Find a match that is currently PLAYING
     let match = userMatches.find(m => {
       // Force correct date for check
@@ -124,7 +124,7 @@ export const HomeTab = () => {
       const mCopy = { ...m, date: correctDate };
       return getMatchStatus(mCopy, state.world.currentDate) === 'PLAYING';
     });
-    
+
     // 2. If none, find a match that is LOCKED or SCHEDULED (the next one)
     if (!match) {
       match = userMatches.find(m => {
@@ -137,7 +137,7 @@ export const HomeTab = () => {
         return status === 'LOCKED' || status === 'SCHEDULED';
       });
     }
-    
+
     // 3. If still none, check if there was a match today that is already FINISHED
     if (!match) {
       const todayStr = state.world.currentDate.split('T')[0];
@@ -147,11 +147,11 @@ export const HomeTab = () => {
         const d = new Date(seasonStart);
         d.setDate(d.getDate() + (match.round * 2));
         const correctDate = d.toISOString().split('T')[0];
-        
+
         // Match finished if played OR if time passed logically
         const mCopy = { ...m, date: correctDate };
         const status = getMatchStatus(mCopy, state.world.currentDate);
-        
+
         return (m.played || status === 'FINISHED') && correctDate === todayStr;
       });
     }
@@ -306,28 +306,6 @@ export const HomeTab = () => {
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-5xl mx-auto pb-8 px-2 sm:px-0">
-      {/* Lobby Hero Section */}
-      {isLobby && (
-        <div className="relative overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] border border-cyan-500/20 bg-black/40 backdrop-blur-xl p-6 sm:p-8 mb-2">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/10 blur-[100px] -mr-32 -mt-32" />
-          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 sm:gap-8">
-            <div className="flex-1 text-center md:text-left">
-              <h2 className="text-2xl sm:text-4xl font-black italic text-white mb-2 sm:mb-3 tracking-tight">
-                PREPARAÇÃO <span className="text-cyan-400">FINAL</span>
-              </h2>
-              <p className="text-white/60 text-sm sm:text-lg max-w-xl leading-relaxed">
-                A temporada 2050 ainda não começou. Ajuste seu elenco, defina suas táticas e prepare seus atletas no Centro de Treinamento antes da estreia.
-              </p>
-            </div>
-            <button
-              onClick={handleStartSeason}
-              className="w-full sm:w-auto px-8 sm:px-10 py-4 sm:py-5 bg-cyan-500 text-black font-black italic rounded-2xl hover:bg-cyan-400 transition-all shadow-[0_0_30px_rgba(6,182,212,0.3)] hover:scale-105 active:scale-95 uppercase tracking-widest text-sm sm:text-lg"
-            >
-              Iniciar Temporada
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* SYNC INDICATOR */}
       {isSyncing && (
@@ -340,10 +318,10 @@ export const HomeTab = () => {
       {/* TOP ROW: Premium Status Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
         {/* CARD 1: PRÓXIMO CONFRONTO - FUTURISTIC REDESIGN */}
-        <div className="relative group overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] bg-black/10 backdrop-blur-3xl border border-cyan-400/20 p-4 sm:p-8 transition-all duration-700 hover:border-cyan-400/40 shadow-[0_0_50px_rgba(34,211,238,0.1)] min-h-[160px] sm:min-h-[220px] flex flex-col justify-center">
+        <div className="relative group overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] glass-card-neon neon-border-cyan white-gradient-sheen p-4 sm:p-8 transition-all duration-700 min-h-[160px] sm:min-h-[220px] flex flex-col justify-center">
           {/* Neon Glow Effects */}
-          <div className="absolute top-0 left-0 w-32 h-32 bg-cyan-500/10 blur-[80px] -translate-x-1/2 -translate-y-1/2" />
-          <div className="absolute bottom-0 right-0 w-32 h-32 bg-fuchsia-500/10 blur-[80px] translate-x-1/2 translate-y-1/2" />
+          <div className="absolute top-0 left-0 w-32 h-32 bg-cyan-500/20 blur-[80px] -translate-x-1/2 -translate-y-1/2" />
+          <div className="absolute bottom-0 right-0 w-32 h-32 bg-fuchsia-500/20 blur-[80px] translate-x-1/2 translate-y-1/2" />
 
           <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-6">
             <div className="flex-1 space-y-4 text-center sm:text-left">
@@ -359,16 +337,18 @@ export const HomeTab = () => {
                     </div>
                   )}
                 </div>
-                
+
                 <div className="text-4xl sm:text-6xl font-black text-white tracking-tighter italic">
-                  {nextMatchData?.status === 'PLAYING' ? (
+                  {isLobby ? (
+                    <span className="text-white/20 text-2xl sm:text-4xl">—</span>
+                  ) : nextMatchData?.status === 'PLAYING' ? (
                     <div className="flex items-center gap-4">
                       <span>{nextMatchData.match.homeScore}</span>
                       <span className="text-white/20">-</span>
                       <span>{nextMatchData.match.awayScore}</span>
                     </div>
                   ) : (
-                    timeLeft || '00:00'
+                    timeLeft || 'Aguardando...'
                   )}
                 </div>
               </div>
@@ -381,7 +361,7 @@ export const HomeTab = () => {
                     <span className={!nextMatchData.isHome ? 'text-cyan-400' : ''}>{nextMatchData.opponent?.name}</span>
                   </div>
                   <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-[0.3em]">
-                    {new Date(`${nextMatchData.match.date}T${nextMatchData.match.time}`).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).replace('.', '').toUpperCase()} • {nextMatchData.match.time}
+                    {isLobby ? '--/--' : new Date(`${nextMatchData.match.date}T${nextMatchData.match.time}`).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).replace('.', '').toUpperCase()} • {isLobby ? '--:--' : nextMatchData.match.time}
                   </p>
                 </div>
               ) : (
@@ -425,9 +405,9 @@ export const HomeTab = () => {
         </div>
 
         {/* CARD 2: SCORE BALANCE / TETO DE PODER */}
-        <div className="relative group overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] glass-card-neon p-4 sm:p-8 transition-all hover:scale-[1.02] duration-500 shadow-2xl min-h-[160px] sm:min-h-[220px] flex flex-col justify-between">
-          <div className="absolute -top-24 -right-24 w-48 h-48 bg-fuchsia-500/10 blur-[100px] group-hover:bg-fuchsia-500/20 transition-all duration-700" />
-          <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-cyan-500/10 blur-[100px] group-hover:bg-cyan-500/20 transition-all duration-700" />
+        <div className="relative group overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] glass-card-neon neon-border-magenta white-gradient-sheen p-4 sm:p-8 transition-all hover:scale-[1.02] duration-500 min-h-[160px] sm:min-h-[220px] flex flex-col justify-between">
+          <div className="absolute -top-24 -right-24 w-48 h-48 bg-fuchsia-500/20 blur-[100px] group-hover:bg-fuchsia-500/30 transition-all duration-700" />
+          <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-cyan-500/20 blur-[100px] group-hover:bg-cyan-500/30 transition-all duration-700" />
 
           <div className="relative z-10 flex flex-col h-full justify-between gap-6">
             <div className="flex justify-between items-start">
@@ -458,12 +438,11 @@ export const HomeTab = () => {
 
               <div className="flex-1 max-w-[120px]">
                 <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/10 shadow-inner p-[1px]">
-                  <div 
-                    className={`h-full rounded-full transition-all duration-1000 ${
-                      pointsLeft < 0 ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.6)]' : 
-                      pointsLeft < 500 ? 'bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.6)]' : 
-                      'bg-gradient-to-r from-cyan-500 to-fuchsia-500 shadow-[0_0_15px_rgba(34,211,238,0.6)]'
-                    }`}
+                  <div
+                    className={`h-full rounded-full transition-all duration-1000 ${pointsLeft < 0 ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.6)]' :
+                      pointsLeft < 500 ? 'bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.6)]' :
+                        'bg-gradient-to-r from-cyan-500 to-fuchsia-500 shadow-[0_0_15px_rgba(34,211,238,0.6)]'
+                      }`}
                     style={{ width: `${Math.min((totalPoints / powerCap) * 100, 100)}%` }}
                   />
                 </div>
@@ -479,7 +458,7 @@ export const HomeTab = () => {
         <div className="lg:col-span-2">
           <div
             onClick={() => headlineData.type === 'match' && headlineData.match ? setSelectedMatchReport(headlineData.match) : null}
-            className={`relative group overflow-hidden rounded-xl glass-card border-white/10 p-3 sm:p-4 transition-all hover:neon-border-magenta shadow-xl ${headlineData.type === 'match' ? 'cursor-pointer' : ''}`}
+            className={`relative group overflow-hidden rounded-[2rem] glass-card-neon white-gradient-sheen border border-magenta-500/20 p-4 sm:p-6 transition-all hover:border-magenta-500/50 shadow-[0_0_30px_rgba(217,70,239,0.15)] ${headlineData.type === 'match' ? 'cursor-pointer' : ''}`}
           >
             {/* Background Accent */}
             <div className="absolute top-0 right-0 w-48 h-48 bg-magenta-500/10 blur-[80px] -mr-24 -mt-24 group-hover:bg-magenta-500/20 transition-all" />
@@ -593,13 +572,13 @@ export const HomeTab = () => {
               const homeTeam = state.teams[m.homeTeamId];
               const awayTeam = state.teams[m.awayTeamId];
               return (
-                <div key={i} className="group relative glass-card border-white/5 rounded-xl p-3 hover:neon-border-cyan transition-all cursor-pointer overflow-hidden">
-                  <div className="absolute top-0 right-0 w-8 h-8 bg-cyan-500/5 blur-lg group-hover:bg-cyan-500/10 transition-all" />
+                <div key={i} className="group relative glass-card-neon white-gradient-sheen border-white/5 rounded-xl sm:rounded-2xl p-3 sm:p-4 hover:border-cyan-500/30 hover:shadow-[0_0_20px_rgba(34,211,238,0.2)] transition-all cursor-pointer overflow-hidden">
+                  <div className="absolute top-0 right-0 w-12 h-12 bg-cyan-500/10 blur-xl group-hover:bg-cyan-500/20 transition-all" />
 
                   <div className="relative z-10">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-[7px] text-cyan-400 font-black uppercase tracking-widest italic">{m.date.split('-').reverse().slice(0, 2).join('/')}</span>
-                      <span className="text-[7px] text-white font-black tabular-nums">{m.time}</span>
+                      <span className="text-[7px] text-cyan-400 font-black uppercase tracking-widest italic">{isLobby ? '--/--' : m.date.split('-').reverse().slice(0, 2).join('/')}</span>
+                      <span className="text-[7px] text-white font-black tabular-nums">{isLobby ? '--:--' : m.time}</span>
                     </div>
 
                     <div className="space-y-1.5">
@@ -651,7 +630,7 @@ export const HomeTab = () => {
             <div className="w-3 h-[1px] bg-purple-500/50" />
             Sistema
           </h3>
-          <div className="glass-card border-white/5 rounded-xl overflow-hidden shadow-lg">
+          <div className="glass-card-neon white-gradient-sheen border-purple-500/20 rounded-xl sm:rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(168,85,247,0.1)]">
             <div className="divide-y divide-white/5">
               {[
                 { label: 'Otimização Tática', time: 'AGORA', status: 'cyan', icon: Zap },

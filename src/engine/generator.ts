@@ -607,8 +607,8 @@ export const generateInitialState = (): GameState => {
     userTeamId: null,
     userManagerId: null,
     lastHeadline: {
-      title: "Temporada Iniciada",
-      message: "A nova era do futebol de elite começa hoje em Neo-City. Quem dominará os distritos?"
+      title: "Pré-Temporada",
+      message: "Tudo preparado para a formação de elencos e treinamentos. O campeonato aguarda a largada oficial."
     },
     notifications: [],
     training: {

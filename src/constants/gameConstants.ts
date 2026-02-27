@@ -32,8 +32,8 @@ export const PLAYER_PHASE_HISTORY_SIZE = 5;
 
 // --- Match Engine ---
 export const MATCH_DURATION_MINUTES = 90;
-export const MATCH_REAL_TIME_SECONDS = 300; // 5 minutes real-time per match
-export const COMMENTARY_INTERVAL_SECONDS = 12; // Adjusted for 5 min match (300/25 events approx)
+export const MATCH_REAL_TIME_SECONDS = 120; // 2 minutes real-time per match
+export const COMMENTARY_INTERVAL_SECONDS = 4.8; // Adjusted for 2 min match (120/25 events approx)
 export const COMMENTARY_COUNT = 25;
 
 // --- Team Composition ---

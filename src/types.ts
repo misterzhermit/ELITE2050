@@ -85,6 +85,9 @@ export interface TeamTactics {
   mentality?: Mentality;
   linePosition?: number; // 0 (Recuada) to 100 (Alta)
   aggressiveness?: number; // 0 (Sombra) to 100 (Caçada)
+  intensity?: number; // 0 to 100
+  width?: number; // 0 to 100
+  passing?: number; // 0 to 100
   slots?: (TacticalCard | null)[]; // Max 3 slots
   preferredFormation: string;
 }
@@ -135,6 +138,18 @@ export interface Manager {
 }
 
 export type MatchStatus = 'SCHEDULED' | 'LOCKED' | 'PLAYING' | 'FINISHED';
+
+export type CardType = 'CARD_YELLOW' | 'CARD_RED' | 'COMMENTARY' | 'INJURY' | 'HALF_TIME';
+
+export interface TradeOffer {
+  id: string;
+  fromTeamId: string;
+  toTeamId: string;
+  offeredPlayerId: string;
+  requestedPlayerId: string;
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED';
+  date: string;
+}
 
 export interface MatchEvent {
   id: string;

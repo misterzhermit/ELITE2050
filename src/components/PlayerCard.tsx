@@ -148,15 +148,19 @@ const PlayerCardComponent: React.FC<PlayerCardProps> = ({ player, onClick, onPro
         onDragStart={(e: any) => onDragStart && onDragStart(e, player)}
         className={`relative w-full aspect-[1/1.3] sm:aspect-[1/1.5] rounded-xl border bg-gradient-to-br ${style.bg} ${style.border} shadow-[0_2px_8px_rgba(0,0,0,0.2)] ${draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} hover:scale-[1.05] transition-transform flex flex-col justify-between p-1 sm:p-1.5 overflow-hidden backdrop-blur-md`}
       >
-        {/* Background Image Overlay */}
-        <div
-          className="absolute inset-0 opacity-50 mix-blend-luminosity"
-          style={{ backgroundImage: `url(https://picsum.photos/seed/${player.id}/200/300)`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent pointer-events-none" />
+        {/* Background Avatar */}
+        <div className="absolute inset-0 z-10">
+          <PlayerAvatar
+            player={player}
+            size="xl"
+            mode="full"
+            className="w-full h-full object-cover object-top opacity-60 group-hover:scale-105 transition-transform duration-700"
+          />
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent pointer-events-none z-20" />
 
         {/* Top Section */}
-        <div className="relative z-10 flex justify-between items-start">
+        <div className="relative z-30 flex justify-between items-start">
           <div className="flex flex-col items-center">
             <span className={`text-base sm:text-lg font-black leading-none drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] ${style.text}`}>{player.totalRating}</span>
             <span className="text-[5px] sm:text-[6px] font-bold uppercase tracking-widest text-white/80 mt-0.5">
@@ -180,7 +184,7 @@ const PlayerCardComponent: React.FC<PlayerCardProps> = ({ player, onClick, onPro
         </div>
 
         {/* Bottom Section */}
-        <div className="relative z-10 flex flex-col gap-0.5">
+        <div className="relative z-30 flex flex-col gap-0.5">
           <div className="text-center">
             <div className="flex items-center justify-center gap-1">
               <h3 className="text-[7px] sm:text-[8px] font-black leading-tight uppercase tracking-tight text-white drop-shadow-md truncate">{player.nickname}</h3>

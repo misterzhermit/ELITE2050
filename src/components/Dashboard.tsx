@@ -9,14 +9,41 @@ import { WorldTab } from './dashboard/WorldTab';
 import { DatabaseTab } from './dashboard/DatabaseTab';
 import { CareerTab } from './dashboard/CareerTab';
 import { NewGameFlow } from './NewGameFlow';
-import { Users, Brain, Target, Home, Trophy, History, MessageSquare, Shield, Clock, TrendingUp, Save, Rocket, PlayCircle, LogOut } from 'lucide-react';
+import { Users, Brain, Target, Home, Trophy, History, MessageSquare, Shield, Clock, TrendingUp, Save, Rocket, PlayCircle, LogOut, Calendar, Briefcase, Globe } from 'lucide-react';
 import { useGameDispatch, useGameState } from '../store/GameContext';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// --- Haptics & Sound Engine ---
+const playClickSound = () => {
+  try {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioContext) {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.05);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.05);
+    }
+  } catch (e) { } // Ignore if browser blocks it
+};
+
+const triggerHaptic = () => {
+  if (typeof navigator !== 'undefined' && navigator.vibrate) {
+    navigator.vibrate(15);
+  }
+};
 
 import { useDashboardData } from '../hooks/useDashboardData';
 
 type Tab = 'home' | 'team' | 'calendar' | 'world' | 'career';
-type TeamSubTab = 'squad' | 'tactics' | 'training';
+type TeamSubTab = 'squad' | 'lineup' | 'tactics' | 'training';
 
 export const Dashboard: React.FC = () => {
   const { state, isPaused } = useGameState();
@@ -26,10 +53,14 @@ export const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [activeTeamTab, setActiveTeamTab] = useState<TeamSubTab>('squad');
 
-  // Background image URL (referenced by the generated artifact name or logic)
-  const bgImage = "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070&auto=format&fit=crop";
-  // Note: Since I generated an image, I will use a local reference or a high-quality placeholder that matches the style if local isn't ready.
-  // Actually, I should use the one I generated if I can refer to it, but for now I'll use a CSS class approach.
+  const bgImages = {
+    home: '/home.jpg',
+    team: '/elenco.jpg',
+    calendar: '/calendar.jpg',
+    world: '/mundo.jpg',
+    career: '/carreira.jpg',
+  };
+  const bgImage = bgImages[activeTab] || "/home.jpg";
 
   // Patch state if training is missing (compatibility with old saves)
   useEffect(() => {
@@ -79,13 +110,18 @@ export const Dashboard: React.FC = () => {
             <div className="flex bg-black/40 backdrop-blur-md rounded-2xl p-1 border border-white/5 shadow-lg overflow-x-auto scrollbar-hide">
               {[
                 { id: 'squad', label: 'Elenco', icon: Users },
+                { id: 'lineup', label: 'Escalação', icon: Shield },
                 { id: 'tactics', label: 'Tática', icon: Brain },
                 { id: 'training', label: 'Treino', icon: Target },
               ].map(tab => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTeamTab(tab.id as TeamSubTab)}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-bold transition-all whitespace-nowrap text-[10px] uppercase tracking-widest
+                  onClick={() => {
+                    playClickSound();
+                    triggerHaptic();
+                    setActiveTeamTab(tab.id as TeamSubTab);
+                  }}
+                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl font-bold transition-all whitespace-nowrap text-[9px] sm:text-[10px] uppercase tracking-widest active:scale-90
                     ${activeTeamTab === tab.id
                       ? 'bg-cyan-500 text-black shadow-[0_0_20px_rgba(6,182,212,0.4)]'
                       : 'text-white/40 hover:text-white hover:bg-white/5'
@@ -96,7 +132,8 @@ export const Dashboard: React.FC = () => {
                 </button>
               ))}
             </div>
-            {activeTeamTab === 'squad' && <SquadTab />}
+            {activeTeamTab === 'squad' && <SquadTab showLineup={false} />}
+            {activeTeamTab === 'lineup' && <SquadTab showLineup={true} lineupOnly />}
             {activeTeamTab === 'tactics' && <TacticsTab />}
             {activeTeamTab === 'training' && <TrainingTab />}
           </div>
@@ -115,56 +152,61 @@ export const Dashboard: React.FC = () => {
   return (
     <div className="relative h-screen w-screen overflow-hidden text-white font-sans selection:bg-cyan-500/30 stadium-bg"
       style={{ backgroundImage: `linear-gradient(to bottom, rgba(10, 10, 15, 0.6), rgba(10, 10, 15, 0.98)), url(${bgImage})` }}>
-      
+
       {/* Background Glows */}
       <div className="absolute top-0 left-1/4 w-[50%] h-[30%] bg-cyan-500/10 blur-[150px] pointer-events-none animate-pulse" />
       <div className="absolute bottom-0 right-1/4 w-[50%] h-[30%] bg-fuchsia-500/10 blur-[150px] pointer-events-none animate-pulse" />
 
-      {/* Persistent Glass Header */}
-      <header className="fixed top-0 left-0 right-0 h-16 sm:h-24 glass-header z-50 flex items-center px-4 sm:px-12 justify-between border-b border-white/5 backdrop-blur-3xl shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
-        <div className="flex items-center gap-3 sm:gap-6">
-          <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl glass-card flex items-center justify-center neon-border-cyan overflow-hidden shadow-2xl group cursor-pointer hover:scale-110 transition-transform active:scale-95">
-            <div className="w-full h-full bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center group-hover:from-cyan-500/40 transition-all">
-              <span className="font-black text-lg sm:text-2xl italic text-cyan-400 neon-text-cyan">M</span>
+      {/* Boxed Floating Glass Header */}
+      <header className="fixed top-4 left-1/2 -translate-x-1/2 max-w-7xl w-[94%] sm:w-[92%] glass-card-neon neon-border-cyan white-gradient-sheen z-50 flex items-center px-4 sm:px-8 h-16 sm:h-20 rounded-2xl sm:rounded-3xl shadow-[0_15px_40px_rgba(0,0,0,0.7)] group">
+        <div className="flex items-center gap-3 sm:gap-6 relative z-10 w-full justify-between">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center overflow-hidden shadow-2xl cursor-pointer hover:scale-110 transition-transform active:scale-95 bg-black/40 border border-cyan-500/50">
+              <div className="w-full h-full bg-gradient-to-br from-cyan-500/20 to-fuchsia-500/20 flex items-center justify-center group-hover:from-cyan-500/40 transition-all">
+                <span className="font-black text-lg sm:text-xl italic text-cyan-400 neon-text-cyan">M</span>
+              </div>
+            </div>
+            <div className="flex flex-col">
+              <h1 className="text-[10px] sm:text-[14px] font-black italic tracking-tighter uppercase text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] leading-none truncate max-w-[120px] sm:max-w-none">
+                {state.userTeam?.name || 'Admin Elite'}
+              </h1>
+              <p className="text-[7px] sm:text-[9px] font-bold text-cyan-400 uppercase tracking-[0.3em] mt-1">
+                Admin Nível 10
+              </p>
             </div>
           </div>
-          <div className="flex flex-col">
-            <h1 className="text-[10px] sm:text-base font-black italic tracking-tighter uppercase neon-text-white leading-none truncate max-w-[120px] sm:max-w-none">
-              {state.userTeam?.name || 'Admin Elite'}
-            </h1>
-            <p className="text-[7px] sm:text-[10px] font-bold text-white/30 uppercase tracking-[0.3em] mt-1 sm:mt-1.5">
-              Admin Nível 10
-            </p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2 sm:gap-8">
-          <div className="glass-card px-3 sm:px-6 py-1.5 sm:py-3 rounded-xl sm:rounded-2xl border-white/5 flex items-center gap-3 sm:gap-4 shadow-2xl backdrop-blur-2xl">
-            <div className="text-right">
-              <div className="text-[10px] sm:text-sm font-black italic tabular-nums text-white leading-tight">
+          <div className="flex items-center gap-2 sm:gap-6">
+            <div className="text-right hidden sm:block mr-2">
+              <div className="text-[10px] sm:text-xs font-black italic tabular-nums text-white leading-tight">
                 {new Date(state.world.currentDate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
               </div>
-              <div className="text-[7px] sm:text-[10px] font-black text-cyan-400 uppercase tracking-widest mt-0.5">
+              <div className="text-[7px] sm:text-[9px] font-black text-white/50 uppercase tracking-widest mt-0.5">
                 Dia {daysPassed}
               </div>
             </div>
-            <button 
-              onClick={togglePause} 
-              className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all border border-white/10 shadow-inner group active:scale-90"
-            >
-              <Clock size={14} className={`${isPaused ? 'text-amber-500 animate-pulse' : 'text-cyan-400'} group-hover:scale-110 transition-transform sm:size-[18px]`} />
-            </button>
-            <button 
-              onClick={() => {
-                if (window.confirm('Deseja sair deste mundo e voltar à seleção?')) {
-                  leaveWorld();
-                }
-              }}
-              className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all border border-white/10 shadow-inner group active:scale-90"
-              title="Sair do Mundo"
-            >
-              <LogOut size={14} className="text-red-400 group-hover:scale-110 transition-transform sm:size-[18px]" />
-            </button>
+
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button
+                onClick={togglePause}
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-black/40 hover:bg-black/60 flex items-center justify-center transition-all border border-cyan-500/30 shadow-inner group active:scale-90"
+              >
+                <Clock size={14} className={`${isPaused ? 'text-amber-500 animate-pulse' : 'text-cyan-400'} group-hover:scale-110 transition-transform sm:size-[16px]`} />
+              </button>
+              <button
+                onClick={() => {
+                  playClickSound();
+                  triggerHaptic();
+                  if (window.confirm('Deseja sair deste mundo e voltar à seleção?')) {
+                    leaveWorld();
+                  }
+                }}
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-black/40 hover:bg-black/60 flex items-center justify-center transition-all border border-cyan-500/30 shadow-inner group active:scale-90"
+                title="Sair do Mundo"
+              >
+                <LogOut size={14} className="text-red-400 group-hover:scale-110 transition-transform sm:size-[16px]" />
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -174,10 +216,11 @@ export const Dashboard: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 w-full">
           {/* LOBBY STATUS BANNER */}
           {state.world.status === 'LOBBY' && (
-            <motion.div 
+            <motion.div
+              layoutId="lobby-banner"
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-6 sm:mb-8 p-4 sm:p-6 xl:p-8 rounded-3xl sm:rounded-[2.5rem] bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/30 backdrop-blur-3xl shadow-[0_0_50px_rgba(245,158,11,0.15)] relative overflow-hidden group"
+              className="mb-6 sm:mb-8 p-4 sm:p-6 xl:p-8 rounded-[2rem] sm:rounded-[2.5rem] glass-card-neon white-gradient-sheen border-amber-500/30 shadow-[0_0_50px_rgba(245,158,11,0.15)] relative overflow-hidden group"
             >
               {/* Animated Background Icon */}
               <div className="absolute -right-10 -bottom-10 opacity-5 group-hover:opacity-10 transition-all duration-700 group-hover:scale-110 group-hover:-rotate-12">
@@ -198,8 +241,10 @@ export const Dashboard: React.FC = () => {
                 </div>
 
                 {state.isCreator ? (
-                  <button 
+                  <button
                     onClick={() => {
+                      playClickSound();
+                      triggerHaptic();
                       setState(prev => ({
                         ...prev,
                         world: { ...prev.world, status: 'ACTIVE' }
@@ -223,7 +268,17 @@ export const Dashboard: React.FC = () => {
             </motion.div>
           )}
 
-          {renderCurrentTab()}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, scale: 0.98, filter: 'blur(4px)' }}
+              animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, scale: 1.02, filter: 'blur(4px)' }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+            >
+              {renderCurrentTab()}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
 
@@ -232,33 +287,39 @@ export const Dashboard: React.FC = () => {
         {[
           { id: 'home', label: 'Home', icon: Home },
           { id: 'team', label: 'Elenco', icon: Users },
-          { id: 'calendar', label: 'Geral', icon: Trophy },
-          { id: 'world', label: 'Universo', icon: History },
-          { id: 'career', label: 'Admin', icon: Shield },
+          { id: 'calendar', label: 'Calendário', icon: Calendar },
+          { id: 'world', label: 'Mundo', icon: Trophy },
+          { id: 'career', label: 'Carreira', icon: Briefcase },
         ].map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as Tab)}
-            className={`flex-1 flex flex-col items-center gap-1 sm:gap-2 py-3 sm:py-4 rounded-[1.5rem] sm:rounded-[2.5rem] transition-all relative group ${activeTab === tab.id ? 'text-cyan-400' : 'text-white/20 hover:text-white/50'}`}
+            onClick={() => {
+              if (activeTab !== tab.id) {
+                playClickSound();
+                triggerHaptic();
+                setActiveTab(tab.id as Tab);
+              }
+            }}
+            className={`flex-1 flex flex-col items-center gap-1 sm:gap-2 py-3 sm:py-4 rounded-[1.5rem] sm:rounded-[2.5rem] transition-all relative group active:scale-90 ${activeTab === tab.id ? 'text-cyan-400' : 'text-white/20 hover:text-white/50'}`}
           >
             {activeTab === tab.id && (
-              <motion.div 
+              <motion.div
                 layoutId="nav-glow"
-                className="absolute inset-0 bg-gradient-to-b from-cyan-400/10 to-transparent rounded-[1.5rem] sm:rounded-[2.5rem] z-0" 
+                className="absolute inset-0 bg-gradient-to-t from-cyan-500/30 to-transparent rounded-[1.5rem] sm:rounded-[2.5rem] z-0"
               />
             )}
-            <tab.icon 
-              size={activeTab === tab.id ? 22 : 20} 
-              className={`relative z-10 transition-all duration-300 sm:size-[${activeTab === tab.id ? 26 : 24}px] ${activeTab === tab.id ? 'drop-shadow-[0_0_12px_rgba(34,211,238,1)] scale-110' : 'group-hover:scale-110'}`} 
+            <tab.icon
+              size={activeTab === tab.id ? 22 : 20}
+              className={`relative z-10 transition-all duration-300 sm:size-[${activeTab === tab.id ? 26 : 24}px] ${activeTab === tab.id ? 'drop-shadow-[0_0_12px_rgba(34,211,238,1)] scale-110' : 'group-hover:scale-110'}`}
             />
             <span className={`text-[7px] sm:text-[9px] font-black tracking-[0.2em] uppercase relative z-10 transition-all duration-300 ${activeTab === tab.id ? 'opacity-100 translate-y-0' : 'opacity-40 translate-y-0.5 group-hover:opacity-100 group-hover:translate-y-0'}`}>
               {tab.label}
             </span>
 
             {activeTab === tab.id && (
-              <motion.div 
+              <motion.div
                 layoutId="nav-indicator"
-                className="absolute -bottom-1 w-8 sm:w-12 h-[2px] sm:h-[3px] bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,1)] rounded-full" 
+                className="absolute -bottom-1 w-8 sm:w-12 h-[2px] sm:h-[3px] bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,1)] rounded-full"
               />
             )}
           </button>
