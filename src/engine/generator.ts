@@ -18,8 +18,25 @@ import {
 } from '../types';
 import { generateCalendar } from './CalendarGenerator';
 
-// Utility to generate random numbers in a range
-const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+// --- Seeded Random Engine (Fixed Base) ---
+let _seed = 1234567; // Fixed seed for "Base Fixa"
+const mulberry32 = (a: number) => {
+  return () => {
+    let t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+};
+let rand = mulberry32(_seed);
+
+export const resetGeneratorSeed = (newSeed: number = 1234567) => {
+  _seed = newSeed;
+  rand = mulberry32(_seed);
+};
+
+const randomInt = (min: number, max: number) => Math.floor(rand() * (max - min + 1)) + min;
+const randomFloat = () => rand();
 
 /**
  * Maps the current real date to the game world year (2050).
@@ -32,9 +49,25 @@ export const getGameDate2050 = (realDate?: Date): Date => {
 
 const generateRatingPool = () => {
   const ratings: number[] = [];
-  for (let i = 0; i < 750; i++) ratings.push(randomInt(400, 1000));
-  for (let i = 0; i < 250; i++) ratings.push(randomInt(250, 399));
-  return ratings.sort(() => Math.random() - 0.5);
+
+  // Professional Distribution for 1000 players:
+  // Gods (900-1000): 15 players
+  for (let i = 0; i < 15; i++) ratings.push(randomInt(900, 1000));
+
+  // Elites (800-899): 80 players
+  for (let i = 0; i < 80; i++) ratings.push(randomInt(800, 899));
+
+  // Pros (700-799): 200 players
+  for (let i = 0; i < 200; i++) ratings.push(randomInt(700, 799));
+
+  // Average (550-699): 450 players
+  for (let i = 0; i < 450; i++) ratings.push(randomInt(550, 699));
+
+  // Rookies/Below (200-549): 255 players
+  for (let i = 0; i < 255; i++) ratings.push(randomInt(200, 549));
+
+  // Deterministic shuffle
+  return ratings.sort(() => rand() - 0.5);
 };
 
 const firstNamesMale = [
@@ -159,7 +192,7 @@ const calculateFusions = (p: Pentagon, pos: PositionType): { fusions: FusionSkil
   return { fusions, total };
 };
 
-const generateBadges = (totalRating: number): Badges => {
+export const generateBadges = (totalRating: number): Badges => {
   const badges: Badges = {
     slot1: technicalTraits[randomInt(0, technicalTraits.length - 1)],
     slot2: null,
@@ -405,6 +438,7 @@ export const generateManager = (id: string, district: District): Manager => {
 };
 
 export const generateInitialState = (): GameState => {
+  resetGeneratorSeed(); // FIXED BASE: Ensure every new game starts the same way
   const players: Record<string, Player> = {};
   const teams: Record<string, Team> = {};
   const managers: Record<string, Manager> = {};

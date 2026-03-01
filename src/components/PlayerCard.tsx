@@ -14,9 +14,10 @@ interface PlayerCardProps {
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent, player: Player) => void;
   teamLogo?: TeamLogoMetadata;
+  onTeamClick?: (teamId: string) => void;
 }
 
-const PlayerCardComponent: React.FC<PlayerCardProps> = ({ player, onClick, onProposta, variant = 'full', draggable, onDragStart, teamLogo }) => {
+const PlayerCardComponent: React.FC<PlayerCardProps> = ({ player, onClick, onProposta, variant = 'full', draggable, onDragStart, teamLogo, onTeamClick }) => {
   const { state } = useGame();
 
   const playerTeam = player.contract.teamId ? state.teams[player.contract.teamId] : null;
@@ -91,7 +92,17 @@ const PlayerCardComponent: React.FC<PlayerCardProps> = ({ player, onClick, onPro
               )}
             </div>
             <span className="text-[8px] text-slate-400 uppercase tracking-widest">
-              {playerTeam ? playerTeam.name : player.district} • {player.role === 'GOL' ? 'GOL' : player.role === 'ZAG' ? 'ZAG' : player.role === 'MEI' ? 'MEI' : 'ATA'}
+              <span
+                className={`cursor-pointer hover:text-white transition-colors`}
+                onClick={(e) => {
+                  if (player.contract.teamId && onTeamClick) {
+                    e.stopPropagation();
+                    onTeamClick(player.contract.teamId);
+                  }
+                }}
+              >
+                {playerTeam ? playerTeam.name : player.district}
+              </span> • {player.role === 'GOL' ? 'GOL' : player.role === 'ZAG' ? 'ZAG' : player.role === 'MEI' ? 'MEI' : 'ATA'}
             </span>
           </div>
         </div>
@@ -125,7 +136,15 @@ const PlayerCardComponent: React.FC<PlayerCardProps> = ({ player, onClick, onPro
             ) : (
               <Mars size={10} className="text-blue-400" />
             )}
-            <span className={`text-[8px] px-1.5 py-0.5 rounded-lg uppercase tracking-widest font-bold border ${style.badge}`}>
+            <span
+              onClick={(e) => {
+                if (player.contract.teamId && onTeamClick) {
+                  e.stopPropagation();
+                  onTeamClick(player.contract.teamId);
+                }
+              }}
+              className={`text-[8px] px-1.5 py-0.5 rounded-lg uppercase tracking-widest font-bold border ${style.badge} cursor-pointer hover:white-gradient-sheen transition-all`}
+            >
               {playerTeam ? playerTeam.name : `#${player.district}`}
             </span>
           </div>
@@ -194,7 +213,15 @@ const PlayerCardComponent: React.FC<PlayerCardProps> = ({ player, onClick, onPro
                 <Mars size={5} className="text-blue-400 sm:size-[6px]" />
               )}
             </div>
-            <div className={`inline-block px-1 py-0.5 mt-0.5 rounded-lg text-[4px] sm:text-[5px] uppercase tracking-widest font-bold border ${style.badge} opacity-80`}>
+            <div
+              onClick={(e) => {
+                if (player.contract.teamId && onTeamClick) {
+                  e.stopPropagation();
+                  onTeamClick(player.contract.teamId);
+                }
+              }}
+              className={`inline-block px-1 py-0.5 mt-0.5 rounded-lg text-[4px] sm:text-[5px] uppercase tracking-widest font-bold border ${style.badge} opacity-80 cursor-pointer hover:opacity-100 transition-opacity`}
+            >
               {playerTeam ? playerTeam.name : player.district}
             </div>
           </div>
@@ -286,7 +313,7 @@ const PlayerCardComponent: React.FC<PlayerCardProps> = ({ player, onClick, onPro
             <div className="h-1 sm:h-1.5 bg-white/5 rounded-full overflow-hidden p-[1px] border border-white/5">
               <div
                 className={`h-full rounded-full ${style.bg} transition-all duration-1000 shadow-[0_0_10px_rgba(34,211,238,0.4)]`}
-                style={{ width: `${(player.totalRating / 1000) * 100}%` }}
+                style={{ width: `${Math.max(0, ((player.totalRating - 400) / 600) * 100)}%` }}
               />
             </div>
           </div>
@@ -298,7 +325,7 @@ const PlayerCardComponent: React.FC<PlayerCardProps> = ({ player, onClick, onPro
             <div className="h-1 sm:h-1.5 bg-white/5 rounded-full overflow-hidden p-[1px] border border-white/5">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-amber-500 to-yellow-300 transition-all duration-1000 shadow-[0_0_10px_rgba(245,158,11,0.4)]"
-                style={{ width: `${(player.potential / 1000) * 100}%` }}
+                style={{ width: `${Math.max(0, ((player.potential - 400) / 600) * 100)}%` }}
               />
             </div>
           </div>
@@ -313,7 +340,7 @@ const PlayerCardComponent: React.FC<PlayerCardProps> = ({ player, onClick, onPro
             className="w-full h-7 sm:h-10 mt-2 sm:mt-4 bg-white text-black text-[8px] sm:text-[10px] font-black rounded sm:rounded-xl transition-all active:scale-95 uppercase tracking-[0.2em] hover:bg-cyan-400 hover:text-black shadow-[0_10px_20px_rgba(0,0,0,0.4)] flex items-center justify-center gap-1.5 sm:gap-2 group/btn"
           >
             <Zap size={10} fill="currentColor" className="group-hover/btn:animate-pulse sm:size-[14px]" />
-            CONTRATAR
+            {state.world.status === 'DRAFT' ? 'CONTRATAR' : 'PROPOR ROUBO'}
           </button>
         )}
       </div>

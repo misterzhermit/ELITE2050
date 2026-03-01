@@ -1,9 +1,12 @@
 import { GameState, Team, Player, PlayerRole, LeagueTeamStats, GameNotification, District, MatchResult, TeamStats, Match, TacticalCard } from '../types';
 import { simulateMatch, TeamStats as MatchTeamStats } from './MatchEngine';
 import { calculateEvolution } from './simulation';
+import { generateCalendar } from './CalendarGenerator';
+import { generateBadges } from './generator';
 
 import {
   MAX_TEAM_POWER,
+  MAX_TEAM_POWER_TIER_1,
   SEASON_ROUNDS,
   ELITE_CUP_ROUNDS,
   DISTRICT_CUP_ROUNDS,
@@ -29,15 +32,42 @@ export const getSeasonDayNumber = (dateStr: string, seasonStartRealStr?: string 
 };
 
 const isSeasonMatchDay = (dayNumber: number) => {
-  // Matches start on Day 2 (Day 1 is Lobby/Pre-season)
   if (dayNumber < 2) return false;
-  // Matches happen every day: 2, 3, 4, ...
-  return (dayNumber - 2) % MATCH_INTERVAL_DAYS === 0;
+
+  if (dayNumber <= 28) return dayNumber % 2 === 0;
+
+  // Elite Cup (Oitavas, Quartas, Semis, Final - with 1 rest day in between)
+  // Day 29, 31, 33, 35
+  if (dayNumber >= 29 && dayNumber <= 35) return (dayNumber - 29) % 2 === 0;
+
+  // District Cup (Rodada 1, 2, 3, Final - consecutive)
+  // Day 36, 37, 38, 39
+  if (dayNumber >= 36 && dayNumber <= 39) return true;
+
+  return false;
 };
 
 const getRoundFromDay = (dayNumber: number) => {
   if (dayNumber < 2) return 0;
-  return Math.floor((dayNumber - 2) / MATCH_INTERVAL_DAYS) + 1;
+
+  if (dayNumber <= 28) {
+    if (dayNumber % 2 === 0) return Math.floor(dayNumber / 2);
+    else return 0; // Rest days between league matches
+  }
+
+  if (dayNumber >= 29 && dayNumber <= 35) {
+    if ((dayNumber - 29) % 2 === 0) {
+      return 14 + Math.floor((dayNumber - 29) / 2) + 1;
+    } else {
+      return 0; // Rest day during Elite Cup
+    }
+  }
+
+  if (dayNumber >= 36 && dayNumber <= 39) {
+    return 18 + (dayNumber - 35);
+  }
+
+  return 0; // No round
 };
 
 const sortStandings = (standings: LeagueTeamStats[]) =>
@@ -155,6 +185,48 @@ export const updateStandings = (standings: LeagueTeamStats[], homeId: string, aw
   }
 };
 
+export const updatePlayerSatisfaction = (state: GameState, teamId: string, result: MatchResult | null) => {
+  const team = state.teams[teamId];
+  if (!team || !team.squad) return;
+
+  const lineupIds = Object.values(team.lineup).filter(Boolean);
+
+  team.squad.forEach(playerId => {
+    const player = state.players[playerId];
+    if (!player) return;
+
+    let delta = 0;
+    const isStarter = lineupIds.includes(playerId);
+    // Bench is usually the rest of the 18-man match squad if the game had a concept of bench
+    // For now, let's say the first 18 are "involved", others are "reserves"
+    const isBench = team.squad.indexOf(playerId) < 18 && !isStarter;
+    const isReserve = !isStarter && !isBench;
+
+    // 1. Playing Time (Daily impact)
+    if (isStarter) delta += 2;
+    else if (isBench) delta -= 2;
+    else delta -= 4;
+
+    // 2. Performance (Match impact)
+    if (result) {
+      const isHome = result.homeTeamId === teamId;
+      const won = isHome ? result.homeScore > result.awayScore : result.awayScore > result.homeScore;
+      const draw = result.homeScore === result.awayScore;
+
+      if (won) delta += 2;
+      else if (draw) delta += 0;
+      else delta -= 3;
+    }
+
+    // 3. Superstar factor (rating > 850)
+    if (player.totalRating > 850 && !isStarter) {
+      delta -= 5;
+    }
+
+    player.satisfaction = Math.max(0, Math.min(100, (player.satisfaction || 70) + delta));
+  });
+};
+
 const updatePlayerEvolutions = (
   state: GameState,
   result: MatchResult,
@@ -245,9 +317,10 @@ const updateSinglePlayerEvolution = (state: GameState, player: Player, result: M
   player.history.averageRating = Number(((player.history.averageRating * oldGames + matchRating) / player.history.gamesPlayed).toFixed(2));
 };
 
-export const calculateAttr = (sel: { gk: Player, def: Player[], mid: Player[], att: Player[] }, attr: string) => {
+export const calculateAttr = (sel: { gk: Player, def: Player[], mid: Player[], att: Player[] }, attr: string, hypePlayerId?: string | null) => {
   if (attr === 'goalkeeper') {
-    return Math.round(sel.gk.totalRating * (sel.gk.role === 'GOL' ? 1.0 : 0.5) / 10);
+    const hypeBonus = sel.gk.id === hypePlayerId ? 1.03 : 1.0;
+    return Math.round((sel.gk.totalRating * hypeBonus) * (sel.gk.role === 'GOL' ? 1.0 : 0.5) / 10);
   }
   let players: Player[] = [];
   let targetRole: PlayerRole = 'ZAG';
@@ -260,7 +333,8 @@ export const calculateAttr = (sel: { gk: Player, def: Player[], mid: Player[], a
   const sum = players.reduce((acc, p) => {
     const isTarget = p.role === targetRole;
     const penalty = isTarget ? 1.0 : 0.6;
-    return acc + (p.totalRating * penalty);
+    const hypeBonus = p.id === hypePlayerId ? 1.03 : 1.0;
+    return acc + (p.totalRating * penalty * hypeBonus);
   }, 0);
 
   // Scaling to 0-100 range for MatchEngine
@@ -268,12 +342,41 @@ export const calculateAttr = (sel: { gk: Player, def: Player[], mid: Player[], a
 };
 
 export const getMatchSquad = (team: Team, players: Record<string, Player>): { gk: Player, def: Player[], mid: Player[], att: Player[], all: Player[] } => {
+  // 1. Try to use manual lineup if strictly defined (11 players)
+  const lineup = team.lineup || {};
+  const lineupIds = Object.values(lineup).filter(Boolean);
+
+  if (lineupIds.length >= 11) {
+    const starters = lineupIds.map(id => players[id]).filter(p => !!p);
+
+    // Categorize by SLOT ID prefix to respect "out of position" choices
+    let gk: Player | null = null;
+    const def: Player[] = [];
+    const mid: Player[] = [];
+    const att: Player[] = [];
+
+    Object.entries(lineup).forEach(([slotId, playerId]) => {
+      const p = players[playerId];
+      if (!p) return;
+
+      if (slotId.startsWith('GOL')) gk = p;
+      else if (slotId.startsWith('ZAG')) def.push(p);
+      else if (slotId.startsWith('MEI')) mid.push(p);
+      else if (slotId.startsWith('ATA')) att.push(p);
+    });
+
+    // Fallback if slot naming is weird or GK missing
+    if (!gk) gk = starters.find(p => p.role === 'GOL') || starters[0];
+    const all = [gk, ...def, ...mid, ...att];
+
+    return { gk, def, mid, att, all };
+  }
+
+  // 2. Fallback to Auto-selection (Old behavior for AI teams)
   const squad = team.squad.map(id => players[id]).filter(p => !!p);
 
-  // 1. Find best GK
   let gk = squad.find(p => p.role === 'GOL');
   if (!gk) {
-    // Fallback: Best rated player becomes GK
     const sorted = [...squad].sort((a, b) => b.totalRating - a.totalRating);
     gk = sorted[0];
   }
@@ -285,7 +388,6 @@ export const getMatchSquad = (team: Team, players: Record<string, Player>): { gk
   const mid: Player[] = [];
   const att: Player[] = [];
 
-  // Helper to fill slots
   const fill = (target: Player[], roles: string[], count: number) => {
     for (let i = 0; i < count; i++) {
       if (target.length >= count) break;
@@ -320,19 +422,32 @@ export const simulateAndRecordMatch = (state: GameState, match: Match, standings
   const homeSelection = getMatchSquad(homeTeam, state.players);
   const awaySelection = getMatchSquad(awayTeam, state.players);
 
+  const homeUnderstanding = (state.userTeamId === homeTeam.id)
+    ? (state.training?.playstyleTraining?.understanding[homeTeam.tactics.playStyle] || 0)
+    : 70; // AI teams usually have good understanding
+
+  const awayUnderstanding = (state.userTeamId === awayTeam.id)
+    ? (state.training?.playstyleTraining?.understanding[awayTeam.tactics.playStyle] || 0)
+    : 70;
+
+  const hypePlayerId = state.training?.individualFocus?.evolutionSlot;
+  const stabilizationPlayerId = state.training?.individualFocus?.stabilizationSlot;
+
   const homeStats: MatchTeamStats = {
     id: homeTeam.id,
     name: homeTeam.name,
-    attack: calculateAttr(homeSelection, 'attack'),
-    midfield: calculateAttr(homeSelection, 'midfield'),
-    defense: calculateAttr(homeSelection, 'defense'),
-    goalkeeper: calculateAttr(homeSelection, 'goalkeeper'),
+    attack: calculateAttr(homeSelection, 'attack', hypePlayerId),
+    midfield: calculateAttr(homeSelection, 'midfield', hypePlayerId),
+    defense: calculateAttr(homeSelection, 'defense', hypePlayerId),
+    goalkeeper: calculateAttr(homeSelection, 'goalkeeper', hypePlayerId),
     playStyle: homeTeam.tactics.playStyle,
     mentality: homeTeam.tactics.mentality,
     linePosition: homeTeam.tactics.linePosition,
     aggressiveness: homeTeam.tactics.aggressiveness,
     slots: homeTeam.tactics.slots,
-    chemistry: homeTeam.chemistry || 50
+    chemistry: Math.round((homeTeam.chemistry || 50) * (0.5 + (homeUnderstanding / 200))), // Max 1.0x at 100% understanding
+    hypePlayerId,
+    stabilizationPlayerId
   };
 
   // Home advantage (5% bonus to all attributes)
@@ -344,16 +459,18 @@ export const simulateAndRecordMatch = (state: GameState, match: Match, standings
   const awayStats: MatchTeamStats = {
     id: awayTeam.id,
     name: awayTeam.name,
-    attack: calculateAttr(awaySelection, 'attack'),
-    midfield: calculateAttr(awaySelection, 'midfield'),
-    defense: calculateAttr(awaySelection, 'defense'),
-    goalkeeper: calculateAttr(awaySelection, 'goalkeeper'),
+    attack: calculateAttr(awaySelection, 'attack', hypePlayerId),
+    midfield: calculateAttr(awaySelection, 'midfield', hypePlayerId),
+    defense: calculateAttr(awaySelection, 'defense', hypePlayerId),
+    goalkeeper: calculateAttr(awaySelection, 'goalkeeper', hypePlayerId),
     playStyle: awayTeam.tactics.playStyle,
     mentality: awayTeam.tactics.mentality,
     linePosition: awayTeam.tactics.linePosition,
     aggressiveness: awayTeam.tactics.aggressiveness,
     slots: awayTeam.tactics.slots,
-    chemistry: awayTeam.chemistry || 50
+    chemistry: Math.round((awayTeam.chemistry || 50) * (0.5 + (awayUnderstanding / 200))),
+    hypePlayerId,
+    stabilizationPlayerId
   };
 
   const result = simulateMatch(homeStats, awayStats, homeSelection.all, awaySelection.all);
@@ -367,6 +484,10 @@ export const simulateAndRecordMatch = (state: GameState, match: Match, standings
   const awayPower = calculateTeamPower(awayTeam, state.players);
 
   updatePlayerEvolutions(state, result, homeSelection.all, awaySelection.all, homePower, awayPower);
+
+  // Update Satisfaction
+  updatePlayerSatisfaction(state, match.homeTeamId, result);
+  updatePlayerSatisfaction(state, match.awayTeamId, result);
 
   if (standings) {
     updateStandings(standings, match.homeTeamId, match.awayTeamId, result.homeScore, result.awayScore);
@@ -435,13 +556,16 @@ const simulateAITeamDay = (state: GameState, teamId: string) => {
   const team = state.teams[teamId];
   if (!team) return;
 
+  // AI should only make transfers during Open Windows to avoid spam
+  if (!state.world.transferWindowOpen) return;
+
   const squadPlayers = team.squad.map(id => state.players[id]).filter(p => !!p);
 
-  // 1. Check satisfaction & release (40% chance if satisfaction < 45)
+  // 1. Check satisfaction & release (5% chance if satisfaction < 40)
   // Need to ensure squad doesnt drop below 15 for safety
   squadPlayers.forEach(player => {
-    if (team.squad.length > SAFETY_NET_MIN_PLAYERS && player.satisfaction < 45) {
-      if (Math.random() < 0.40) {
+    if (team.squad.length > SAFETY_NET_MIN_PLAYERS && player.satisfaction < 40) {
+      if (Math.random() < 0.05) {
         // Release player
         player.contract.teamId = '';
         team.squad = team.squad.filter(id => id !== player.id);
@@ -466,7 +590,7 @@ const simulateAITeamDay = (state: GameState, teamId: string) => {
   });
 
   // 2. Sign Free Agents if squad < 16
-  if (team.squad.length < 16 && state.world.transferWindowOpen) {
+  if (team.squad.length < 16) {
     const freeAgents = Object.values(state.players)
       .filter(p => p.contract.teamId === '')
       .sort((a, b) => b.totalRating - a.totalRating);
@@ -552,8 +676,8 @@ export const advanceGameDay = (prevState: GameState, skipDateIncrement = false):
   const isMatchDay = isSeasonMatchDay(dayNumber);
 
   // Transfer Window Logic
-  // Open only if it's NOT a match day, OR if it's pre-season/post-season
-  world.transferWindowOpen = (!isMatchDay && dayNumber > 0 && dayNumber < SEASON_DAYS) || dayNumber <= 2 || dayNumber >= SEASON_DAYS;
+  // Open if it's NOT a match day, OR if it's pre-season (Day 1) or post-season (Day 37-45)
+  world.transferWindowOpen = !isMatchDay;
 
   // --- Progress Card Laboratory ---
   if (state.training?.cardLaboratory?.slots) {
@@ -635,6 +759,57 @@ export const advanceGameDay = (prevState: GameState, skipDateIncrement = false):
     }
   });
 
+  // --- Process Transfer Proposals ---
+  if (state.transferProposals) {
+    state.transferProposals = state.transferProposals.map(prop => {
+      if (prop.status === 'PENDING') {
+        const player = state.players[prop.playerId];
+        const fromTeam = prop.fromTeamId ? state.teams[prop.fromTeamId] : null;
+        const toTeam = state.teams[prop.toTeamId];
+
+        if (player && toTeam) {
+          // Logic: If satisfaction is low, AI is likely to sell.
+          // Since satisfaction < 80 was required to send, we just add a bit of randomness.
+          const accepted = Math.random() > 0.3; // 70% chance of acceptance
+
+          if (accepted) {
+            // Execution
+            if (fromTeam) {
+              fromTeam.squad = fromTeam.squad.filter(id => id !== player.id);
+              // Clean lineup
+              Object.keys(fromTeam.lineup).forEach(pos => {
+                if (fromTeam.lineup[pos as any] === player.id) delete fromTeam.lineup[pos as any];
+              });
+            }
+            toTeam.squad.push(player.id);
+            player.contract.teamId = toTeam.id;
+
+            state.notifications.unshift({
+              id: `transf_ok_${Date.now()}_${player.id}`,
+              date: state.world.currentDate,
+              title: 'Proposta Aceita!',
+              message: `O ${fromTeam?.name || 'Mercado'} aceitou a proposta! ${player.nickname} assinou com o ${toTeam.name}.`,
+              type: 'transfer',
+              read: false
+            });
+            return { ...prop, status: 'ACCEPTED' as const };
+          } else {
+            state.notifications.unshift({
+              id: `transf_no_${Date.now()}_${player.id}`,
+              date: state.world.currentDate,
+              title: 'Proposta Recusada',
+              message: `O ${fromTeam?.name || 'Clube'} recusou a proposta por ${player.nickname}. Eles pedem um valor maior ou o atleta mudou de ideia.`,
+              type: 'transfer',
+              read: false
+            });
+            return { ...prop, status: 'DECLINED' as const };
+          }
+        }
+      }
+      return prop;
+    });
+  }
+
   if (isMatchDay) {
     const round = getRoundFromDay(dayNumber);
     world.currentRound = round;
@@ -663,6 +838,7 @@ export const advanceGameDay = (prevState: GameState, skipDateIncrement = false):
 
               // Update Headline if it's user's team
               if (state.userTeamId && (match.homeTeamId === state.userTeamId || match.awayTeamId === state.userTeamId)) {
+                match.revealed = false; // Blind report
                 const isHome = match.homeTeamId === state.userTeamId;
                 const opponentId = isHome ? match.awayTeamId : match.homeTeamId;
                 const opponent = state.teams[opponentId];
@@ -767,6 +943,7 @@ export const advanceGameDay = (prevState: GameState, skipDateIncrement = false):
 
             // Update Headline if it's user's team
             if (state.userTeamId && (match.homeTeamId === state.userTeamId || match.awayTeamId === state.userTeamId)) {
+              match.revealed = false; // Blind report
               const isHome = match.homeTeamId === state.userTeamId;
               const opponentId = isHome ? match.awayTeamId : match.homeTeamId;
               const opponent = state.teams[opponentId];
@@ -854,6 +1031,9 @@ export const advanceGameDay = (prevState: GameState, skipDateIncrement = false):
           world.districtCup.matches.push(match);
           simulateAndRecordMatch(state, match, world.districtCup.standings);
           match.played = true;
+          if (state.userTeamId && (match.homeTeamId === state.userTeamId || match.awayTeamId === state.userTeamId)) {
+            match.revealed = false;
+          }
         });
         world.districtCup.round = districtRound;
 
@@ -933,4 +1113,85 @@ export const advanceGameDay = (prevState: GameState, skipDateIncrement = false):
   }
 
   return state;
+};
+export const startNewSeason = (state: GameState): GameState => {
+  const currentSeason = state.world.currentSeason || 2050;
+  const nextSeason = currentSeason + 1;
+
+  // 1. Reset Leagues and Regenerate Calendars
+  const leagues = { ...state.world.leagues };
+
+  // Pivot date: 1 week after the current date for the new season start
+  const currentWorldDate = new Date(state.world.currentDate);
+  const newSeasonStartDate = new Date(currentWorldDate);
+  newSeasonStartDate.setDate(newSeasonStartDate.getDate() + 7);
+  newSeasonStartDate.setHours(0, 0, 0, 0);
+
+  Object.keys(leagues).forEach(key => {
+    const league = { ...leagues[key] };
+
+    // Reset Standings
+    league.standings = league.standings.map(s => ({
+      ...s,
+      points: 0,
+      played: 0,
+      won: 0,
+      drawn: 0,
+      lost: 0,
+      goalsFor: 0,
+      goalsAgainst: 0,
+      gd: 0
+    }));
+
+    // Regenerate Matches
+    const leagueTeamIds = league.standings.map(s => s.teamId);
+    const teamObjs = leagueTeamIds.map(id => state.teams[id]);
+    league.matches = generateCalendar(teamObjs, league.id, newSeasonStartDate.toISOString());
+
+    leagues[key] = league;
+  });
+
+  // 2. Trait Re-evaluation and History Reset
+  const players = { ...state.players };
+  Object.keys(players).forEach(id => {
+    const player = { ...players[id] };
+
+    // Recalculate Badges based on potentially new Rating
+    player.badges = generateBadges(player.totalRating);
+
+    // Reset Seasonal Stats
+    player.history = {
+      ...player.history,
+      goals: 0,
+      assists: 0,
+      gamesPlayed: 0,
+      averageRating: 0,
+      // lastMatchRatings should probably stay for form? 
+      // Let's clear it for a "clean" season start
+      lastMatchRatings: []
+    };
+
+    players[id] = player;
+  });
+
+  // 3. Final World State Update
+  return {
+    ...state,
+    players,
+    world: {
+      ...state.world,
+      currentSeason: nextSeason,
+      currentRound: 1,
+      currentDate: newSeasonStartDate.toISOString(),
+      seasonStartReal: newSeasonStartDate.toISOString(),
+      status: 'LOBBY', // Move back to LOBBY for the new preseason
+      leagues,
+      eliteCup: { ...state.world.eliteCup, round: 0, teams: [], winnerId: null, bracket: { round1: [], quarters: [], semis: [], final: null } },
+      districtCup: { ...state.world.districtCup, round: 0, teams: [], matches: [], standings: [], winnerId: null, final: null }
+    },
+    lastHeadline: {
+      title: `Temporada ${nextSeason} Iniciada`,
+      message: `Bem-vindos ao ano de ${nextSeason}. As lendas do passado agora enfrentam novos desafios. Traços técnicos foram recalibrados.`
+    }
+  };
 };

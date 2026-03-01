@@ -8,6 +8,7 @@ import { useGame } from '../store/GameContext';
 import { calculateTeamPower } from '../engine/gameLogic';
 import { useTransfers } from '../hooks/useTransfers';
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
+import { TRAIT_DESCRIPTIONS } from '../constants/traitDescriptions';
 
 interface PlayerModalProps {
   player: Player;
@@ -412,14 +413,19 @@ export const PlayerModal: React.FC<PlayerModalProps> = ({ player, onClose }) => 
           <div className="grid grid-cols-2 gap-2 sm:gap-3">
             <div className="bg-black/50 border border-white/10 rounded-xl p-2.5 sm:p-3">
               <p className="text-[8px] sm:text-[9px] text-slate-400 uppercase tracking-[0.25em] font-semibold mb-1.5 sm:mb-2">Traços</p>
-              <div className="flex flex-wrap gap-1.5 sm:gap-2">
+              <div className="flex flex-col gap-2">
                 {traitList.length === 0 && (
                   <span className="text-[9px] sm:text-[10px] text-slate-500">Sem traços</span>
                 )}
                 {traitList.map((trait, index) => (
-                  <span key={`${trait}-${index}`} className={`text-[8px] sm:text-[10px] font-semibold uppercase tracking-[0.18em] px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full border ${theme.border} ${theme.main} bg-black/40`}>
-                    {trait}
-                  </span>
+                  <div key={`${trait}-${index}`} className="flex flex-col items-start gap-1">
+                    <span className={`text-[8px] sm:text-[10px] font-semibold uppercase tracking-[0.18em] px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-[6px] border ${theme.border} ${theme.main} bg-black/40`}>
+                      {trait}
+                    </span>
+                    <span className="text-[8px] text-slate-400 leading-tight">
+                      {TRAIT_DESCRIPTIONS[trait] || 'Efeito misterioso durante a simulação.'}
+                    </span>
+                  </div>
                 ))}
               </div>
             </div>

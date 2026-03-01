@@ -42,10 +42,33 @@ export const HomeTab = () => {
   const { handleAdvanceDay } = useGameDay();
   const { handleMakeProposal } = useTransfers(userTeam?.id || null, totalPoints, powerCap);
 
+  const handleRevealMatch = (matchId: string) => {
+    setState(prev => {
+      const newState = { ...prev };
+      // Search in all leagues
+      Object.keys(newState.world.leagues).forEach(key => {
+        const league = newState.world.leagues[key as any];
+        const match = league.matches.find(m => m.id === matchId);
+        if (match) match.revealed = true;
+      });
+      // Search in cups
+      const ecMatch = [...(newState.world.eliteCup.bracket.oitavas || []), ...(newState.world.eliteCup.bracket.quartas || []), ...(newState.world.eliteCup.bracket.semis || []), newState.world.eliteCup.bracket.final].find(m => m?.id === matchId);
+      if (ecMatch) ecMatch.revealed = true;
+
+      const dcMatch = newState.world.districtCup.matches.find(m => m.id === matchId);
+      if (dcMatch) dcMatch.revealed = true;
+      if (newState.world.districtCup.final?.id === matchId) newState.world.districtCup.final.revealed = true;
+
+      return newState;
+    });
+  };
+
   const [timeLeft, setTimeLeft] = useState<string>('');
 
   // Determine Headline based on last match
   const lastMatch = pastMatches?.[0];
+  const isRevealed = lastMatch?.revealed !== false;
+
   const headlineData = React.useMemo(() => {
     if (lastMatch) {
       const isHome = lastMatch.homeId === userTeam?.id;
@@ -58,17 +81,21 @@ export const HomeTab = () => {
 
       return {
         type: 'match',
-        title: isWin ? "Vitória Espetacular!" : isDraw ? "Empate Tático" : "Derrota Amarga",
-        message: `O ${userTeam?.name} ${isWin ? 'dominou' : isDraw ? 'empatou com' : 'tropeçou contra'} o ${opponentName} no placar de ${lastMatch.homeScore}-${lastMatch.awayScore}.`,
-        match: lastMatch
+        title: !isRevealed ? "Partida Encerrada" : (isWin ? "Vitória Espetacular!" : isDraw ? "Empate Tático" : "Derrota Amarga"),
+        message: !isRevealed
+          ? `O relato da partida contra o ${opponentName} já está disponível na mesa do treinador.`
+          : `O ${userTeam?.name} ${isWin ? 'dominou' : isDraw ? 'empatou com' : 'tropeçou contra'} o ${opponentName} no placar de ${lastMatch.homeScore}-${lastMatch.awayScore}.`,
+        match: lastMatch,
+        revealed: isRevealed
       };
     }
     return {
       type: 'news',
       title: state.lastHeadline?.title || "Mercado Aquecido",
-      message: state.lastHeadline?.message || "Novas promessas surgem nos distritos periféricos de Neo-City."
+      message: state.lastHeadline?.message || "Novas promessas surgem nos distritos periféricos de Neo-City.",
+      revealed: true
     };
-  }, [lastMatch, state.lastHeadline, userTeam]);
+  }, [lastMatch, state.lastHeadline, userTeam, isRevealed]);
 
   // Calendar events for news feed
   const newsFeed = React.useMemo(() => {
@@ -90,12 +117,14 @@ export const HomeTab = () => {
           subtitle = `Dia difícil para o ${userTeam?.name}, que acabou superado pelo ${opponent}.`;
         }
 
+        const isRevealed = m.revealed !== false;
+
         feed.push({
           id: `match_${m.id}`,
           type: 'match',
           title: isWin ? 'Vitória' : isDraw ? 'Empate' : 'Derrota',
-          subtitle: subtitle,
-          score: `${m.homeScore}-${m.awayScore}`,
+          subtitle: !isRevealed ? `Relato disponível contra o ${opponent}.` : subtitle,
+          score: !isRevealed ? '??-??' : `${m.homeScore}-${m.awayScore}`,
           match: m,
           date: m.date
         });
@@ -347,6 +376,24 @@ export const HomeTab = () => {
                       <span className="text-white/20">-</span>
                       <span>{nextMatchData.match.awayScore}</span>
                     </div>
+                  ) : nextMatchData?.status === 'FINISHED' && nextMatchData.match.revealed === false ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-white/20">??</span>
+                      <span className="text-white/10">-</span>
+                      <span className="text-white/20">??</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleRevealMatch(nextMatchData.match.id); }}
+                        className="ml-4 px-3 py-1 bg-white/10 rounded-full text-[8px] font-black uppercase text-white hover:bg-white/20 border border-white/10"
+                      >
+                        REVELAR
+                      </button>
+                    </div>
+                  ) : nextMatchData?.status === 'FINISHED' ? (
+                    <div className="flex items-center gap-4">
+                      <span>{nextMatchData.match.homeScore}</span>
+                      <span className="text-white/20">-</span>
+                      <span>{nextMatchData.match.awayScore}</span>
+                    </div>
                   ) : (
                     timeLeft || 'Aguardando...'
                   )}
@@ -492,16 +539,27 @@ export const HomeTab = () => {
 
               <div className="mt-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="flex -space-x-1.5">
-                    {[1, 2, 3].map(i => (
-                      <div key={i} className="w-6 h-6 rounded-full border-2 border-slate-900 bg-slate-800 flex items-center justify-center text-[8px] font-bold text-white">
-                        {String.fromCharCode(64 + i)}
+                  {!isRevealed ? (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleRevealMatch(lastMatch!.id); }}
+                      className="flex items-center gap-2 px-4 py-1.5 bg-magenta-500 rounded-full text-[10px] font-black text-black uppercase hover:scale-105 transition-all shadow-[0_0_15px_rgba(217,70,239,0.4)]"
+                    >
+                      <Eye size={12} /> Revelar Placar
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <div className="flex -space-x-1.5">
+                        {[1, 2, 3].map(i => (
+                          <div key={i} className="w-6 h-6 rounded-full border-2 border-slate-900 bg-slate-800 flex items-center justify-center text-[8px] font-bold text-white">
+                            {String.fromCharCode(64 + i)}
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  <span className="text-[10px] font-bold text-slate-500">
-                    {headlineData.type === 'match' ? 'Clique para ver Relatório' : 'Feed Atualizado'}
-                  </span>
+                      <span className="text-[10px] font-bold text-slate-500">
+                        Clique para ver Relatório
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <ChevronRight size={18} className="text-magenta-500 group-hover:translate-x-1 transition-transform" />
               </div>
@@ -671,6 +729,7 @@ export const HomeTab = () => {
               awayTeam={state.teams[selectedMatchReport.awayTeamId || selectedMatchReport.awayId]}
               players={state.players}
               onClose={() => setSelectedMatchReport(null)}
+              onReveal={handleRevealMatch}
             />
           </div>
         </div>

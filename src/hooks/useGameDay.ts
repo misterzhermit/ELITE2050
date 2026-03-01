@@ -1,5 +1,5 @@
 import { useGame, useGameDispatch } from '../store/GameContext';
-import { advanceGameDay } from '../engine/gameLogic';
+import { advanceGameDay, startNewSeason } from '../engine/gameLogic';
 
 export const useGameDay = () => {
     const { state, setState } = useGame();
@@ -23,5 +23,18 @@ export const useGameDay = () => {
         addToast('Dia avançado com sucesso', 'success');
     };
 
-    return { handleAdvanceDay };
+    const handleStartNewSeason = () => {
+        if (!state.isCreator) {
+            alert('Apenas o Criador do Mundo pode iniciar a nova temporada.');
+            return;
+        }
+
+        if (!window.confirm('A Temporada atual chegou ao fim! Deseja calcular a evolução dos jogadores e iniciar o próximo ano?')) return;
+
+        console.log('GM: Iniciando nova temporada...');
+        setState(prev => startNewSeason(prev));
+        addToast('Nova temporada iniciada com sucesso! Elencos, calendários e traços atualizados.', 'success');
+    };
+
+    return { handleAdvanceDay, handleStartNewSeason };
 };

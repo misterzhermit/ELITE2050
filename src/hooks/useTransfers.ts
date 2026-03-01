@@ -8,73 +8,74 @@ export const useTransfers = (userTeamId: string | null, totalPoints: number, pow
 
     const handleMakeProposal = async (player: Player) => {
         const userTeam = userTeamId ? state.teams[userTeamId] : null;
+        const isDraft = (state.world as any).status === 'DRAFT';
 
         if (!userTeam) {
             addToast('Você precisa estar em um time para fazer uma proposta!', 'error');
             return;
         }
 
-        if (userTeam.squad.length >= 20) {
-            addToast('Seu elenco já está cheio (máximo 20 jogadores)!', 'error');
+        if (userTeam.squad.length >= 25) {
+            addToast('Seu elenco já está cheio (máximo 25 jogadores)!', 'error');
             return;
         }
 
-        const value = player.totalRating;
-        const nextTotalPoints = totalPoints + player.totalRating;
+        if (!isDraft && (player.satisfaction || 70) >= 80) {
+            addToast(`${player.nickname} está muito feliz no clube atual e não tem interesse em sair agora. (Satisfação: ${player.satisfaction}%)`, 'warning');
+            return;
+        }
+
+        const currentPower = userTeam.squad.reduce((sum, id) => sum + (state.players[id]?.totalRating || 0), 0);
+        const nextTotalPoints = currentPower + player.totalRating;
 
         if (nextTotalPoints > powerCap) {
-            addToast(`Contratação excede o Score Máximo de ${powerCap} pts!`, 'error');
+            addToast(`A vinda de ${player.nickname} excederia o limite de ${powerCap} pts de Score!`, 'error');
             return;
         }
 
-        if (window.confirm(`Deseja contratar ${player.nickname} por ${player.totalRating} pts de score?`)) {
+        const confirmMsg = isDraft
+            ? `Deseja contratar ${player.nickname} para o seu novo elenco por ${player.totalRating} pts?`
+            : `Deseja enviar uma proposta de roubo para ${player.nickname} por ${player.totalRating} pts? A IA responderá no próximo dia.`;
+
+        if (window.confirm(confirmMsg)) {
             try {
-                const newNotification: GameNotification = {
-                    id: `transf_${Date.now()}`,
-                    date: new Date().toISOString(),
-                    title: 'Transferência Concluída',
-                    message: `${player.nickname} assinou com o ${userTeam.name}!`,
-                    type: 'transfer',
-                    read: false
-                };
+                if (isDraft) {
+                    // Instant transfer during draft
+                    setState(prev => {
+                        const newState = { ...prev };
+                        const myTeam = newState.teams[userTeam.id];
+                        const targetId = player.contract.teamId;
 
-                setState(prev => {
-                    const newState = { ...prev };
-                    newState.players[player.id] = {
-                        ...player,
-                        contract: {
-                            ...player.contract,
-                            teamId: userTeam.id
+                        if (targetId) {
+                            newState.teams[targetId].squad = newState.teams[targetId].squad.filter(id => id !== player.id);
                         }
+                        myTeam.squad.push(player.id);
+                        newState.players[player.id].contract.teamId = userTeam.id;
+                        newState.players[player.id].satisfaction = 100; // High satisfaction on join
+                        return newState;
+                    });
+                    addToast(`${player.nickname} contratado para o elenco!`, 'success');
+                } else {
+                    const newProposal: any = {
+                        id: `prop_${Date.now()}`,
+                        playerId: player.id,
+                        fromTeamId: userTeam.id,
+                        toTeamId: player.contract.teamId || null,
+                        value: player.totalRating,
+                        status: 'PENDING',
+                        date: state.world.currentDate
                     };
-                    newState.teams[userTeam.id] = {
-                        ...newState.teams[userTeam.id],
-                        squad: [...newState.teams[userTeam.id].squad, player.id]
-                    };
-                    newState.notifications = [newNotification, ...(newState.notifications || [])];
-                    return newState;
-                });
 
-                if (isOnline) {
-                    const { data } = await supabase.auth.getUser();
-                    await supabase.from('transfers').insert({
-                        player_id: player.id,
-                        from_team_id: null,
-                        to_team_id: userTeam.id,
-                        value: value,
-                        user_id: data.user?.id
-                    });
-                    await supabase.from('notifications').insert({
-                        user_id: data.user?.id,
-                        title: newNotification.title,
-                        message: newNotification.message,
-                        type: newNotification.type
-                    });
+                    setState(prev => ({
+                        ...prev,
+                        transferProposals: [newProposal, ...(prev.transferProposals || [])]
+                    }));
+
+                    addToast(`Proposta de roubo enviada para ${player.nickname}! Aguarde a resposta da IA.`, 'success');
                 }
-                addToast(`${player.nickname} agora faz parte do seu elenco!`, 'success');
             } catch (error) {
-                console.error('Erro ao processar transferência:', error);
-                addToast('Erro ao processar transferência. Tente novamente.', 'error');
+                console.error('Erro na transferência:', error);
+                addToast('Erro ao processar transferência.', 'error');
             }
         }
     };
@@ -156,8 +157,9 @@ export const useTransfers = (userTeamId: string | null, totalPoints: number, pow
 
     const handleSendTradeOffer = async (requestedPlayerId: string, offeredPlayerId: string) => {
         const userTeam = userTeamId ? state.teams[userTeamId] : null;
+        const isDraft = (state.world as any).status === 'DRAFT';
 
-        if (!state.world.transferWindowOpen) {
+        if (!isDraft && !state.world.transferWindowOpen) {
             addToast('A janela de transferências está fechada em dias de jogo!', 'error');
             return;
         }
@@ -168,6 +170,7 @@ export const useTransfers = (userTeamId: string | null, totalPoints: number, pow
         }
 
         const requestedPlayer = state.players[requestedPlayerId];
+        const offeredPlayer = state.players[offeredPlayerId];
         const targetTeamId = requestedPlayer?.contract?.teamId;
 
         if (!targetTeamId) {
@@ -175,64 +178,93 @@ export const useTransfers = (userTeamId: string | null, totalPoints: number, pow
             return;
         }
 
-        if (window.confirm(`Propor troca: seu jogador por ${requestedPlayer.nickname}?`)) {
-            const newOffer: import('../types').TradeOffer = {
-                id: `trade_${Date.now()}`,
-                fromTeamId: userTeam.id,
-                toTeamId: targetTeamId,
-                offeredPlayerId,
-                requestedPlayerId,
-                status: 'PENDING',
-                date: state.world.currentDate
-            };
+        const currentPower = userTeam.squad.reduce((sum, id) => sum + (state.players[id]?.totalRating || 0), 0);
+        const nextPowerAfterSwap = currentPower - offeredPlayer.totalRating + requestedPlayer.totalRating;
 
-            setState(prev => ({
-                ...prev,
-                tradeOffers: [newOffer, ...(prev.tradeOffers || [])]
-            }));
+        if (nextPowerAfterSwap > powerCap) {
+            addToast(`Essa troca faria seu time exceder o limite de ${powerCap} pts! (Balanço: ${requestedPlayer.totalRating - offeredPlayer.totalRating} pts)`, 'error');
+            return;
+        }
 
-            // Auto-accept/decline for AI teams right now (simplification)
-            if (targetTeamId !== state.userTeamId) {
-                // Determine AI choice (AI accepts if offered player has higher or equal rating)
-                const offeredPlayer = state.players[offeredPlayerId];
-                if (offeredPlayer.totalRating >= requestedPlayer.totalRating - 15) {
+        if (!isDraft && (requestedPlayer.satisfaction || 70) >= 85) {
+            addToast(`${requestedPlayer.nickname} está muito satisfeito no clube atual e não aceitaria ser trocado agora.`, 'warning');
+            return;
+        }
+
+        const confirmMsg = isDraft
+            ? `Trocar ${offeredPlayer.nickname} (${offeredPlayer.totalRating} pts) por ${requestedPlayer.nickname} (${requestedPlayer.totalRating} pts)?`
+            : `Propor troca de ${offeredPlayer.nickname} por ${requestedPlayer.nickname}?`;
+
+        if (window.confirm(confirmMsg)) {
+            if (isDraft) {
+                // Instant trade during draft
+                setState(prev => {
+                    const newState = { ...prev };
+                    const myTeam = newState.teams[userTeam.id];
+                    const aiTeam = newState.teams[targetTeamId];
+
+                    myTeam.squad = myTeam.squad.filter(id => id !== offeredPlayerId);
+                    myTeam.squad.push(requestedPlayerId);
+                    aiTeam.squad = aiTeam.squad.filter(id => id !== requestedPlayerId);
+                    aiTeam.squad.push(offeredPlayerId);
+
+                    newState.players[requestedPlayerId].contract.teamId = userTeam.id;
+                    newState.players[offeredPlayerId].contract.teamId = targetTeamId;
+
+                    return newState;
+                });
+                addToast('Troca efetuada com sucesso!', 'success');
+            } else {
+                const newOffer: any = {
+                    id: `trade_${Date.now()}`,
+                    fromTeamId: userTeam.id,
+                    toTeamId: targetTeamId,
+                    offeredPlayerId,
+                    requestedPlayerId,
+                    status: 'PENDING',
+                    date: state.world.currentDate
+                };
+
+                setState(prev => ({
+                    ...prev,
+                    tradeOffers: [newOffer, ...(prev.tradeOffers || [])]
+                }));
+
+                // Simple AI logic for trade response
+                const diff = offeredPlayer.totalRating - requestedPlayer.totalRating;
+                const acceptanceChance = diff >= 0 ? 0.9 : 0.3 + (diff / 200);
+
+                if (Math.random() < acceptanceChance) {
                     addToast(`O ${state.teams[targetTeamId].name} aceitou a proposta! A troca foi efetuada.`, 'success');
-
-                    // Execute Trade
                     setState(prev => {
                         const newState = { ...prev };
                         const myTeam = newState.teams[userTeam.id];
                         const aiTeam = newState.teams[targetTeamId];
 
-                        // Swap IDs in squads
                         myTeam.squad = myTeam.squad.filter(id => id !== offeredPlayerId);
                         myTeam.squad.push(requestedPlayerId);
-
                         aiTeam.squad = aiTeam.squad.filter(id => id !== requestedPlayerId);
                         aiTeam.squad.push(offeredPlayerId);
 
-                        // Remove from both lineups to prevent ghost references
-                        Object.keys(myTeam.lineup).forEach(pos => { if (myTeam.lineup[pos as any] === offeredPlayerId) delete myTeam.lineup[pos as any]; });
-                        Object.keys(aiTeam.lineup).forEach(pos => { if (aiTeam.lineup[pos as any] === requestedPlayerId) delete aiTeam.lineup[pos as any]; });
-
-                        // Update Players
                         newState.players[requestedPlayerId].contract.teamId = userTeam.id;
                         newState.players[offeredPlayerId].contract.teamId = targetTeamId;
 
-                        newState.tradeOffers[0].status = 'ACCEPTED';
+                        if (newState.tradeOffers && newState.tradeOffers.length > 0) {
+                            newState.tradeOffers[0].status = 'ACCEPTED';
+                        }
 
                         return newState;
                     });
                 } else {
-                    addToast(`O ${state.teams[targetTeamId].name} recusou a troca por ${requestedPlayer.nickname}.`, 'error');
+                    addToast(`O ${state.teams[targetTeamId].name} recusou a troca.`, 'error');
                     setState(prev => {
                         const newState = { ...prev };
-                        newState.tradeOffers[0].status = 'DECLINED';
+                        if (newState.tradeOffers && newState.tradeOffers.length > 0) {
+                            newState.tradeOffers[0].status = 'DECLINED';
+                        }
                         return newState;
                     });
                 }
-            } else {
-                addToast('Proposta enviada com sucesso!', 'success');
             }
         }
     };

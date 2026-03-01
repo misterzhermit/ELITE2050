@@ -4,7 +4,7 @@ import {
   Trophy, Clock, Activity, Zap, Shield,
   ChevronRight, AlertCircle, Award, Target,
   TrendingUp, Users, Play, Pause, FastForward,
-  Info, BarChart3, Star, History
+  Info, BarChart3, Star, History, AlertTriangle, Skull
 } from 'lucide-react';
 import { TeamLogo } from './TeamLogo';
 
@@ -147,23 +147,29 @@ const Timeline: React.FC<{ events: MatchEvent[], players: Record<string, Player>
             >
               {/* Event Dot/Icon */}
               <div className={`absolute left-0 top-0 w-10 h-10 rounded-full border-2 flex items-center justify-center z-10 shadow-lg ${event.type === 'GOAL'
-                  ? 'bg-cyan-500 border-cyan-400 shadow-cyan-500/40'
-                  : event.type === 'CARD_RED'
-                    ? 'bg-red-500 border-red-400 shadow-red-500/40'
-                    : 'bg-slate-900 border-white/20 shadow-black'
+                ? 'bg-cyan-500 border-cyan-400 shadow-cyan-500/40'
+                : event.type === 'CARD_RED'
+                  ? 'bg-red-500 border-red-400 shadow-red-500/40'
+                  : 'bg-slate-900 border-white/20 shadow-black'
                 }`}>
                 {event.type === 'GOAL' && <Trophy className="text-white" size={18} />}
                 {event.type === 'CHANCE' && <Zap className="text-yellow-400" size={18} />}
+                {event.type === 'WOODWORK' && <Target className="text-orange-400" size={18} />}
+                {event.type === 'VAR' && <AlertCircle className="text-purple-400" size={18} />}
+                {event.type === 'BLOCKED' && <Shield className="text-blue-400" size={18} />}
+                {event.type === 'OFFSIDE' && <Clock className="text-slate-400" size={18} />}
+                {event.type === 'COUNTER' && <FastForward className="text-green-400" size={18} />}
                 {event.type === 'CARD_YELLOW' && <div className="w-3 h-4 bg-yellow-400 rounded-sm" />}
                 {event.type === 'CARD_RED' && <div className="w-3 h-4 bg-red-500 rounded-sm" />}
                 {event.type === 'COMMENTARY' && <Info className="text-cyan-400" size={18} />}
-                {event.type === 'INJURY' && <Activity className="text-red-400" size={18} />}
+                {event.type === 'FOUL' && <AlertTriangle className="text-orange-300" size={18} />}
+                {event.type === 'MISTAKE' && <Skull className="text-red-600" size={18} />}
               </div>
 
               {/* Balloon / Card */}
               <div className={`relative p-4 rounded-2xl border transition-all hover:scale-[1.02] duration-300 ${event.type === 'GOAL'
-                  ? 'bg-cyan-500/10 border-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.1)]'
-                  : 'bg-white/5 border-white/10'
+                ? 'bg-cyan-500/10 border-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.1)]'
+                : 'bg-white/5 border-white/10'
                 }`}>
                 {/* Connector Arrow */}
                 <div className={`absolute left-[-8px] top-4 w-4 h-4 rotate-45 border-l border-b ${event.type === 'GOAL' ? 'bg-cyan-950 border-cyan-500/30' : 'bg-slate-900 border-white/10'
@@ -175,7 +181,7 @@ const Timeline: React.FC<{ events: MatchEvent[], players: Record<string, Player>
                       <span className="text-xs font-black text-cyan-400 tabular-nums">{event.minute}'</span>
                       <div className="h-3 w-px bg-white/10" />
                       <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">
-                        {event.type === 'COMMENTARY' ? 'Narrador' : (players[event.playerId || '']?.nickname || 'Partida')}
+                        {(event.type === 'COMMENTARY' || event.type === 'VAR') ? 'Narrador' : (players[event.playerId || '']?.nickname || 'Partida')}
                       </span>
                     </div>
                     {event.type === 'GOAL' && (
@@ -212,6 +218,7 @@ interface PostGameReportProps {
   awayTeam: Team;
   players: Record<string, Player>;
   onClose?: () => void;
+  onReveal?: (matchId: string) => void;
 }
 
 export const PostGameReport: React.FC<PostGameReportProps> = ({
@@ -219,9 +226,11 @@ export const PostGameReport: React.FC<PostGameReportProps> = ({
   homeTeam,
   awayTeam,
   players,
-  onClose
+  onClose,
+  onReveal
 }) => {
   const result = match.result;
+  const isRevealed = match.revealed !== false;
   const [activeTab, setActiveTab] = useState<'stats' | 'timeline'>('stats');
 
   if (!result) return null;
@@ -261,10 +270,22 @@ export const PostGameReport: React.FC<PostGameReportProps> = ({
                 symbolId={homeTeam.logo.symbolId}
                 size={64}
               />
-              <span className="text-4xl font-black text-white italic">{result.homeScore}</span>
+              <span className={`text-4xl font-black text-white italic transition-all duration-1000 ${!isRevealed ? 'blur-md select-none' : ''}`}>
+                {isRevealed ? result.homeScore : '0'}
+              </span>
             </div>
 
-            <div className="text-xl font-black text-white/20 italic">VS</div>
+            <div className="flex flex-col items-center gap-4">
+              <div className="text-xl font-black text-white/20 italic">VS</div>
+              {!isRevealed && (
+                <button
+                  onClick={() => onReveal?.(match.id)}
+                  className="px-4 py-1.5 bg-cyan-500 rounded-full text-[10px] font-black text-black uppercase hover:scale-105 transition-all shadow-[0_0_20px_rgba(6,182,212,0.5)]"
+                >
+                  Revelar Placar
+                </button>
+              )}
+            </div>
 
             <div className="flex flex-col items-center gap-2">
               <TeamLogo
@@ -274,7 +295,9 @@ export const PostGameReport: React.FC<PostGameReportProps> = ({
                 symbolId={awayTeam.logo.symbolId}
                 size={64}
               />
-              <span className="text-4xl font-black text-white italic">{result.awayScore}</span>
+              <span className={`text-4xl font-black text-white italic transition-all duration-1000 ${!isRevealed ? 'blur-md select-none' : ''}`}>
+                {isRevealed ? result.awayScore : '0'}
+              </span>
             </div>
           </div>
         </div>
@@ -336,7 +359,9 @@ export const PostGameReport: React.FC<PostGameReportProps> = ({
                         <div className="text-[8px] font-bold text-white/40 uppercase">{player?.role}</div>
                       </div>
                     </div>
-                    <div className="text-sm font-black text-cyan-400 italic">{(rating / 10).toFixed(1)}</div>
+                    <div className={`text-sm font-black text-cyan-400 italic ${!isRevealed ? 'blur-sm select-none opacity-20' : ''}`}>
+                      {isRevealed ? (rating / 10).toFixed(1) : '??'}
+                    </div>
                   </div>
                 ))}
               </div>

@@ -139,7 +139,7 @@ export interface Manager {
 
 export type MatchStatus = 'SCHEDULED' | 'LOCKED' | 'PLAYING' | 'FINISHED';
 
-export type CardType = 'CARD_YELLOW' | 'CARD_RED' | 'COMMENTARY' | 'INJURY' | 'HALF_TIME';
+export type CardType = 'CARD_YELLOW' | 'CARD_RED' | 'COMMENTARY' | 'HALF_TIME';
 
 export interface TradeOffer {
   id: string;
@@ -151,11 +151,21 @@ export interface TradeOffer {
   date: string;
 }
 
+export interface TransferProposal {
+  id: string;
+  playerId: string;
+  fromTeamId: string | null;
+  toTeamId: string;
+  value: number;
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'WAITING_WINDOW';
+  date: string;
+}
+
 export interface MatchEvent {
   id: string;
   minute: number; // 0-90
   realTimeSecond: number; // 0-360 (6 minutes)
-  type: 'GOAL' | 'CARD_YELLOW' | 'CARD_RED' | 'CHANCE' | 'FOUL' | 'SUBSTITUTION' | 'COMMENTARY' | 'INJURY';
+  type: 'GOAL' | 'CARD_YELLOW' | 'CARD_RED' | 'CHANCE' | 'FOUL' | 'SUBSTITUTION' | 'COMMENTARY' | 'WOODWORK' | 'VAR' | 'BLOCKED' | 'OFFSIDE' | 'COUNTER' | 'MISTAKE';
   title: string;
   description: string;
   playerId?: string;
@@ -191,6 +201,7 @@ export interface Match {
   homeScore?: number;
   awayScore?: number;
   played?: boolean;
+  revealed?: boolean; // New: Hidden scores for user impact
   round: number;
 }
 
@@ -285,7 +296,7 @@ export interface LeagueState {
   teams?: string[];
 }
 
-export type WorldStatus = 'LOBBY' | 'ACTIVE' | 'FINISHED';
+export type WorldStatus = 'DRAFT' | 'LOBBY' | 'ACTIVE' | 'FINISHED';
 
 export interface WorldState {
   id?: string;
@@ -337,4 +348,6 @@ export interface GameState {
     message: string;
   };
   training: TrainingState;
+  transferProposals?: TransferProposal[];
+  tradeOffers?: TradeOffer[];
 }

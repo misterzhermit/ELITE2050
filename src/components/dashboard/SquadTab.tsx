@@ -69,7 +69,7 @@ export const SquadTab = (props: { showLineup?: boolean; lineupOnly?: boolean }) 
   }
 
   return (
-    <div className="space-y-4 sm:space-y-8 animate-in fade-in duration-500 pb-10 px-2 sm:px-0">
+    <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-500 pb-10 px-2 sm:px-0">
       {isLocked && (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 animate-in fade-in slide-in-from-top-4">
           <div className="bg-amber-500/20 p-1.5 sm:p-2 rounded-lg">
@@ -83,6 +83,48 @@ export const SquadTab = (props: { showLineup?: boolean; lineupOnly?: boolean }) 
           </div>
         </div>
       )}
+
+      {/* Team Power Dashboard */}
+      <div className="bg-black/40 border border-white/10 rounded-2xl p-4 sm:p-6 mb-6 shadow-xl backdrop-blur-md relative overflow-hidden group">
+        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center p-2 shadow-inner">
+              <Zap className="text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]" size={24} />
+            </div>
+            <div>
+              <h2 className="text-white font-black uppercase tracking-widest text-xs sm:text-sm">Poder do Elenco</h2>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-2xl sm:text-3xl font-black italic text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-200">
+                  {dashData.totalPoints.toLocaleString()}
+                </span>
+                <span className="text-white/40 font-bold text-[10px] sm:text-xs">/ {dashData.powerCap.toLocaleString()} Max</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 max-w-md w-full">
+            <div className="flex justify-between items-end mb-2">
+              <span className="text-[10px] sm:text-xs font-bold text-white/50 uppercase tracking-widest">Espaço na Folha</span>
+              <span className={`text-[10px] sm:text-xs font-black p-1 px-2 rounded-lg ${dashData.pointsLeft < 0 ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-green-500/20 text-green-400 border border-green-500/30'}`}>
+                {dashData.pointsLeft > 0 ? '+' : ''}{dashData.pointsLeft.toLocaleString()}
+              </span>
+            </div>
+            <div className="h-2 sm:h-3 w-full bg-white/5 rounded-full overflow-hidden border border-white/5 shadow-inner">
+              <div
+                className={`h-full rounded-full transition-all duration-1000 ${dashData.totalPoints > dashData.powerCap
+                  ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.8)]'
+                  : dashData.totalPoints > dashData.powerCap * 0.9
+                    ? 'bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.8)]'
+                    : 'bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.8)]'
+                  }`}
+                style={{ width: `${Math.min(100, (dashData.totalPoints / dashData.powerCap) * 100)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* ESCALAÇÃO - LineupBuilder (shown when lineupOnly or showLineup prop) */}
       {(props.lineupOnly || props.showLineup) && (

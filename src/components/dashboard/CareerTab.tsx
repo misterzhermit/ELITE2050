@@ -13,6 +13,7 @@ import { LineupBuilder } from '../LineupBuilder';
 import { LiveReport, PostGameReport } from '../MatchReports';
 import { getMatchStatus } from '../../utils/matchUtils';
 import { Player } from '../../types';
+import { SEASON_DAYS } from '../../constants/gameConstants';
 import * as LucideIcons from 'lucide-react';
 const { Home, Trophy, ShoppingCart, Database, User, Clock, Newspaper, TrendingUp, AlertCircle, Award, Calendar, Users, Activity, Sliders, Flame, Target, Zap, FastForward, Globe, MessageSquare, AlertTriangle, TrendingDown, Briefcase, Star, Search, Crown, ChevronRight, Lock, ChevronDown, Eye, Shield, Brain, X, Save, Play } = LucideIcons;
 
@@ -34,7 +35,7 @@ export const CareerTab = (props: any) => {
   } = useMatchSimulation(userTeam?.id || null);
   const { handleUpdateTactics } = useTactics(userTeam?.id || null);
   const { handleSetFocus, handleStartCardLab, handleChemistryBoost } = useTraining(userTeam?.id || null);
-  const { handleAdvanceDay } = useGameDay();
+  const { handleAdvanceDay, handleStartNewSeason } = useGameDay();
   const [isCareerModalOpen, setIsCareerModalOpen] = useState(false);
   const [gmRandomPlayer, setGmRandomPlayer] = useState<Player | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
@@ -119,46 +120,44 @@ export const CareerTab = (props: any) => {
         {/* Left Column - Team Context */}
         <div className="lg:col-span-8 space-y-4 sm:space-y-6">
           {/* User Team Card */}
-          <div className="glass-card-neon white-gradient-sheen border-cyan-500/30 p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] shadow-[0_0_30px_rgba(34,211,238,0.15)] relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-cyan-500/10 transition-colors duration-700" />
+          <div className="glass-card-neon white-gradient-sheen border-cyan-500/30 p-3 sm:p-5 rounded-2xl sm:rounded-[2rem] shadow-[0_0_30px_rgba(34,211,238,0.1)] relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl -mr-12 -mt-12 group-hover:bg-cyan-500/10 transition-colors duration-700" />
 
-            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 relative z-10">
+            <div className="flex items-center gap-4 sm:gap-6 relative z-10">
               <div className="relative">
-                <div className="absolute inset-0 bg-cyan-500/20 blur-2xl rounded-full animate-pulse" />
-                <div className="w-20 h-20 sm:w-28 sm:h-28 glass-card rounded-2xl sm:rounded-[2rem] flex items-center justify-center border border-cyan-500/30 shadow-[0_0_30px_rgba(6,182,212,0.2)]">
+                <div className="absolute inset-0 bg-cyan-500/20 blur-xl rounded-full animate-pulse" />
+                <div className="w-14 h-14 sm:w-20 sm:h-20 glass-card rounded-xl sm:rounded-2xl flex items-center justify-center border border-cyan-500/30">
                   {userTeam ? (
                     <TeamLogo
                       primaryColor={userTeam.logo?.primary || '#fff'}
                       secondaryColor={userTeam.logo?.secondary || '#000'}
                       patternId={userTeam.logo?.patternId as any}
                       symbolId={userTeam.logo?.symbolId}
-                      size={window.innerWidth < 640 ? 48 : 64}
+                      size={window.innerWidth < 640 ? 36 : 56}
                     />
                   ) : (
-                    <Users size={window.innerWidth < 640 ? 32 : 48} className="text-cyan-400/50" />
+                    <Users size={window.innerWidth < 640 ? 24 : 36} className="text-cyan-400/50" />
                   )}
                 </div>
               </div>
 
-              <div className="text-center sm:text-left flex-1">
-                <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-                  <h2 className="text-2xl sm:text-4xl font-black text-white uppercase italic tracking-tight neon-text-cyan truncate max-w-[250px] sm:max-w-none">
+              <div className="text-left flex-1 min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                  <h2 className="text-xl sm:text-2xl font-black text-white uppercase italic tracking-tight neon-text-cyan truncate">
                     {userTeam?.name || 'SEM CLUBE'}
                   </h2>
-                  <div className="bg-cyan-500/10 border border-cyan-500/30 px-3 py-1 rounded-full flex items-center gap-2">
-                    <Trophy size={10} className="text-cyan-400" />
-                    <span className="text-[8px] sm:text-[10px] font-black text-cyan-400 uppercase tracking-widest">
-                      LIGA {userTeam?.district || 'DESCONHECIDA'}
+                  <div className="bg-cyan-500/10 border border-cyan-500/30 px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
+                    <Trophy size={8} className="text-cyan-400" />
+                    <span className="text-[7px] sm:text-[9px] font-black text-cyan-400 uppercase tracking-widest">
+                      {userTeam?.district || 'DISTRITO'}
                     </span>
                   </div>
                 </div>
-                <div className="flex flex-wrap justify-center sm:justify-start gap-4 sm:gap-6 mt-3">
-                  <div className="flex flex-col">
-                    <span className="text-[7px] sm:text-[9px] text-cyan-400/50 font-black uppercase tracking-widest">Reputação</span>
-                    <div className="flex items-center gap-1">
-                      <Star size={10} className="text-yellow-400 fill-yellow-400" />
-                      <span className="text-xs sm:text-lg font-mono font-black text-white">4.8</span>
-                    </div>
+                <div className="flex items-center gap-3 mt-1 sm:mt-2">
+                  <div className="flex items-center gap-1">
+                    <Star size={8} className="text-yellow-400 fill-yellow-400" />
+                    <span className="text-[10px] sm:text-sm font-mono font-black text-white">4.8</span>
+                    <span className="text-[7px] text-cyan-400/50 uppercase tracking-widest ml-1">Reputação</span>
                   </div>
                 </div>
               </div>
@@ -166,56 +165,49 @@ export const CareerTab = (props: any) => {
           </div>
 
           {/* Tactics & Training Overview */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-            <div className="glass-card-neon white-gradient-sheen border-purple-500/20 shadow-[0_0_30px_rgba(168,85,247,0.1)] p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] group hover:border-purple-500/30 transition-all duration-500">
-              <div className="flex items-center justify-between mb-4 sm:mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 glass-card rounded-xl flex items-center justify-center text-purple-400 border border-purple-500/30">
-                    <Target size={window.innerWidth < 640 ? 16 : 20} />
-                  </div>
-                  <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-widest">Foco Tático</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="glass-card-neon border-purple-500/20 shadow-[0_0_20px_rgba(168,85,247,0.1)] p-3 sm:p-5 rounded-2xl transition-all duration-500">
+              <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                <div className="w-8 h-8 rounded-lg glass-card flex items-center justify-center text-purple-400 border border-purple-500/30">
+                  <Target size={14} />
                 </div>
-                <button className="p-2 hover:bg-white/5 rounded-lg transition-colors">
-                  <Sliders size={14} className="text-white/20" />
-                </button>
+                <h3 className="text-[9px] sm:text-[11px] font-black text-white uppercase tracking-widest">Resumo Tático</h3>
               </div>
-              <div className="space-y-3 sm:space-y-4">
-                <div className="bg-white/5 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-white/5">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-[8px] sm:text-[10px] text-purple-400/70 font-black uppercase tracking-widest">Mentalidade</span>
-                    <span className="text-[9px] sm:text-[11px] text-white font-black uppercase italic">Ultra-Ofensiva</span>
-                  </div>
-                  <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                    <div className="h-full w-[85%] bg-gradient-to-r from-purple-500 to-fuchsia-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]" />
-                  </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[7px] text-white/30 font-bold uppercase tracking-widest">Estilo</span>
+                  <span className="text-[9px] sm:text-[10px] font-black text-purple-400 uppercase italic truncate">{userTeam?.tactics.playStyle}</span>
+                </div>
+                <div className="flex flex-col gap-1 border-x border-white/5 px-2">
+                  <span className="text-[7px] text-white/30 font-bold uppercase tracking-widest">Mente</span>
+                  <span className="text-[9px] sm:text-[10px] font-black text-fuchsia-400 uppercase italic truncate">{userTeam?.tactics.mentality}</span>
+                </div>
+                <div className="flex flex-col gap-1 items-end">
+                  <span className="text-[7px] text-white/30 font-bold uppercase tracking-widest text-right">Ataque</span>
+                  <span className="text-[9px] sm:text-[10px] font-black text-white uppercase italic truncate">
+                    {userTeam?.tactics.linePosition <= 30 ? 'Recuada' : userTeam?.tactics.linePosition >= 70 ? 'Alta' : 'Média'}
+                  </span>
                 </div>
               </div>
             </div>
 
-            <div className="glass-card-neon white-gradient-sheen border-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.1)] p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] group hover:border-emerald-500/30 transition-all duration-500">
-              <div className="flex items-center justify-between mb-4 sm:mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 glass-card rounded-xl flex items-center justify-center text-emerald-400 border border-emerald-500/30">
-                    <Flame size={window.innerWidth < 640 ? 16 : 20} />
+            <div className="glass-card-neon border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.1)] p-3 sm:p-5 rounded-2xl transition-all duration-500">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg glass-card flex items-center justify-center text-emerald-400 border border-emerald-500/30">
+                    <Flame size={14} />
                   </div>
-                  <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-widest">Card Lab</h3>
+                  <h3 className="text-[9px] sm:text-[11px] font-black text-white uppercase tracking-widest">Card Lab</h3>
                 </div>
-                <div className="flex items-center gap-1 px-2 py-1 bg-emerald-500/10 rounded-full">
+                <div className="flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/10 rounded-full">
                   <div className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-[7px] sm:text-[8px] font-black text-emerald-400 uppercase tracking-widest">Ativo</span>
+                  <span className="text-[6px] sm:text-[8px] font-black text-emerald-400 uppercase tracking-widest">Ativo</span>
                 </div>
               </div>
-              <div className="bg-emerald-500/5 border border-emerald-500/20 p-3 sm:p-4 rounded-xl sm:rounded-2xl flex items-center gap-4">
-                <div className="flex-1">
-                  <p className="text-[9px] sm:text-[11px] text-white/70 font-medium mb-2 leading-relaxed">Próxima evolução disponível em:</p>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-lg sm:text-2xl font-mono font-black text-emerald-400">02</span>
-                    <span className="text-[8px] sm:text-[10px] text-emerald-500/50 font-black uppercase">dias</span>
-                  </div>
-                </div>
-                <button className="w-10 h-10 sm:w-12 sm:h-12 glass-card rounded-xl flex items-center justify-center text-emerald-400 hover:bg-emerald-500/20 transition-all group">
-                  <Zap size={window.innerWidth < 640 ? 16 : 20} className="group-hover:scale-110 transition-transform" />
-                </button>
+              <div className="flex items-center justify-between">
+                <span className="text-[8px] sm:text-[10px] text-white/40 uppercase font-black">Próxima Evolução:</span>
+                <span className="text-xs sm:text-sm font-mono font-black text-emerald-400">02 DIAS</span>
               </div>
             </div>
           </div>
@@ -224,58 +216,52 @@ export const CareerTab = (props: any) => {
         {/* Right Column - Side Panels */}
         <div className="lg:col-span-4 space-y-4 sm:space-y-6">
           {/* Calendar Mini View */}
-          <div className="glass-card-neon white-gradient-sheen border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.1)] p-4 sm:p-6 rounded-2xl sm:rounded-[2rem]">
-            <div className="flex items-center justify-between mb-4 sm:mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 glass-card rounded-xl flex items-center justify-center text-cyan-400 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.2)]">
-                  <Calendar size={window.innerWidth < 640 ? 16 : 20} />
+          <div className="glass-card-neon white-gradient-sheen border-cyan-500/20 shadow-[0_0_20px_rgba(34,211,238,0.1)] p-3 sm:p-5 rounded-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg glass-card flex items-center justify-center text-cyan-400 border border-cyan-500/30 shadow-[0_0_10px_rgba(6,182,212,0.2)]">
+                  <Calendar size={14} />
                 </div>
-                <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-widest">Calendário</h3>
+                <h3 className="text-[9px] sm:text-[11px] font-black text-white uppercase tracking-widest">Calendário</h3>
               </div>
-              <span className="text-[8px] sm:text-[10px] font-black text-cyan-400/50 uppercase tracking-[0.2em]">Janeiro 2050</span>
             </div>
 
-            <div className="space-y-2 sm:space-y-3">
+            <div className="space-y-2">
               {upcomingMatches.length > 0 ? (
                 upcomingMatches.slice(0, 2).map((match, idx) => {
                   const opponent = state.teams[match.homeTeamId === userTeam?.id ? match.awayTeamId : match.homeTeamId];
                   return (
-                    <div key={match.id} className="flex items-center justify-between bg-white/5 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-white/5 group hover:bg-white/10 transition-colors">
-                      <div className="flex items-center gap-3 sm:gap-4">
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 glass-card rounded-lg flex items-center justify-center border border-white/10">
+                    <div key={match.id} className="flex items-center justify-between bg-white/5 p-2 rounded-xl border border-white/5 group hover:bg-white/10 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 glass-card rounded-lg flex items-center justify-center border border-white/10">
                           {opponent ? (
                             <TeamLogo
                               primaryColor={opponent.logo?.primary || '#fff'}
                               secondaryColor={opponent.logo?.secondary || '#000'}
                               patternId={opponent.logo?.patternId as any}
                               symbolId={opponent.logo?.symbolId}
-                              size={window.innerWidth < 640 ? 20 : 24}
+                              size={16}
                             />
-                          ) : <Users size={16} className="text-white/20" />}
+                          ) : <Users size={12} className="text-white/20" />}
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[9px] sm:text-[11px] font-black text-white uppercase truncate max-w-[80px] sm:max-w-none">
+                          <span className="text-[9px] sm:text-[11px] font-black text-white uppercase truncate max-w-[100px]">
                             {opponent?.name || 'DESCONHECIDO'}
                           </span>
-                          <span className="text-[7px] sm:text-[9px] text-cyan-400/50 font-black uppercase tracking-widest">
+                          <span className="text-[7px] sm:text-[8px] text-cyan-400/50 font-black uppercase tracking-widest">
                             {state.world.status === 'LOBBY' ? '--/--' : new Date(match.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
                           </span>
                         </div>
                       </div>
-                      <div className="flex flex-col items-end">
-                        <span className="text-[7px] sm:text-[9px] text-white/20 font-black uppercase tracking-widest mb-1">
-                          {match.homeTeamId === userTeam?.id ? 'CASA' : 'FORA'}
-                        </span>
-                        <div className="px-2 py-0.5 bg-white/5 rounded border border-white/10">
-                          <span className="text-[8px] sm:text-[10px] font-mono text-white/60">VS</span>
-                        </div>
-                      </div>
+                      <span className="text-[8px] sm:text-[10px] font-black text-white/20 uppercase italic">
+                        {match.homeTeamId === userTeam?.id ? 'CASA' : 'FORA'}
+                      </span>
                     </div>
                   );
                 })
               ) : (
-                <div className="p-8 text-center border-2 border-dashed border-white/5 rounded-2xl">
-                  <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">Sem jogos agendados</span>
+                <div className="p-4 text-center border border-dashed border-white/5 rounded-xl">
+                  <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">Sem jogos</span>
                 </div>
               )}
             </div>
@@ -417,15 +403,16 @@ export const CareerTab = (props: any) => {
               </div>
               <div>
                 <h4 className="text-[10px] sm:text-xs font-black text-white uppercase tracking-widest">Relógio Global</h4>
-                <p className="text-[8px] sm:text-[10px] text-slate-500 font-bold uppercase">{isPaused ? 'Simulação Pausada' : 'Simulação Ativa'}</p>
+                <p className="text-[8px] sm:text-[10px] text-slate-500 font-bold uppercase">{isPaused ? 'Pausado' : 'Ativo'}</p>
               </div>
             </div>
             <div className="text-right">
-              <div className="text-lg sm:text-xl font-black text-white tabular-nums tracking-tighter italic">
-                {new Date(state.world.currentDate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              <div className="text-lg sm:text-xl font-black text-white tabular-nums tracking-tighter italic flex flex-col items-end">
+                <span>{new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}, 2050</span>
+                <span className="text-xs opacity-40">{new Date(state.world.currentDate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
               </div>
-              <div className="text-[8px] sm:text-[9px] font-black text-cyan-400 uppercase tracking-widest">
-                Dia {Math.floor((new Date(state.world.currentDate).getTime() - new Date('2050-01-01').getTime()) / (1000 * 60 * 60 * 24)) + 1}
+              <div className="text-[8px] sm:text-[9px] font-black text-cyan-400 uppercase tracking-widest mt-1">
+                {state.world.status === 'LOBBY' ? 'Dia da Season: 0' : `Dia da Season: ${Math.floor((new Date(state.world.currentDate).getTime() - new Date(state.world.seasonStartReal || state.world.currentDate).getTime()) / (1000 * 60 * 60 * 24)) + 1}`}
               </div>
             </div>
           </div>
@@ -451,13 +438,31 @@ export const CareerTab = (props: any) => {
             </div>
           </div>
 
-          <button
-            onClick={handleAdvanceDay}
-            className="w-full flex items-center justify-center gap-2 bg-black/40 border border-white/5 hover:border-red-500/50 p-3 sm:p-4 rounded-xl sm:rounded-2xl transition-all group"
-          >
-            <FastForward size={14} className="text-red-400" />
-            <span className="text-[9px] sm:text-[10px] font-black text-white uppercase tracking-widest">Avançar Dia</span>
-          </button>
+          {(() => {
+            const currentDayNumber = state.world.status === 'LOBBY' ? 0 : Math.floor((new Date(state.world.currentDate).getTime() - new Date(state.world.seasonStartReal || state.world.currentDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+            if (state.world.status !== 'LOBBY' && currentDayNumber > SEASON_DAYS) {
+              return (
+                <button
+                  onClick={handleStartNewSeason}
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 to-emerald-500 border border-emerald-400 p-3 sm:p-4 rounded-xl sm:rounded-2xl transition-all group hover:scale-[1.02] shadow-[0_0_20px_rgba(16,185,129,0.3)] animate-pulse"
+                >
+                  <Award size={16} className="text-black" />
+                  <span className="text-[10px] sm:text-xs font-black text-black uppercase tracking-widest">Próxima Temporada</span>
+                </button>
+              );
+            }
+
+            return (
+              <button
+                onClick={handleAdvanceDay}
+                className="w-full flex items-center justify-center gap-2 bg-black/40 border border-white/5 hover:border-red-500/50 p-3 sm:p-4 rounded-xl sm:rounded-2xl transition-all group"
+              >
+                <FastForward size={14} className="text-red-400" />
+                <span className="text-[9px] sm:text-[10px] font-black text-white uppercase tracking-widest">Avançar Dia</span>
+              </button>
+            );
+          })()}
         </div>
 
         {/* Mini Card Display Area */}

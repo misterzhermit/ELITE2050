@@ -15,7 +15,7 @@ export const ELITE_CUP_ROUNDS = 4;
 export const DISTRICT_CUP_ROUNDS = 4;
 export const TOTAL_ROUNDS = SEASON_ROUNDS + ELITE_CUP_ROUNDS + DISTRICT_CUP_ROUNDS; // 22
 export const SEASON_DAYS = 45; // 45 real-time days per season
-export const MATCH_INTERVAL_DAYS = 1; // Matches every day for faster progress
+export const MATCH_INTERVAL_DAYS = 2; // Dia Sim, Dia Não (Liga)
 export const DEFAULT_TIME_SPEED = 1; // 1s real = 1s game (Sync 1:1)
 
 // --- Safety Net (ensures AI teams remain competitive) ---

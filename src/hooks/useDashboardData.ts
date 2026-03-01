@@ -157,12 +157,13 @@ export const useDashboardData = () => {
             };
         };
 
-        return {
-            norte: processLeague(state.world.leagues.norte),
-            sul: processLeague(state.world.leagues.sul),
-            leste: processLeague(state.world.leagues.leste),
-            oeste: processLeague(state.world.leagues.oeste)
-        };
+        const processedLeagues: Record<string, any> = {};
+        Object.keys(state.world.leagues).forEach(key => {
+            if (state.world.leagues[key]) {
+                processedLeagues[key] = processLeague(state.world.leagues[key] as LeagueState);
+            }
+        });
+        return processedLeagues;
     }, [state.world, state.teams, state.players]);
 
     return {

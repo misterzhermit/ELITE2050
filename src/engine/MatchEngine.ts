@@ -15,6 +15,8 @@ export interface TeamStats {
   aggressiveness: number;
   slots: (TacticalCard | null)[];
   chemistry: number;
+  hypePlayerId?: string | null;
+  stabilizationPlayerId?: string | null;
 }
 
 const PLAYSTYLE_EFFECTS: Record<PlayStyle, { att: number, mid: number, def: number, staminaDrain: number, tickReduction?: number, lateBonus?: number }> = {
@@ -74,9 +76,50 @@ const GOAL_DESCRIPTIONS = [
 const DEFENSE_DESCRIPTIONS = [
   "Pelo amor dos meus filhinhos! Que defesa inacreditável do goleiro adversário no chute de {player}!",
   "Olho no lance... Espalma pro lado! Defesa gigante após a bomba de {player}.",
-  "Xiiii... A zaga travou na hora H! {player} já ia comemorar.",
   "O goleiro voa como um gato e tira a bola no ângulo! Que chance de {player}.",
   "Cruzamento cortado! A defesa corta o perigo de {player} na pequena área."
+];
+
+const WOODWORK_DESCRIPTIONS = [
+  "NO POSTE! A bola explode na trave após o chute de {player}!",
+  "UUUUUH! {player} solta a bomba e ela carimba o travessão!",
+  "Na trave! O goleiro já estava batido, mas o metal salvou o adversário."
+];
+
+const BLOCKED_DESCRIPTIONS = [
+  "Bloqueio espetacular! O chute de {player} explode no corpo do defensor que se atirou na bola.",
+  "Zaga muito sólida! {player} tentou o chute mas foi travado no momento exato.",
+  "Desvio providencial! A defesa se desdobra para fechar os espaços e impedir a finalização."
+];
+
+const VAR_DESCRIPTIONS = [
+  "Opa... O árbitro coloca a mão no ouvido. O VAR está checando a legalidade do lance.",
+  "Tensão em Neo-City! O lance de {player} está sendo revisado pela arbitragem de vídeo.",
+  "Arbitragem confirma: A decisão de campo está mantida após a revisão."
+];
+
+const OFFSIDE_DESCRIPTIONS = [
+  "Bandeira erguida! {player} estava ligeiramente à frente no momento do passe.",
+  "Impedimento marcado! A linha defensiva subiu bem e deixou o atacante em posição irregular.",
+  "Lance anulado. O ataque se precipitou e caiu na armadilha da zaga."
+];
+
+const COUNTER_DESCRIPTIONS = [
+  "CONTRA-ATAQUE! A bola é recuperada e o time sai em velocidade máxima com {player}!",
+  "Transição explosiva! O erro no ataque gera uma oportunidade de ouro no contra-golpe.",
+  "Lá vai o time no contra-ataque! Pegaram a defesa desarrumada agora."
+];
+
+const MISTAKE_DESCRIPTIONS = [
+  "FRANGO! {player} comete uma falha bizarra e entrega o ouro pro adversário!",
+  "QUE TRAPALHADA! A defesa se enrola sozinha e {player} quase marca um gol contra.",
+  "Erro infantil! {player} tentou o recuo e deu um presente para o ataque inimigo."
+];
+
+const FOUL_DESCRIPTIONS = [
+  "Falta marcada! {player} chega atrasado e comete a infração no meio-campo.",
+  "Jogo parado. O juiz vê a falta de {player} na disputa por baixo.",
+  "Entrada mais forte de {player}, o árbitro apenas adverte verbalmente."
 ];
 
 const COMMENTARY_TEMPLATES = [
@@ -146,20 +189,26 @@ export function simulateMatch(
 
   // Tactical Card Effects
   const getCardEffects = (slots: (TacticalCard | null)[]) => {
-    let att = 1.0, mid = 1.0, def = 1.0, gk = 1.0;
+    let att = 1.0, mid = 1.0, def = 1.0, gk = 1.0, chaos = 0;
     if (slots && Array.isArray(slots)) {
       slots.forEach(card => {
         if (!card) return;
-        // Simple logic for card effects based on their name/description
-        if (card.name && card.name.includes('Ataque')) att += 0.1;
-        if (card.name && card.name.includes('Defesa')) def += 0.1;
-        if (card.name && card.name.includes('Meio')) mid += 0.1;
-        if (card.name && card.name.includes('Goleiro')) gk += 0.1;
-        if (card.name === 'Super Chute') att += 0.15;
-        if (card.name === 'Muralha') def += 0.15;
+        const name = card.name || '';
+        // Sector Bonuses (Stackable) - Softer values as requested
+        if (name.includes('Ataque')) att += 0.05;
+        if (name.includes('Defesa')) def += 0.05;
+        if (name.includes('Meio')) mid += 0.05;
+        if (name.includes('Goleiro')) gk += 0.05;
+
+        // Specific Named Cards
+        if (name === 'Super Chute') att += 0.10;
+        if (name === 'Muralha') def += 0.10;
+        if (name === 'Maestro') mid += 0.08;
+        if (name === 'Bio-Otimização') { att += 0.04; mid += 0.04; def += 0.04; gk += 0.04; }
+        if (name === 'Holograma') chaos += 3;
       });
     }
-    return { att, mid, def, gk };
+    return { att, mid, def, gk, chaos };
   };
 
   const homeCards = getCardEffects(home.slots);
@@ -169,26 +218,30 @@ export function simulateMatch(
     ...defaultSector,
     averageAttribute: home.attack,
     chemistry: home.chemistry,
-    tacticalBonus: (homeEffect.att || 1.0) * (homeCards.att || 1.0) * (1 + ((home.linePosition || 50) - 50) / 200) + (homeMentality.attBonus || 0)
+    chaosMax: 10 + homeCards.chaos,
+    tacticalBonus: (homeEffect.att || 1.0) * (homeCards.att || 1.0) * (1 + ((home.linePosition || 50) - 50) / 200) + (homeMentality.attBonus || 0) + (home.aggressiveness / 500)
   };
   const homeDefenseSector: SectorInput = {
     ...defaultSector,
     averageAttribute: home.defense,
     chemistry: home.chemistry,
-    tacticalBonus: (homeEffect.def || 1.0) * (homeCards.def || 1.0) * (1 + (50 - (home.linePosition || 50)) / 200) - (homeMentality.defPenalty || 0)
+    chaosMax: 10 + homeCards.chaos,
+    tacticalBonus: (homeEffect.def || 1.0) * (homeCards.def || 1.0) * (1 + (50 - (home.linePosition || 50)) / 200) - (homeMentality.defPenalty || 0) + (home.aggressiveness / 500)
   };
 
   const awayAttackSector: SectorInput = {
     ...defaultSector,
     averageAttribute: away.attack,
     chemistry: away.chemistry,
-    tacticalBonus: (awayEffect.att || 1.0) * (awayCards.att || 1.0) * (1 + ((away.linePosition || 50) - 50) / 200) + (awayMentality.attBonus || 0)
+    chaosMax: 10 + awayCards.chaos,
+    tacticalBonus: (awayEffect.att || 1.0) * (awayCards.att || 1.0) * (1 + ((away.linePosition || 50) - 50) / 200) + (awayMentality.attBonus || 0) + (away.aggressiveness / 500)
   };
   const awayDefenseSector: SectorInput = {
     ...defaultSector,
     averageAttribute: away.defense,
     chemistry: away.chemistry,
-    tacticalBonus: (awayEffect.def || 1.0) * (awayCards.def || 1.0) * (1 + (50 - (away.linePosition || 50)) / 200) - (awayMentality.defPenalty || 0)
+    chaosMax: 10 + awayCards.chaos,
+    tacticalBonus: (awayEffect.def || 1.0) * (awayCards.def || 1.0) * (1 + (50 - (away.linePosition || 50)) / 200) - (awayMentality.defPenalty || 0) + (away.aggressiveness / 500)
   };
 
   // --- INJECT COMMENTARY CARDS (Distributed across the match) ---
@@ -269,9 +322,9 @@ export function simulateMatch(
     const baseSecond = Math.floor((minute / MATCH_DURATION_MINUTES) * MATCH_REAL_TIME_SECONDS);
     const currentEventSecond = Math.max(0, Math.min(MATCH_REAL_TIME_SECONDS - 1, baseSecond + Math.floor(Math.random() * 7) - 3));
 
-    // Event chance: Lowered for more realistic match flow
-    // Base intensity 0.1, peaks at 0.3 at minute 90
-    let intensity = 0.1 + (minute / 450);
+    // Event chance: Increased for more realistic goal counts 
+    // Base intensity 0.18, peaks at ~0.48 at minute 90
+    let intensity = 0.18 + (minute / 300);
     if (hasPossession === 'home' && awayEffect.tickReduction) intensity *= (1 - awayEffect.tickReduction);
     if (hasPossession === 'away' && homeEffect.tickReduction) intensity *= (1 - homeEffect.tickReduction);
 
@@ -288,6 +341,16 @@ export function simulateMatch(
       const defender = activeAway[0];
 
       if (result.outcome === 'goal') {
+        const varRoll = Math.random();
+        if (varRoll < 0.08) {
+          events.push({
+            id: `var_${home.id}_${minute}_${Date.now()}`, minute, realTimeSecond: currentEventSecond, type: 'VAR',
+            title: 'VAR EM AÇÃO',
+            description: VAR_DESCRIPTIONS[Math.floor(Math.random() * VAR_DESCRIPTIONS.length)].replace('{player}', mainAttacker.nickname),
+            teamId: 'system'
+          });
+        }
+
         homeScore++;
         homeShots++;
         homeShotsOnTarget++;
@@ -303,71 +366,91 @@ export function simulateMatch(
 
         events.push({
           id: `event_${home.id}_${minute}_${Date.now()}_${Math.random()}`,
-          minute,
-          realTimeSecond: currentEventSecond,
-          type: 'GOAL',
-          title: 'GOL!',
-          description: goalDesc,
-          playerId: mainAttacker.id,
-          assistantId: assistant?.id,
-          teamId: home.id
+          minute, realTimeSecond: currentEventSecond + 1, type: 'GOAL', title: 'GOL!',
+          description: goalDesc, playerId: mainAttacker.id, assistantId: assistant?.id, teamId: home.id
         });
       } else if (result.outcome === 'defense') {
         homeShots++;
-        if (Math.random() > 0.4) homeShotsOnTarget++;
+        const defenseVariant = Math.random();
 
-        const descTmpl = DEFENSE_DESCRIPTIONS[Math.floor(Math.random() * DEFENSE_DESCRIPTIONS.length)];
-        const defDesc = descTmpl.replace('{player}', mainAttacker.nickname);
+        if (defenseVariant < 0.2) {
+          events.push({
+            id: `wood_${home.id}_${minute}_${Date.now()}`, minute, realTimeSecond: currentEventSecond, type: 'WOODWORK',
+            title: 'NA TRAVE!',
+            description: WOODWORK_DESCRIPTIONS[Math.floor(Math.random() * WOODWORK_DESCRIPTIONS.length)].replace('{player}', mainAttacker.nickname),
+            teamId: home.id, playerId: mainAttacker.id
+          });
+        } else if (defenseVariant < 0.5) {
+          events.push({
+            id: `block_${away.id}_${minute}_${Date.now()}`, minute, realTimeSecond: currentEventSecond, type: 'BLOCKED',
+            title: 'BLOQUEADO!',
+            description: BLOCKED_DESCRIPTIONS[Math.floor(Math.random() * BLOCKED_DESCRIPTIONS.length)].replace('{player}', mainAttacker.nickname),
+            teamId: away.id, playerId: defender.id
+          });
+        } else {
+          if (Math.random() > 0.4) homeShotsOnTarget++;
+          const descTmpl = DEFENSE_DESCRIPTIONS[Math.floor(Math.random() * DEFENSE_DESCRIPTIONS.length)];
+          const defDesc = descTmpl.replace('{player}', mainAttacker.nickname);
 
-        events.push({
-          id: `event_${away.id}_${minute}_${Date.now()}_${Math.random()}`,
-          minute,
-          realTimeSecond: currentEventSecond,
-          type: 'CHANCE',
-          title: 'DEFESA!',
-          description: defDesc,
-          playerId: defender.id,
-          teamId: away.id
-        });
+          events.push({
+            id: `event_${away.id}_${minute}_${Date.now()}_${Math.random()}`,
+            minute, realTimeSecond: currentEventSecond, type: 'CHANCE',
+            title: 'DEFESA!', description: defDesc, playerId: defender.id, teamId: away.id
+          });
+        }
       } else {
-        // --- FOULS, CARDS, INJURIES ---
-        const foulRoll = Math.random();
+        const turnoverRoll = Math.random();
+        if (turnoverRoll < 0.10) {
+          events.push({
+            id: `off_${home.id}_${minute}_${Date.now()}`, minute, realTimeSecond: currentEventSecond, type: 'OFFSIDE',
+            title: 'IMPEDIMENTO',
+            description: OFFSIDE_DESCRIPTIONS[Math.floor(Math.random() * OFFSIDE_DESCRIPTIONS.length)].replace('{player}', mainAttacker.nickname),
+            teamId: home.id, playerId: mainAttacker.id
+          });
+        } else if (turnoverRoll < 0.20) {
+          events.push({
+            id: `cnt_${away.id}_${minute}_${Date.now()}`, minute, realTimeSecond: currentEventSecond, type: 'COUNTER',
+            title: 'CONTRA-ATAQUE!',
+            description: COUNTER_DESCRIPTIONS[Math.floor(Math.random() * COUNTER_DESCRIPTIONS.length)].replace('{player}', defender.nickname),
+            teamId: away.id, playerId: defender.id
+          });
+        } else if (turnoverRoll < 0.25) {
+          events.push({
+            id: `err_${home.id}_${minute}_${Date.now()}`, minute, realTimeSecond: currentEventSecond, type: 'MISTAKE',
+            title: 'FALHA!',
+            description: MISTAKE_DESCRIPTIONS[Math.floor(Math.random() * MISTAKE_DESCRIPTIONS.length)].replace('{player}', mainAttacker.nickname),
+            teamId: home.id, playerId: mainAttacker.id
+          });
+        } else {
+          const foulRoll = Math.random();
+          const foulChance = 0.12 * (home.aggressiveness / 50);
 
-        // Chance of event increases with aggression and minute
-        const foulChance = 0.12 * (home.aggressiveness / 50);
+          if (foulRoll < foulChance) {
+            const yellowRoll = Math.random();
+            const isYellow = yellowRoll < 0.25;
+            const isRed = !isYellow && yellowRoll < 0.30;
 
-        if (foulRoll < foulChance) {
-          const isYellow = Math.random() < 0.65;
-          const isRed = !isYellow && Math.random() < 0.2;
-          const isInjury = !isYellow && !isRed && Math.random() < 0.15;
-
-          if (isInjury) {
-            events.push({
-              id: `event_${home.id}_${minute}_injury`,
-              minute,
-              realTimeSecond: currentEventSecond,
-              type: 'INJURY',
-              title: 'LESÃO!',
-              description: `${mainAttacker.nickname} cai no gramado sentindo dores fortes!`,
-              playerId: mainAttacker.id,
-              teamId: home.id
-            });
-          } else if (isYellow || isRed) {
-            events.push({
-              id: `event_${home.id}_${minute}_card`,
-              minute,
-              realTimeSecond: currentEventSecond,
-              type: isRed ? 'CARD_RED' : 'CARD_YELLOW',
-              title: isRed ? 'CARTÃO VERMELHO!' : 'CARTÃO AMARELO!',
-              description: `${mainAttacker.nickname} recebe o cartão após entrada dura em ${defender.nickname}.`,
-              playerId: mainAttacker.id,
-              teamId: home.id
-            });
+            if (isYellow || isRed) {
+              events.push({
+                id: `event_${home.id}_${minute}_card`,
+                minute, realTimeSecond: currentEventSecond,
+                type: isRed ? 'CARD_RED' : 'CARD_YELLOW',
+                title: isRed ? 'CARTÃO VERMELHO!' : 'CARTÃO AMARELO!',
+                description: `${mainAttacker.nickname} recebe o cartão após entrada dura em ${defender.nickname}.`,
+                playerId: mainAttacker.id, teamId: home.id
+              });
+            } else {
+              events.push({
+                id: `event_${home.id}_${minute}_foul`,
+                minute, realTimeSecond: currentEventSecond, type: 'FOUL', title: 'FALTA',
+                description: FOUL_DESCRIPTIONS[Math.floor(Math.random() * FOUL_DESCRIPTIONS.length)].replace('{player}', mainAttacker.nickname),
+                playerId: mainAttacker.id, teamId: home.id
+              });
+            }
           }
         }
       }
     } else {
-      // --- AWAY TEAM POSSESSION ---
       const activeAway = pickWeightedRandom(awayPlayers, 3);
       const activeHome = pickWeightedRandom(homePlayers, 3);
 
@@ -378,6 +461,16 @@ export function simulateMatch(
       const defender = activeHome[0];
 
       if (result.outcome === 'goal') {
+        const varRoll = Math.random();
+        if (varRoll < 0.08) {
+          events.push({
+            id: `var_${away.id}_${minute}_${Date.now()}`, minute, realTimeSecond: currentEventSecond, type: 'VAR',
+            title: 'VAR EM AÇÃO',
+            description: VAR_DESCRIPTIONS[Math.floor(Math.random() * VAR_DESCRIPTIONS.length)].replace('{player}', mainAttacker.nickname),
+            teamId: 'system'
+          });
+        }
+
         awayScore++;
         awayShots++;
         awayShotsOnTarget++;
@@ -393,63 +486,87 @@ export function simulateMatch(
 
         events.push({
           id: `event_${away.id}_${minute}_goal`,
-          minute,
-          realTimeSecond: currentEventSecond,
-          type: 'GOAL',
-          title: 'GOL!',
-          description: goalDesc,
-          playerId: mainAttacker.id,
-          assistantId: assistant?.id,
-          teamId: away.id
+          minute, realTimeSecond: currentEventSecond + 1, type: 'GOAL', title: 'GOL!',
+          description: goalDesc, playerId: mainAttacker.id, assistantId: assistant?.id, teamId: away.id
         });
       } else if (result.outcome === 'defense') {
         awayShots++;
-        if (Math.random() > 0.4) awayShotsOnTarget++;
+        const defenseVariant = Math.random();
 
-        const descTmpl = DEFENSE_DESCRIPTIONS[Math.floor(Math.random() * DEFENSE_DESCRIPTIONS.length)];
-        const defDesc = descTmpl.replace('{player}', mainAttacker.nickname);
+        if (defenseVariant < 0.2) {
+          events.push({
+            id: `wood_${away.id}_${minute}_${Date.now()}`, minute, realTimeSecond: currentEventSecond, type: 'WOODWORK',
+            title: 'NA TRAVE!',
+            description: WOODWORK_DESCRIPTIONS[Math.floor(Math.random() * WOODWORK_DESCRIPTIONS.length)].replace('{player}', mainAttacker.nickname),
+            teamId: away.id, playerId: mainAttacker.id
+          });
+        } else if (defenseVariant < 0.5) {
+          events.push({
+            id: `block_${home.id}_${minute}_${Date.now()}`, minute, realTimeSecond: currentEventSecond, type: 'BLOCKED',
+            title: 'BLOQUEADO!',
+            description: BLOCKED_DESCRIPTIONS[Math.floor(Math.random() * BLOCKED_DESCRIPTIONS.length)].replace('{player}', mainAttacker.nickname),
+            teamId: home.id, playerId: defender.id
+          });
+        } else {
+          if (Math.random() > 0.4) awayShotsOnTarget++;
+          const descTmpl = DEFENSE_DESCRIPTIONS[Math.floor(Math.random() * DEFENSE_DESCRIPTIONS.length)];
+          const defDesc = descTmpl.replace('{player}', mainAttacker.nickname);
 
-        events.push({
-          id: `event_${home.id}_${minute}_defense`,
-          minute,
-          realTimeSecond: currentEventSecond,
-          type: 'CHANCE',
-          title: 'DEFESA!',
-          description: defDesc,
-          playerId: defender.id,
-          teamId: home.id
-        });
+          events.push({
+            id: `event_${home.id}_${minute}_defense`,
+            minute, realTimeSecond: currentEventSecond, type: 'CHANCE',
+            title: 'DEFESA!', description: defDesc, playerId: defender.id, teamId: home.id
+          });
+        }
       } else {
-        const foulRoll = Math.random();
-        const foulChance = 0.12 * (away.aggressiveness / 50);
+        const turnoverRoll = Math.random();
+        if (turnoverRoll < 0.10) {
+          events.push({
+            id: `off_${away.id}_${minute}_${Date.now()}`, minute, realTimeSecond: currentEventSecond, type: 'OFFSIDE',
+            title: 'IMPEDIMENTO',
+            description: OFFSIDE_DESCRIPTIONS[Math.floor(Math.random() * OFFSIDE_DESCRIPTIONS.length)].replace('{player}', mainAttacker.nickname),
+            teamId: away.id, playerId: mainAttacker.id
+          });
+        } else if (turnoverRoll < 0.20) {
+          events.push({
+            id: `cnt_${home.id}_${minute}_${Date.now()}`, minute, realTimeSecond: currentEventSecond, type: 'COUNTER',
+            title: 'CONTRA-ATAQUE!',
+            description: COUNTER_DESCRIPTIONS[Math.floor(Math.random() * COUNTER_DESCRIPTIONS.length)].replace('{player}', defender.nickname),
+            teamId: home.id, playerId: defender.id
+          });
+        } else if (turnoverRoll < 0.25) {
+          events.push({
+            id: `err_${away.id}_${minute}_${Date.now()}`, minute, realTimeSecond: currentEventSecond, type: 'MISTAKE',
+            title: 'FALHA!',
+            description: MISTAKE_DESCRIPTIONS[Math.floor(Math.random() * MISTAKE_DESCRIPTIONS.length)].replace('{player}', mainAttacker.nickname),
+            teamId: away.id, playerId: mainAttacker.id
+          });
+        } else {
+          const foulRoll = Math.random();
+          const foulChance = 0.12 * (away.aggressiveness / 50);
 
-        if (foulRoll < foulChance) {
-          const isYellow = Math.random() < 0.65;
-          const isRed = !isYellow && Math.random() < 0.2;
-          const isInjury = !isYellow && !isRed && Math.random() < 0.15;
+          if (foulRoll < foulChance) {
+            const yellowRoll = Math.random();
+            const isYellow = yellowRoll < 0.25;
+            const isRed = !isYellow && yellowRoll < 0.30;
 
-          if (isInjury) {
-            events.push({
-              id: `event_${away.id}_${minute}_injury`,
-              minute,
-              realTimeSecond: currentEventSecond,
-              type: 'INJURY',
-              title: 'LESÃO!',
-              description: `${mainAttacker.nickname} está sendo atendido pelos médicos.`,
-              playerId: mainAttacker.id,
-              teamId: away.id
-            });
-          } else if (isYellow || isRed) {
-            events.push({
-              id: `event_${away.id}_${minute}_card`,
-              minute,
-              realTimeSecond: currentEventSecond,
-              type: isRed ? 'CARD_RED' : 'CARD_YELLOW',
-              title: isRed ? 'CARTÃO VERMELHO!' : 'CARTÃO AMARELO!',
-              description: `${mainAttacker.nickname} foi advertido pelo árbitro.`,
-              playerId: mainAttacker.id,
-              teamId: away.id
-            });
+            if (isYellow || isRed) {
+              events.push({
+                id: `event_${away.id}_${minute}_card`,
+                minute, realTimeSecond: currentEventSecond,
+                type: isRed ? 'CARD_RED' : 'CARD_YELLOW',
+                title: isRed ? 'CARTÃO VERMELHO!' : 'CARTÃO AMARELO!',
+                description: `${mainAttacker.nickname} foi advertido pelo árbitro.`,
+                playerId: mainAttacker.id, teamId: away.id
+              });
+            } else {
+              events.push({
+                id: `event_${away.id}_${minute}_foul`,
+                minute, realTimeSecond: currentEventSecond, type: 'FOUL', title: 'FALTA',
+                description: FOUL_DESCRIPTIONS[Math.floor(Math.random() * FOUL_DESCRIPTIONS.length)].replace('{player}', mainAttacker.nickname),
+                playerId: mainAttacker.id, teamId: away.id
+              });
+            }
           }
         }
       }
@@ -458,9 +575,32 @@ export function simulateMatch(
 
   const totalPossession = homePossessionWon + awayPossessionWon;
   const finalRatings: Record<string, number> = {};
+
   Object.entries(playerRatings).forEach(([id, ratings]) => {
-    const sum = ratings.reduce((a, b) => a + b, 0);
-    finalRatings[id] = Number((sum / ratings.length).toFixed(1));
+    // Start with the real average of what they did on the pitch
+    let sum = ratings.reduce((a, b) => a + b, 0);
+    let avg = sum / Math.max(1, ratings.length);
+
+    // Check if player's team won
+    // We check if the player object exists in the respective arrays passed to the engine
+    const isHomePlayer = homePlayers.some(p => p.id === id);
+    const isAwayPlayer = awayPlayers.some(p => p.id === id);
+
+    // Stabilization focus: significantly reduce variance if focused
+    const isStabilized = (isHomePlayer && home.stabilizationPlayerId === id) || (isAwayPlayer && away.stabilizationPlayerId === id);
+    const varianceFactor = isStabilized ? 1.0 : 4.0;
+    const randomSwing = (Math.random() - 0.5) * varianceFactor;
+
+    let teamBonus = 0;
+    if (isHomePlayer && homeScore > awayScore) teamBonus = 0.5;
+    if (isHomePlayer && homeScore < awayScore) teamBonus = -0.5;
+    if (isAwayPlayer && awayScore > homeScore) teamBonus = 0.5;
+    if (isAwayPlayer && awayScore < homeScore) teamBonus = -0.5;
+
+    avg += teamBonus + randomSwing;
+
+    // Ensure it falls within 3.0 and 10.0 so the delta math in simulation.ts works perfectly
+    finalRatings[id] = Number((Math.max(3.0, Math.min(10.0, avg))).toFixed(1));
   });
 
   // Generate Headline

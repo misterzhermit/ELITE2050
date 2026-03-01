@@ -30,6 +30,27 @@ export const CompetitionTab = (props: any) => {
   const { handleSetFocus, handleStartCardLab, handleChemistryBoost } = useTraining(userTeam?.id || null);
   const { handleAdvanceDay } = useGameDay();
 
+  const handleRevealMatch = (matchId: string) => {
+    setState(prev => {
+      const newState = { ...prev };
+      // Search in all leagues
+      Object.keys(newState.world.leagues).forEach(key => {
+        const league = newState.world.leagues[key as any];
+        const match = league.matches.find(m => m.id === matchId);
+        if (match) match.revealed = true;
+      });
+      // Search in cups
+      const ecMatch = [...(newState.world.eliteCup.bracket.oitavas || []), ...(newState.world.eliteCup.bracket.quartas || []), ...(newState.world.eliteCup.bracket.semis || []), newState.world.eliteCup.bracket.final].find(m => m?.id === matchId);
+      if (ecMatch) ecMatch.revealed = true;
+
+      const dcMatch = newState.world.districtCup.matches.find(m => m.id === matchId);
+      if (dcMatch) dcMatch.revealed = true;
+      if (newState.world.districtCup.final?.id === matchId) newState.world.districtCup.final.revealed = true;
+
+      return newState;
+    });
+  };
+
   const [timeLeft, setTimeLeft] = useState<string>('');
 
   React.useEffect(() => {
@@ -82,6 +103,7 @@ export const CompetitionTab = (props: any) => {
 
         // Generate news for played matches
         if (m.played) {
+          const isRevealed = m.revealed !== false;
           const isWin = (m.homeId === userTeam?.id && m.homeScore > m.awayScore) ||
             (m.awayId === userTeam?.id && m.awayScore > m.homeScore);
           const isDraw = m.homeScore === m.awayScore;
@@ -91,16 +113,16 @@ export const CompetitionTab = (props: any) => {
               id: `news_win_${m.id}`,
               type: 'news',
               date: new Date(matchDate.getTime() + 7200000), // 2 hours after match
-              title: 'Vitória Convincente',
-              subtitle: `O ${userTeam?.name} superou o ${m.homeId === userTeam?.id ? m.away : m.home} e subiu na tabela.`
+              title: isRevealed ? 'Vitória Convincente' : 'Fim de Jogo',
+              subtitle: isRevealed ? `O ${userTeam?.name} superou o ${m.homeId === userTeam?.id ? m.away : m.home} e subiu na tabela.` : 'O resultado desta partida já foi processado e aguarda sua leitura.'
             });
           } else if (!isDraw) {
             events.push({
               id: `news_loss_${m.id}`,
               type: 'news',
               date: new Date(matchDate.getTime() + 7200000),
-              title: 'Derrota Dolorosa',
-              subtitle: `O técnico precisa rever a estratégia após o revés contra o ${m.homeId === userTeam?.id ? m.away : m.home}.`
+              title: isRevealed ? 'Derrota Dolorosa' : 'Fim de Jogo',
+              subtitle: isRevealed ? `O técnico precisa rever a estratégia após o revés contra o ${m.homeId === userTeam?.id ? m.away : m.home}.` : 'O resultado desta partida já foi processado e aguarda sua leitura.'
             });
           }
         }
@@ -129,7 +151,7 @@ export const CompetitionTab = (props: any) => {
   }).replace('.', '').toUpperCase();
 
   return (
-    <div className="space-y-4 sm:space-y-8 animate-in fade-in duration-700 max-w-6xl mx-auto pb-12 px-2 sm:px-0">
+    <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-700 max-w-6xl mx-auto pb-12 px-2 sm:px-0">
       {/* Main Highlight Match - Futuristic Redesign */}
       <div className="glass-card-neon white-gradient-sheen relative overflow-hidden rounded-[1.5rem] sm:rounded-[2.5rem] border-cyan-400/30 p-5 sm:p-12 shadow-[0_0_50px_rgba(34,211,238,0.15)] group transition-all duration-700 hover:border-cyan-400/50">
         {/* Neon Glow Effects */}
@@ -148,7 +170,7 @@ export const CompetitionTab = (props: any) => {
               </div>
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-4 sm:space-y-6">
               <div className="flex items-center justify-center md:justify-start gap-2 sm:gap-3 text-white/80 font-black text-xs sm:text-lg uppercase tracking-tight italic">
                 <span className={`truncate max-w-[100px] sm:max-w-none ${nextMatch.homeId === userTeam?.id ? 'text-cyan-400' : ''}`}>{nextMatch.home}</span>
                 <span className="text-white/20 shrink-0 text-[10px] sm:text-base">VS</span>
@@ -272,7 +294,7 @@ export const CompetitionTab = (props: any) => {
                       <div className="flex items-center justify-center min-w-[1.5rem] sm:min-w-[2rem]">
                         {isPlayed ? (
                           <span className="text-[9px] sm:text-[12px] font-black text-white tracking-wider bg-white/5 px-1 sm:px-1.5 py-0.5 rounded border border-white/5">
-                            {event.data.homeScore}-{event.data.awayScore}
+                            {event.data.revealed !== false ? `${event.data.homeScore}-${event.data.awayScore}` : '??-??'}
                           </span>
                         ) : (
                           <span className="text-[7px] sm:text-[10px] font-black text-white/10 italic">VS</span>
@@ -347,6 +369,7 @@ export const CompetitionTab = (props: any) => {
                 awayTeam={state.teams[selectedMatchReport.awayTeamId || selectedMatchReport.awayId]}
                 players={state.players}
                 onClose={() => setSelectedMatchReport(null)}
+                onReveal={handleRevealMatch}
               />
             </div>
           </div>

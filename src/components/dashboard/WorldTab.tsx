@@ -36,6 +36,15 @@ export const WorldTab = (props: any) => {
   const [activeLeagueTab, setActiveLeagueTab] = useState<'standings' | 'scorers' | 'all-teams'>('standings');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
+  React.useEffect(() => {
+    if (activeWorldTab === 'leagues') {
+      const keys = Object.keys(dashData.leaguesData || {});
+      if (keys.length > 0 && !keys.includes(activeLeague)) {
+        setActiveLeague(keys[0]);
+      }
+    }
+  }, [activeWorldTab, dashData.leaguesData, activeLeague]);
+
   // Market filters
   const [marketSearch, setMarketSearch] = useState('');
   const [marketDistrict, setMarketDistrict] = useState('all');
@@ -57,7 +66,7 @@ export const WorldTab = (props: any) => {
     if (!team) return null;
     return (
       <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-500 pb-24">
-        <header className="flex items-center gap-3 sm:gap-6 mb-4 sm:mb-8">
+        <header className="flex items-center gap-2 sm:gap-4 mb-2 sm:mb-4">
           <button
             onClick={() => setSelectedTeamView(null)}
             className="w-10 h-10 sm:w-12 sm:h-12 glass-card rounded-full flex items-center justify-center hover:bg-white/10 transition-all border border-white/10 shadow-xl group"
@@ -98,7 +107,7 @@ export const WorldTab = (props: any) => {
           </div>
         </header>
 
-        <div className="flex gap-2 sm:gap-3 mb-4 sm:mb-8">
+        <div className="flex gap-2 sm:gap-3 mb-2 sm:mb-4">
           <button
             onClick={() => setWorldTeamSubTab('squad')}
             className={`flex-1 sm:flex-none px-4 sm:px-8 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-[0.1em] sm:tracking-[0.2em] transition-all ${worldTeamSubTab === 'squad' ? 'glass-card-neon border-cyan-500/50 text-white shadow-[0_0_20px_rgba(34,211,238,0.2)]' : 'glass-card border-white/5 text-white/40 hover:text-white/60'}`}
@@ -124,6 +133,7 @@ export const WorldTab = (props: any) => {
                   player={player}
                   onClick={setSelectedPlayer}
                   onProposta={handleMakeProposal}
+                  onTeamClick={setSelectedTeamView}
                 />
               );
             })}
@@ -140,7 +150,7 @@ export const WorldTab = (props: any) => {
               Formação e Estilo
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-12">
+            <div className="grid grid-cols-2 gap-2 sm:gap-4">
               <div className="relative aspect-square sm:aspect-[3/4] glass-card rounded-2xl sm:rounded-[2rem] border-white/5 overflow-hidden group shadow-inner">
                 {/* Field Markings */}
                 <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/10 to-transparent opacity-20" />
@@ -196,7 +206,7 @@ export const WorldTab = (props: any) => {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-8 animate-in fade-in duration-700 pb-24">
+    <div className="space-y-3 sm:space-y-6 animate-in fade-in duration-700 pb-24">
       {/* Navigation Tabs */}
       <div className="flex gap-2 sm:gap-3 overflow-x-auto hide-scrollbar py-2 px-1">
         {[
@@ -338,15 +348,15 @@ export const WorldTab = (props: any) => {
         if (!activeLeagueData) return <div className="text-center text-slate-500 p-10 font-black uppercase tracking-widest text-[10px] italic">Dados da liga indisponíveis.</div>;
 
         return (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="space-y-3 sm:space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Seção de Copas com destaque horizontal */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pb-4 px-1">
+            <div className="grid grid-cols-2 gap-2 sm:gap-4 pb-2 px-1">
               <div
                 onClick={() => setActiveCompetition('elite')}
                 className={`w-full relative overflow-hidden glass-card rounded-[1.5rem] sm:rounded-[2rem] p-3 sm:p-5 flex items-center gap-3 sm:gap-4 cursor-pointer transition-all group border-white/5 ${activeCompetition === 'elite' ? 'glass-card-neon border-fuchsia-500/50 shadow-[0_0_30px_rgba(217,70,239,0.2)]' : 'hover:border-white/10'}`}
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className={`w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center border shrink-0 transition-all ${activeCompetition === 'elite' ? 'bg-fuchsia-500/20 border-fuchsia-500/50 text-fuchsia-400 shadow-[0_0_15px_rgba(217,70,239,0.3)]' : 'glass-card border-white/5 text-white/20'}`}>
+                <div className={`w-8 h-8 sm:w-14 sm:h-14 rounded-lg sm:rounded-2xl flex items-center justify-center border shrink-0 transition-all ${activeCompetition === 'elite' ? 'bg-fuchsia-500/20 border-fuchsia-500/50 text-fuchsia-400 shadow-[0_0_15px_rgba(217,70,239,0.3)]' : 'glass-card border-white/5 text-white/20'}`}>
                   <Flame size={window.innerWidth < 640 ? 18 : 24} className={activeCompetition === 'elite' ? 'animate-pulse' : ''} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -363,7 +373,7 @@ export const WorldTab = (props: any) => {
                 className={`w-full relative overflow-hidden glass-card rounded-[1.5rem] sm:rounded-[2rem] p-3 sm:p-5 flex items-center gap-3 sm:gap-4 cursor-pointer transition-all group border-white/5 ${activeCompetition === 'district' ? 'glass-card-neon border-cyan-500/50 shadow-[0_0_30px_rgba(34,211,238,0.2)]' : 'hover:border-white/10'}`}
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className={`w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center border shrink-0 transition-all ${activeCompetition === 'district' ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]' : 'glass-card border-white/5 text-white/20'}`}>
+                <div className={`w-8 h-8 sm:w-14 sm:h-14 rounded-lg sm:rounded-2xl flex items-center justify-center border shrink-0 transition-all ${activeCompetition === 'district' ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]' : 'glass-card border-white/5 text-white/20'}`}>
                   <Globe size={window.innerWidth < 640 ? 18 : 24} className={activeCompetition === 'district' ? 'animate-pulse' : ''} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -377,36 +387,37 @@ export const WorldTab = (props: any) => {
             </div>
 
             {/* Seletor de Ligas Horizontal Compacto */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 pb-6 px-1">
+            <div className="grid grid-cols-4 gap-1.5 sm:gap-3 pb-4 px-1">
               {(Object.keys(leaguesData) as Array<keyof typeof leaguesData>).map((leagueKey) => {
                 const league = leaguesData[leagueKey];
                 if (!league) return null;
                 const isActive = activeLeague === leagueKey && activeCompetition === 'league';
 
                 const getClasses = () => {
-                  switch (leagueKey) {
-                    case 'norte':
+                  const keyStr = String(leagueKey);
+                  switch (true) {
+                    case keyStr.includes('norte') || keyStr.includes('cyan'):
                       return {
                         glow: 'rgba(34,211,238,0.4)',
                         color: 'cyan',
                         border: 'border-cyan-500/50',
                         bg: 'bg-cyan-500/10'
                       };
-                    case 'sul':
+                    case keyStr.includes('sul') || keyStr.includes('orange'):
                       return {
                         glow: 'rgba(249,115,22,0.4)',
                         color: 'orange',
                         border: 'border-orange-500/50',
                         bg: 'bg-orange-500/10'
                       };
-                    case 'leste':
+                    case keyStr.includes('leste') || keyStr.includes('green') || keyStr.includes('emerald'):
                       return {
                         glow: 'rgba(16,185,129,0.4)',
                         color: 'emerald',
                         border: 'border-emerald-500/50',
                         bg: 'bg-emerald-500/10'
                       };
-                    case 'oeste':
+                    case keyStr.includes('oeste') || keyStr.includes('purple'):
                       return {
                         glow: 'rgba(168,85,247,0.4)',
                         color: 'purple',
@@ -432,14 +443,14 @@ export const WorldTab = (props: any) => {
                       setActiveLeague(leagueKey);
                       setActiveCompetition('league');
                     }}
-                    className={`w-full glass-card rounded-xl sm:rounded-2xl p-3 sm:p-4 cursor-pointer transition-all group flex flex-col items-center gap-2.5 sm:gap-3 border-white/5 ${isActive ? `glass-card-neon ${styles.border} ${styles.bg} shadow-[0_0_20px_${styles.glow}]` : 'hover:border-white/20'}`}
+                    className={`w-full glass-card rounded-lg sm:rounded-2xl p-2 sm:p-4 cursor-pointer transition-all group flex flex-col items-center gap-1 sm:gap-3 border-white/5 ${isActive ? `glass-card-neon ${styles.border} ${styles.bg} shadow-[0_0_20px_${styles.glow}]` : 'hover:border-white/20'}`}
                   >
-                    <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center border transition-all ${isActive ? `${styles.bg} ${styles.border} text-${styles.color}-400` : 'glass-card border-white/5 text-white/20 group-hover:text-white/40'}`}>
-                      <Trophy size={window.innerWidth < 640 ? 18 : 20} />
+                    <div className={`w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center border transition-all ${isActive ? `${styles.bg} ${styles.border} text-${styles.color}-400` : 'glass-card border-white/5 text-white/20 group-hover:text-white/40'}`}>
+                      <Trophy size={window.innerWidth < 640 ? 14 : 20} />
                     </div>
                     <div className="text-center">
-                      <span className={`text-[9px] sm:text-[10px] font-black uppercase tracking-[0.1em] sm:tracking-[0.2em] block italic ${isActive ? `text-${styles.color}-400 neon-text-${styles.color}` : 'text-white/40 group-hover:text-white/60'}`}>{league.name}</span>
-                      <span className="text-[6px] sm:text-[7px] text-white/20 font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] mt-0.5 sm:mt-1 block italic">{(league.teams?.length || 0)} Clubes</span>
+                      <span className={`text-[7px] sm:text-[10px] font-black uppercase tracking-[0.05em] sm:tracking-[0.2em] block italic ${isActive ? `text-${styles.color}-400 neon-text-${styles.color}` : 'text-white/40 group-hover:text-white/60'}`}>{league.name.split(' ')[1] || league.name}</span>
+                      <span className="text-[5px] sm:text-[7px] text-white/10 font-black uppercase tracking-[0.1em] sm:tracking-[0.3em] mt-0.5 block italic truncate">{(league.teams?.length || 0)} CLB</span>
                     </div>
                   </div>
                 );
@@ -447,7 +458,7 @@ export const WorldTab = (props: any) => {
             </div>
 
             {activeCompetition === 'league' && (
-              <div className="space-y-4 sm:space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <div className="space-y-3 sm:space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6 px-1">
                   <div className="flex gap-1.5 sm:gap-2 glass-card p-1 sm:p-1.5 rounded-xl sm:rounded-2xl border-white/5 w-full sm:w-auto overflow-x-auto hide-scrollbar">
                     {[
@@ -654,7 +665,7 @@ export const WorldTab = (props: any) => {
 
             {activeCompetition === 'elite' && (
               <div className="space-y-4 sm:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <div className="flex items-center justify-between glass-card-neon border-fuchsia-500/30 p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] shadow-[0_0_30px_rgba(217,70,239,0.1)]">
+                <div className="flex items-center justify-between glass-card-neon border-fuchsia-500/30 p-3 sm:p-4 rounded-xl sm:rounded-[2rem] shadow-[0_0_30px_rgba(217,70,239,0.1)]">
                   <div className="flex items-center gap-3 sm:gap-4">
                     <div className="w-10 h-10 sm:w-12 sm:h-12 glass-card rounded-xl flex items-center justify-center text-fuchsia-400 border border-fuchsia-500/30 shadow-[0_0_15px_rgba(217,70,239,0.3)]">
                       <Trophy size={window.innerWidth < 640 ? 20 : 24} />
@@ -677,7 +688,7 @@ export const WorldTab = (props: any) => {
                       <div className="w-1 h-4 bg-fuchsia-500 rounded-full shadow-[0_0_10px_rgba(217,70,239,1)]" />
                       <h4 className="text-xs font-black text-white uppercase tracking-[0.3em] italic">Oitavas</h4>
                     </div>
-                    <div className="space-y-3">
+                    <div className="space-y-4 sm:space-y-6">
                       {state.world.eliteCup.bracket.round1.map((match) => {
                         const hTeam = state.teams[match.homeTeamId];
                         const aTeam = state.teams[match.awayTeamId];
@@ -926,7 +937,7 @@ export const WorldTab = (props: any) => {
 
             {activeCompetition === 'district' && (
               <div className="space-y-6 sm:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <div className="flex items-center justify-between glass-card-neon border-cyan-500/30 p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] shadow-[0_0_30px_rgba(34,211,238,0.1)]">
+                <div className="flex items-center justify-between glass-card-neon border-cyan-500/30 p-3 sm:p-4 rounded-xl sm:rounded-[2rem] shadow-[0_0_30px_rgba(34,211,238,0.1)]">
                   <div className="flex items-center gap-3 sm:gap-4">
                     <div className="w-10 h-10 sm:w-12 sm:h-12 glass-card rounded-xl flex items-center justify-center text-cyan-400 border border-cyan-500/30 shadow-[0_0_15px_rgba(34,211,238,0.3)]">
                       <Globe size={window.innerWidth < 640 ? 20 : 24} />
@@ -1081,8 +1092,7 @@ export const WorldTab = (props: any) => {
             )}
           </div>
         );
-      })()
-      }
+      })()}
 
       {
         activeWorldTab === 'market' && (
@@ -1172,7 +1182,7 @@ export const WorldTab = (props: any) => {
                   </div>
 
                   {/* Points Slider */}
-                  <div className="space-y-2 col-span-full">
+                  <div className="space-y-4 sm:space-y-6 scrollbar-hide">
                     <div className="flex justify-between items-center">
                       <label className="text-[8px] sm:text-[9px] font-black text-white/40 uppercase tracking-[0.2em]">Rating Range</label>
                       <span className="text-[9px] sm:text-[10px] font-mono text-cyan-400 font-black">{marketPointsMin} - {marketPointsMax}</span>
@@ -1218,7 +1228,7 @@ export const WorldTab = (props: any) => {
                 })
                 .slice(0, marketLimit)
                 .map(player => (
-                  <PlayerCard key={player.id} player={player} onClick={setSelectedPlayer} onProposta={handleMakeProposal} />
+                  <PlayerCard key={player.id} player={player} onClick={setSelectedPlayer} onProposta={handleMakeProposal} onTeamClick={setSelectedTeamView} />
                 ))}
             </div>
           </div>
