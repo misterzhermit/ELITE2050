@@ -347,14 +347,15 @@ export function simulateMatch(
 
     // Update Stamina Drain for all players
     homePlayers.forEach(p => {
-      const effect = calculateDNAEffect(p, 'midfield'); // Generic check
+      const effect = calculateDNAEffect(p, 'midfield');
       const drain = (homeEffect.staminaDrain || 1.0) * (homeMentality.staminaPenalty ? 1.2 : 1.0) * effect.staminaBonus;
-      playerStamina[p.id] = Math.max(10, (playerStamina[p.id] || 100) - (drain / 45)); // Drain over 90 mins
+      // drain * 0.3 per minute -> ~27% drop for Equilibrado, ~40% for Blitzkrieg over 90 mins
+      playerStamina[p.id] = Math.max(10, (playerStamina[p.id] || 100) - (drain * 0.3));
     });
     awayPlayers.forEach(p => {
       const effect = calculateDNAEffect(p, 'midfield');
       const drain = (awayEffect.staminaDrain || 1.0) * (awayMentality.staminaPenalty ? 1.2 : 1.0) * effect.staminaBonus;
-      playerStamina[p.id] = Math.max(10, (playerStamina[p.id] || 100) - (drain / 45));
+      playerStamina[p.id] = Math.max(10, (playerStamina[p.id] || 100) - (drain * 0.3));
     });
 
     if (hasPossession === 'home') {

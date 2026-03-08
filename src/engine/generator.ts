@@ -458,6 +458,7 @@ export const generateManager = (id: string, district: District): Manager => {
     name,
     district,
     reputation: randomInt(10, 90),
+    isNPC: true,
     attributes: {
       evolution: randomInt(10, 100),
       negotiation: randomInt(10, 100),

@@ -1,4 +1,4 @@
-import { GameState, Team, Player, PlayerRole, LeagueTeamStats, GameNotification, District, MatchResult, TeamStats, Match, TacticalCard } from '../types';
+﻿import { GameState, Team, Player, PlayerRole, LeagueTeamStats, GameNotification, District, MatchResult, TeamStats, Match, TacticalCard } from '../types';
 import { simulateMatch, TeamStats as MatchTeamStats } from './MatchEngine';
 import { calculateEvolution } from './simulation';
 import { generateCalendar } from './CalendarGenerator';
@@ -149,7 +149,7 @@ export const applySafetyNet = (state: GameState, teamId: string) => {
   }
 
   if (addedPlayers > 0) {
-    const message = `Piso de segurança ativado. ${addedPlayers} jogadores recrutados para o elenco.`;
+    const message = `Piso de seguranÃ§a ativado. ${addedPlayers} jogadores recrutados para o elenco.`;
     const notification: GameNotification = {
       id: `n_${Date.now()}_safetynet_${team.id}`,
       date: state.world.currentDate,
@@ -322,7 +322,7 @@ const updateSinglePlayerEvolution = (state: GameState, player: Player, result: M
 
   player.history.seasonRatingDelta = (player.history.seasonRatingDelta || 0) + delta;
 
-  // Pentágono e Form
+  // PentÃ¡gono e Form
   player.history.lastMatchRatings = [matchRating, ...(player.history.lastMatchRatings || [])].slice(0, 5);
 
   const oldGames = player.history.gamesPlayed - 1;
@@ -605,7 +605,7 @@ const simulateAITeamDay = (state: GameState, teamId: string) => {
           id: `ai_release_${Date.now()}_${player.id}`,
           date: state.world.currentDate,
           title: 'Jogador Dispensado pela IA',
-          message: `O ${team.name} dispensou ${player.nickname} devido a baixa satisfação.`,
+          message: `O ${team.name} dispensou ${player.nickname} devido a baixa satisfaÃ§Ã£o.`,
           type: 'transfer',
           read: false
         });
@@ -682,12 +682,12 @@ const processTrainingDay = (state: GameState) => {
             const cardTemplates: Record<string, Partial<TacticalCard>> = {
               'ataque': {
                 name: 'Ataque Total',
-                description: 'Aumenta o bônus ofensivo da equipe em 10%.',
+                description: 'Aumenta o bÃ´nus ofensivo da equipe em 10%.',
                 effect: 'Ataque +10%'
               },
               'defesa': {
                 name: 'Muralha',
-                description: 'Aumenta o bônus defensivo da equipe em 15%.',
+                description: 'Aumenta o bÃ´nus defensivo da equipe em 15%.',
                 effect: 'Defesa +15%'
               },
               'meio': {
@@ -716,8 +716,8 @@ const processTrainingDay = (state: GameState) => {
             state.notifications.unshift({
               id: `n_${Date.now()}_card_lab`,
               date: state.world.currentDate,
-              title: 'Laboratório de Cartas',
-              message: `A pesquisa da carta "${newCard.name}" foi concluída e adicionada ao seu inventário!`,
+              title: 'LaboratÃ³rio de Cartas',
+              message: `A pesquisa da carta "${newCard.name}" foi concluÃ­da e adicionada ao seu inventÃ¡rio!`,
               type: 'success',
               read: false
             });
@@ -820,7 +820,7 @@ const processMatchDay = (state: GameState, round: number) => {
               if (p) {
                 p.achievements.push({
                   season: world.currentSeason || 2050,
-                  title: `Campeão da Liga ${league.name}`,
+                  title: `CampeÃ£o da Liga ${league.name}`,
                   type: 'Clube'
                 });
               }
@@ -834,7 +834,7 @@ const processMatchDay = (state: GameState, round: number) => {
               m.career.totalLeagueTitles += 1;
               m.achievements.push({
                 season: world.currentSeason || 2050,
-                title: `Campeão da Liga ${league.name}`,
+                title: `CampeÃ£o da Liga ${league.name}`,
                 type: 'Clube'
               });
 
@@ -845,7 +845,7 @@ const processMatchDay = (state: GameState, round: number) => {
                   world.news.unshift({
                     id: `n_${Date.now()}_era_zee`,
                     title: `A ERA ${m.name.toUpperCase()}!`,
-                    content: `O manager alcança o status de Lenda após o tricampeonato consecutivo.`,
+                    content: `O manager alcanÃ§a o status de Lenda apÃ³s o tricampeonato consecutivo.`,
                     type: 'CHAMPION',
                     date: world.currentDate,
                     importance: 3
@@ -982,7 +982,7 @@ const processMatchDay = (state: GameState, round: number) => {
         if (p) {
           p.achievements.push({
             season: world.currentSeason || 2050,
-            title: 'Campeão da Copa Elite',
+            title: 'CampeÃ£o da Copa Elite',
             type: 'Clube'
           });
         }
@@ -996,7 +996,7 @@ const processMatchDay = (state: GameState, round: number) => {
         m.career.totalCupTitles += 1;
         m.achievements.push({
           season: world.currentSeason || 2050,
-          title: 'Campeão da Copa Elite',
+          title: 'CampeÃ£o da Copa Elite',
           type: 'Clube'
         });
       }
@@ -1004,7 +1004,7 @@ const processMatchDay = (state: GameState, round: number) => {
       state.notifications.unshift({
         id: `n_${Date.now()}_elite_winner`,
         date: world.currentDate,
-        title: 'Campeão da Copa Elite!',
+        title: 'CampeÃ£o da Copa Elite!',
         message: `${winnerTeam.name} conquistou a Copa Elite em uma final emocionante!`,
         type: 'success',
         read: false
@@ -1093,8 +1093,8 @@ const processMatchDay = (state: GameState, round: number) => {
       state.notifications.unshift({
         id: `n_${Date.now()}_district_winner`,
         date: world.currentDate,
-        title: 'Campeão dos Distritos!',
-        message: `${winnerTeam.name} venceu a Copa dos Distritos e unificou a região!`,
+        title: 'CampeÃ£o dos Distritos!',
+        message: `${winnerTeam.name} venceu a Copa dos Distritos e unificou a regiÃ£o!`,
         type: 'success',
         read: false
       });
@@ -1122,7 +1122,7 @@ const processEndOfDayChecks = (state: GameState, dayNumber: number) => {
           state.notifications.unshift({
             id: `n_${Date.now()}_cure_${player.id}`,
             date: state.world.currentDate,
-            title: 'Cura Concluída',
+            title: 'Cura ConcluÃ­da',
             message: `${player.nickname} superou seu fardo e agora tem o DNA limpo!`,
             type: 'success',
             read: false
@@ -1132,7 +1132,7 @@ const processEndOfDayChecks = (state: GameState, dayNumber: number) => {
           state.notifications.unshift({
             id: `n_${Date.now()}_learn_${player.id}`,
             date: state.world.currentDate,
-            title: 'DNA Evoluído',
+            title: 'DNA EvoluÃ­do',
             message: `${player.nickname} aprendeu o trait [${trait}] em seu slot de legado!`,
             type: 'success',
             read: false
@@ -1202,152 +1202,89 @@ export const cancelDraftProposal = (state: GameState, managerId: string, playerI
 };
 
 export const resolveDraftConflict = (state: GameState) => {
-  const proposals = state.world.draftProposals || [];
-  if (proposals.length === 0) return;
-
-  const playerProposals: Record<string, typeof proposals> = {};
-  proposals.forEach(p => {
-    if (!playerProposals[p.playerId]) playerProposals[p.playerId] = [];
-    playerProposals[p.playerId].push(p);
-  });
-
-  Object.keys(playerProposals).forEach(playerId => {
-    const props = playerProposals[playerId];
-    let bestProposal = props[0];
-    let maxAttractiveness = -1;
-
-    props.forEach(p => {
-      const manager = state.managers[p.managerId];
-      const team = state.teams[p.teamId];
-      if (!manager || !team) return;
-
-      const managerRating = 500 + (manager.reputation * 10);
-      const vagasDisponiveis = Math.max(0, SQUAD_SIZE_MAX - team.squad.length);
-      const attractiveness = (managerRating * 0.7) + (vagasDisponiveis * 40 * 0.3); // Reduced vacancy weight, removed extra scale
-
-      if (attractiveness > maxAttractiveness) {
-        maxAttractiveness = attractiveness;
-        bestProposal = p;
-      }
-    });
-
-    if (bestProposal) {
-      const player = state.players[bestProposal.playerId];
-      const team = state.teams[bestProposal.teamId];
-      if (player && team) {
-        player.contract.teamId = team.id;
-        if (!team.squad.includes(player.id)) {
-          team.squad.push(player.id);
-        }
-        console.log(`DRAFT: Player ${player.nickname} joined ${team.name}`);
+  try {
+    if (!state?.world?.draftProposals || state.world.draftProposals.length === 0) return;
+    const world = state.world;
+    const proposals = world.draftProposals;
+    const playerMap = {};
+    for (const p of proposals) {
+      if (p?.playerId) {
+        if (!playerMap[p.playerId]) playerMap[p.playerId] = [];
+        playerMap[p.playerId].push(p);
       }
     }
-  });
-
-  state.world.draftProposals = []; // Limpa para o próximo dia
-  if (state.lastHeadline) {
-    state.lastHeadline = {
-      title: `DRAFT DIA ${state.world.currentDay - 1} CONCLUÍDO`,
-      message: "A Inteligência Artificial resolveu as disputas pelas contratações na calada da noite."
-    };
-  }
+    for (const playerId of Object.keys(playerMap)) {
+      const list = playerMap[playerId];
+      let best = list[0];
+      let maxAttr = -1;
+      for (const prop of list) {
+        if (!prop?.managerId || !prop?.teamId) continue;
+        const m = state.managers[prop.managerId];
+        const t = state.teams[prop.teamId];
+        if (!m || !t) continue;
+        const isHuman = !m.isNPC;
+        const rep = m?.reputation || 50;
+        const squadSize = t.squad?.length || 0;
+        const attr = (rep * 10) + ((15 - squadSize) * 20) + (isHuman ? 10000 : 0);
+        if (attr > maxAttr) {
+          maxAttr = attr;
+          best = prop;
+        }
+      }
+      if (best) {
+        const pObj = state.players[best.playerId];
+        const tObj = state.teams[best.teamId];
+        if (pObj && tObj) {
+          pObj.contract.teamId = tObj.id;
+          if (!tObj.squad) tObj.squad = [];
+          if (!tObj.squad.includes(pObj.id)) tObj.squad.push(pObj.id);
+        }
+      }
+    }
+    world.draftProposals = [];
+  } catch (e) { }
 };
 
 export const autoCompleteDraft = (state: GameState) => {
-  const teamsNeedingPlayers = Object.values(state.teams).filter(t => t.id.startsWith('t_') && t.squad.length < SQUAD_SIZE_MAX);
-  if (teamsNeedingPlayers.length === 0) return;
+  const teams = Object.values(state.teams).filter(t => t.id.startsWith('t_'));
+  const allFreeAgents = Object.values(state.players)
+    .filter(p => !p.contract.teamId && p.district !== 'EXILADO')
+    .sort((a, b) => b.totalRating - a.totalRating);
 
-  const freeAgents = Object.values(state.players).filter(p => !p.contract.teamId);
+  if (allFreeAgents.length === 0) return;
 
-  // Sort free agents by rating descending
-  freeAgents.sort((a, b) => b.totalRating - a.totalRating);
+  // Phase 1: Ensure Legendary Players (>850) are contracted
+  const legendaries = allFreeAgents.filter(p => p.totalRating >= 850);
 
-  teamsNeedingPlayers.forEach(team => {
-    while (team.squad.length < SQUAD_SIZE_MAX) {
-      // Analyze current roles in squad
-      const rolesCount: Record<string, number> = { GOL: 0, ZAG: 0, MEI: 0, ATA: 0 };
-      const currentPower = team.squad.reduce((sum, id) => sum + (state.players[id]?.totalRating || 0), 0);
+  legendaries.forEach(p => {
+    const targetTeam = teams
+      .filter(t => t.squad.length < SQUAD_SIZE_MAX)
+      .sort((a, b) => (a.powerCap || 0) - (b.powerCap || 0))[0];
 
-      team.squad.forEach(pid => {
-        const p = state.players[pid];
-        if (p) rolesCount[p.role]++;
-      });
-
-      // Determine the most needed role
-      const targets = [
-        { role: 'GOL', min: 1, current: rolesCount.GOL },
-        { role: 'ZAG', min: 4, current: rolesCount.ZAG },
-        { role: 'MEI', min: 4, current: rolesCount.MEI },
-        { role: 'ATA', min: 2, current: rolesCount.ATA }
-      ];
-
-      // Find a role that is below its minimum requirement
-      let neededRole = (targets.find(t => t.current < t.min)?.role) as PlayerRole | undefined;
-
-      // Search for the best player for that role that fits the cap
-      let playerIndex = -1;
-      if (neededRole) {
-        playerIndex = freeAgents.findIndex(p => p.role === neededRole && (currentPower + p.totalRating <= (team.powerCap || 15000)));
-      }
-
-      // If no player fits for specifically needed role, try ANY role that fits
-      if (playerIndex === -1) {
-        playerIndex = freeAgents.findIndex(p => currentPower + p.totalRating <= (team.powerCap || 15000));
-      }
-
-      if (playerIndex !== -1) {
-        const player = freeAgents.splice(playerIndex, 1)[0];
-        if (player) {
-          player.contract.teamId = team.id;
-          team.squad.push(player.id);
-          console.log(`DRAFT AUTO-FILL: Agent ${player.nickname} joined ${team.name} as ${player.role}`);
-        }
-      } else {
-        // Fallback: Generate a "Base Recruit" if no free agent fits or exists
-        const fallbackRole = neededRole || 'ZAG';
-        const newPlayerId = `p_jr_${team.id}_${fallbackRole}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-        const recruitRating = 350 + Math.random() * 150; // Recruits are 350-500
-        const recruit = generatePlayer(newPlayerId, team.district, recruitRating, fallbackRole);
-        recruit.contract.teamId = team.id;
-        state.players[newPlayerId] = recruit;
-        team.squad.push(newPlayerId);
-        console.log(`DRAFT AUTO-FILL: Generated Recruit ${recruit.nickname} for ${team.name} as ${fallbackRole}`);
-      }
+    if (targetTeam) {
+      p.contract.teamId = targetTeam.id;
+      targetTeam.squad.push(p.id);
     }
   });
 
-  // FINAL RECRUITMENT: Ensure any remaining Legendary players (Rating > 850) are contracted
-  const remainingLegendsItems = Object.values(state.players).filter(p => !p.contract.teamId && p.totalRating >= 850);
-  if (remainingLegendsItems.length > 0) {
-    const allTeamsList = Object.values(state.teams).filter(t => t.id.startsWith('t_'));
-    remainingLegendsItems.forEach(legend => {
-      // Find team with lowest power that has space OR can swap its weakest player
-      allTeamsList.sort((a, b) => calculateTeamPower(a, state.players) - calculateTeamPower(b, state.players));
-      for (const team of allTeamsList) {
-        if (team.squad.length < SQUAD_SIZE_MAX) {
-          legend.contract.teamId = team.id;
-          team.squad.push(legend.id);
-          break;
-        } else {
-          // Find weakest player to swap
-          const squadPlayersList = team.squad.map(id => state.players[id]).filter(Boolean).sort((a, b) => a.totalRating - b.totalRating);
-          const weakestOne = squadPlayersList[0];
-          if (weakestOne && weakestOne.totalRating < legend.totalRating) {
-            // Swap!
-            team.squad = team.squad.filter(id => id !== weakestOne.id);
-            weakestOne.contract.teamId = null;
-            legend.contract.teamId = team.id;
-            team.squad.push(legend.id);
-            console.log(`DRAFT LEGEND SWAP: ${legend.nickname} replaced ${weakestOne.nickname} in ${team.name}`);
-            break;
-          }
-        }
-      }
-    });
-  }
+  // Phase 2: Fill remaining slots for all teams to reach SQUAD_SIZE_MAX
+  const remainingFreeAgents = Object.values(state.players)
+    .filter(p => !p.contract.teamId && p.district !== 'EXILADO')
+    .sort((a, b) => b.totalRating - a.totalRating);
+
+  teams.forEach(team => {
+    while (team.squad.length < SQUAD_SIZE_MAX && remainingFreeAgents.length > 0) {
+      const p = remainingFreeAgents.shift()!;
+      p.contract.teamId = team.id;
+      team.squad.push(p.id);
+    }
+  });
 
   if (state.lastHeadline) {
-    state.lastHeadline = { title: "ELENCOS FECHADOS", message: "A Liga realizou o preenchimento automático. Todos os times possuem elencos equilibrados para a estreia!" };
+    state.lastHeadline = {
+      title: "ELENCOS FECHADOS",
+      message: "A Liga realizou o preenchimento automático. Todos os times possuem elencos equilibrados para a estreia!"
+    };
   }
 };
 
@@ -1373,7 +1310,7 @@ export const advanceGameDay = (prevState: GameState, skipDateIncrement = false):
 
     // Time Machine: Increment currentDay
     world.currentDay = (world.currentDay || 0) + 1;
-    console.log(`>>> MÁQUINA DO TEMPO: Avançando para o Dia ${world.currentDay} <<<`);
+    console.log(`>>> MÃQUINA DO TEMPO: AvanÃ§ando para o Dia ${world.currentDay} <<<`);
 
     // Sync seasonStartReal if it's Day 0/1 to ensure matches align
     if (!world.seasonStartReal || new Date(world.currentDate) < new Date(world.seasonStartReal)) {
@@ -1517,7 +1454,7 @@ export const startNewSeason = (state: GameState): GameState => {
     },
     lastHeadline: {
       title: `Temporada ${nextSeason} Iniciada`,
-      message: `Bem-vindos ao ano de ${nextSeason}. As lendas do passado agora enfrentam novos desafios. Traços técnicos foram recalibrados.`
+      message: `Bem-vindos ao ano de ${nextSeason}. As lendas do passado agora enfrentam novos desafios. TraÃ§os tÃ©cnicos foram recalibrados.`
     }
   };
 

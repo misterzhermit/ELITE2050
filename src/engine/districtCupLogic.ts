@@ -9,7 +9,9 @@ export const selectDistrictCupManagers = (state: GameState): Record<District, st
     const humanManagers = activeManagers.filter(m => m.id === state.userManagerId || true); // In multiplayer, check real user IDs
 
     // For this prototype, we'll take top 4 by reputation if available
-    const sorted = [...activeManagers].sort((a, b) => b.reputation - a.reputation);
+    const sorted = activeManagers
+        .filter(m => m && typeof m.reputation === 'number')
+        .sort((a, b) => (b.reputation || 0) - (a.reputation || 0));
     const selected = sorted.slice(0, 4);
 
     const mapping: Partial<Record<District, string>> = {};

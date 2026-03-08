@@ -148,6 +148,7 @@ export interface Manager {
     negotiation: number;
     scout: number;
   };
+  isNPC?: boolean;
   career: {
     titlesWon: number;
     totalLeagueTitles: number;

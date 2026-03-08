@@ -1,0 +1,56 @@
+export const resolveDraftConflict = (state: GameState) => {
+  const proposals = state.world.draftProposals || [];
+  if (proposals.length === 0) return;
+
+  const playerProposals: Record<string, typeof proposals> = {};
+  proposals.forEach(p => {
+    if (!playerProposals[p.playerId]) playerProposals[p.playerId] = [];
+    playerProposals[p.playerId].push(p);
+  });
+
+  Object.keys(playerProposals).forEach(playerId => {
+    const props = playerProposals[playerId];
+    const humanProps = props.filter(p => !state.managers[p.managerId]?.isNPC);
+    const useProps = humanProps.length > 0 ? humanProps : props;
+
+    let bestProposal = useProps[0];
+    let maxAttractiveness = -1;
+
+    useProps.forEach(p => {
+      const manager = state.managers[p.managerId];
+      const team = state.teams[p.teamId];
+
+      if (!manager || !team) {
+        return;
+      }
+
+      const managerRating = 500 + ((manager?.reputation ?? 50) * 10);
+      const vagasDisponiveis = Math.max(0, SQUAD_SIZE_MAX - team.squad.length);
+      const attractiveness = (managerRating * 0.7) + (vagasDisponiveis * 40 * 0.3);
+
+      if (attractiveness > maxAttractiveness) {
+        maxAttractiveness = attractiveness;
+        bestProposal = p;
+      }
+    });
+
+    if (bestProposal) {
+      const player = state.players[bestProposal.playerId];
+      const team = state.teams[bestProposal.teamId];
+      if (player && team) {
+        player.contract.teamId = team.id;
+        if (!team.squad.includes(player.id)) {
+          team.squad.push(player.id);
+        }
+      }
+    }
+  });
+
+  state.world.draftProposals = [];
+  if (state.lastHeadline) {
+    state.lastHeadline = {
+      title: `DRAFT DIA ${state.world.currentDay} CONCLUÍDO`,
+      message: "A Inteligência Artificial resolveu as disputas pelas contratações na calada da noite."
+    };
+  }
+};

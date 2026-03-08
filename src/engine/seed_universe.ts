@@ -3,6 +3,9 @@ import { regenerateDNA } from './generator';
 
 // --- Seeded Random Engine (Internal for Seeding) ---
 let _seed = 1234567;
+export const resetSeed = () => {
+    _seed = 1234567;
+};
 const mulberry32 = (a: number) => {
     return () => {
         let t = a += 0x6D2B79F5;
@@ -49,7 +52,7 @@ const generatePlayer = (tier: keyof typeof TIERS | 'EXILED', id?: string): Playe
     const name = nickname + ' ' + LAST_NAMES[Math.floor(rand() * LAST_NAMES.length)];
 
     const player: Player = {
-        id: id || crypto.randomUUID(),
+        id: id || Math.random().toString(36).substring(2, 11),
         name,
         nickname,
         district: isExiled ? 'EXILADO' : (['NORTE', 'SUL', 'LESTE', 'OESTE'][Math.floor(rand() * 4)] as District),
